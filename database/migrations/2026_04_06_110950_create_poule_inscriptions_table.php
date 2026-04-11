@@ -30,7 +30,6 @@ return new class extends Migration
 
             $table->unique(['poule_id', 'inscription_id']);
             //primary 
-            $table->primary(['poule_id', 'inscription_id']);
             $table->timestamps();
         });
     }
