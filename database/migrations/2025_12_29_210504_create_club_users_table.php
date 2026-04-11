@@ -18,7 +18,7 @@ return new class extends Migration
             $table->timestamps();
             $table->index('club_id');
             $table->index('role_id');
-
+            $table->primary(['user_id', 'club_id']);
             $table->unique(['user_id', 'club_id'], 'user_club_unique');
         });
     }

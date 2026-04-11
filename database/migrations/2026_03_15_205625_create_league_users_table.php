@@ -15,7 +15,7 @@ return new class extends Migration
             $table->foreignUuid('league_id')->constrained('leagues')->cascadeOnDelete();
             $table->foreignUuid('user_id')->constrained('users')->cascadeOnDelete();
             $table->foreignUuid('role_id')->constrained('roles')->cascadeOnDelete();
-
+            $table->primary(['user_id', 'league_id']);
             $table->timestamps();
         });
     }

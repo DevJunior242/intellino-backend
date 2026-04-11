@@ -19,6 +19,8 @@ return new class extends Migration
             $table->date('awarded_at');
             $table->string('instructor_id');
             $table->boolean('is_current')->default(false);
+            //primary 
+            $table->primary(['student_id', 'current_grade_id']);
             $table->timestamps();
         });
     }
