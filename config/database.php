@@ -42,6 +42,7 @@ return [
             'synchronous' => null,
             'transaction_mode' => 'DEFERRED',
         ],
+
         'mysql' => [
             'driver' => 'mysql',
             'url' => env('DB_URL'),
@@ -61,6 +62,7 @@ return [
                 PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT => false,
             ]) : [],
         ],
+
         'mariadb' => [
             'driver' => 'mariadb',
             'url' => env('DB_URL'),
