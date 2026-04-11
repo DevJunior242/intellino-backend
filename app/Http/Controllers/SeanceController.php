@@ -1,0 +1,394 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Note;
+use App\Models\Competition;
+use App\Models\Inscription;
+use App\Models\OrdrePassage;
+use Illuminate\Http\Request;
+use App\Models\ConfigNotation;
+use App\Models\JugeCompetition;
+use App\Models\RotationArbitre;
+use Illuminate\Validation\Rule;
+use App\Services\BracketService;
+use App\Models\ArbitreCompetition;
+use App\Http\Controllers\Controller;
+use App\Services\RotationArbitreService;
+
+class SeanceController extends Controller
+{
+    public function __construct(
+        private RotationArbitreService $rotationService
+    ) {}
+
+    // Appelé quand admin valide la config
+    // Lance la rotation initiale
+    public function valider(ConfigNotation $config)
+    {
+        $problemes = $config->estPrete();
+        if (!empty($problemes)) {
+            return response()->json([
+                'success'   => false,
+                'problemes' => $problemes,
+            ], 422);
+        }
+
+        $config->update([
+            'configuration_validee' => true,
+            'validee_a'             => now(),
+        ]);
+
+        if ($config->estKumite()) {
+            // Générer le tableau de combats
+            app(BracketService::class)->generer($config);
+        }
+        // Générer les PIN si mode tablettes
+        if ($config->estModeTablettes()) {
+            $evenementId = $config->competition->evenement_id;
+
+            \App\Jobs\SendArbitreAccessCodes::dispatch($evenementId);
+        }
+
+        // Générer PIN arbitres
+        // load competition
+        $config->load('competition');
+        $evenementId = $config->competition->evenement_id;
+        ArbitreCompetition::where('evenement_id', $evenementId)
+            ->whereNull('code_acces')
+            ->each(fn($a) => $a->update([
+                'code_acces' => str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT)
+            ]));
+
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Séance ouverte',
+            //'etat'    => $this->rotationService->etat($config),
+        ]);
+    }
+    public function lancerSeance(ConfigNotation $config)
+    {
+        // Mode tablettes — vérifier que tous les arbitres actifs sont connectés
+        if ($config->estModeTablettes()) {
+
+            $problemes = $config->estPretePourSaisie();
+            if (!empty($problemes)) {
+                return response()->json([
+                    'success'   => false,
+                    'problemes' => $problemes,
+                ], 422);
+            }
+        }
+
+
+
+        //exist en cours athlete
+        $existAthlete = OrdrePassage::where('config_notation_id', $config->id)
+            ->where('statut', 'en_cours')
+            ->first();
+
+        // Premier athlète en cours
+        if (!$existAthlete) {
+            $premier = OrdrePassage::where('config_notation_id', $config->id)
+                ->where('statut', 'en_attente')
+                ->orderBy('ordre')
+                ->first();
+
+            if (!$premier) {
+                return response()->json([
+                    'success' => false,
+                    'problemes' => ['Aucun athlète en attente'],
+                ], 422);
+            }
+            $premier->update(['statut' => 'en_cours']);
+            //passer de config a inscription pourr recuperer athlete
+            $premier->load(['inscription.athlete']);
+            $monAthle = $premier->inscription->athlete->fullname ?? "Aucun athlète";
+            return response()->json([
+                'success' => true,
+                'message' => "Séance lancée pour {$monAthle}",
+                'enCours' => $existAthlete ? $existAthlete->load('athlete') : null,
+            ], 201);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'La séance a déjà été lancée pour cet athlète',
+            'enCours' => $existAthlete->load('athlete'),
+        ], 200);
+    }
+    // Appelé quand athlète suivant passe
+    public function athleteSuivant(ConfigNotation $config)
+    {
+        // Marquer l'athlète en cours comme terminé
+        $passageActuel = OrdrePassage::where('config_notation_id', $config->id)
+            ->where('statut', 'en_cours')
+            ->with('notes')
+            ->first();
+
+        if ($passageActuel) {
+            $valeursNotes = $passageActuel->notes->pluck('valeur')->map(fn($v) => (float)$v)->toArray();
+
+            $scoreFinal = $this->calculerScore($valeursNotes, $config->getNbJuges());
+            $passageActuel->update(['statut' => 'termine', 'score_final' => $scoreFinal]);
+        }
+        // Faire tourner les arbitres
+        //$this->rotationService->tourner($config);
+
+        // Passer l'athlète suivant en cours
+        $suivant = OrdrePassage::where('config_notation_id', $config->id)
+            ->where('statut', 'en_attente')
+            ->orderBy('ordre')
+            ->first();
+
+        if ($suivant) {
+            $suivant->update(['statut' => 'en_cours']);
+        }
+
+        return response()->json([
+            'success' => true,
+            'suivant' => $suivant,
+            'etat'    => $this->rotationService->etat($config),
+        ]);
+    }
+
+
+    // État actuel pour l'affichage admin / tablettes
+    public function etat(ConfigNotation $config)
+    {
+        return response()->json([
+            'success' => true,
+            'etat'    => $this->rotationService->etat($config),
+            'enCours' => Inscription::where('competition_id', $config->competition_id)
+                ->where('statut', 'en_cours')
+                ->with('athlete')
+                ->first(),
+        ]);
+    }
+
+
+    public function connecterTablette(Request $request, ConfigNotation $config)
+    {
+        $validated = $request->validate([
+            'code_acces' => 'required|string|size:6',
+        ]);
+
+
+        // Trouver l'arbitre via son PIN personnel
+        // Load competition
+        $config->load('competition');
+        $arbitre = ArbitreCompetition::where('evenement_id', $config->competition->evenement_id)
+
+            ->where('user_id', auth()->id())
+            ->where('code_acces', $validated['code_acces'])
+            ->with('user')
+            ->first();
+
+        if (!$arbitre) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Code d\'accès incorrect',
+            ], 400);
+        }
+
+        // 2. Vérifier sa présence dans la rotation de CETTE config
+        $rotation = RotationArbitre::where('config_notation_id', $config->id)
+            ->where('arbitre_competition_id', $arbitre->id)
+            ->first();
+
+        // Cas A : Il n'est même pas prévu sur ce tatami
+        if (!$rotation) {
+            return response()->json(['success' => false, 'message' => 'Vous n\'êtes pas affecté à ce plateau'], 403);
+        }
+
+        // Cas B : Il est sur le tatami mais au repos (Banc / Poste null)
+        if (!$rotation->actif || is_null($rotation->poste)) {
+            if (!$rotation->est_superviseur) {
+                return response()->json(['success' => false, 'message' => 'En attente d\'affectation à un poste...'], 422);
+            }
+        }
+        // 3. Update du statut de connexion
+        $arbitre->update(['connecte' => true]);
+
+        return response()->json([
+            'success' => true,
+            'message' => "Connecté au poste {$rotation->poste}",
+            'poste'   => $rotation->poste,
+            'nom'     => $arbitre->user->fullname,
+            'superviseur' => $rotation->est_superviseur,
+        ]);
+    }
+
+    public function estPret(ConfigNotation $config)
+    {
+        $problemes = $config->estPretePourSaisie();
+
+        return response()->json([
+            'pret'      => empty($problemes),
+            'problemes' => $problemes,
+        ]);
+    }
+
+    public function enCours(ConfigNotation $config)
+    {
+        $enCours = OrdrePassage::where('config_notation_id', $config->id)
+            ->where('statut', 'en_cours')
+            ->with([
+                'inscription.athlete',
+                'inscription.competition.category'
+
+            ])
+            ->first();
+
+        return response()->json([
+            'success' => true,
+            'enCours' => $enCours,
+        ]);
+    }
+
+
+    // Retourner les arbitres de la rotation pour ce tatami
+    public function arbitresRotation(ConfigNotation $config)
+    {
+        $arbitres = RotationArbitre::where('config_notation_id', $config->id)
+            ->with('arbitreCompetition.user:id,fullname')
+            ->orderBy('ordre')
+            ->get()
+            ->map(fn($r) => [
+                'id'                     => $r->id,
+                'arbitre_competition_id' => $r->arbitre_competition_id,
+                'nom'                    => $r->arbitreCompetition->user->fullname,
+                'poste'                  => $r->poste,
+                'actif'                  => $r->actif,
+                'est_superviseur'        => $r->est_superviseur,
+                'nb_passages'            => $r->nb_passages,
+            ]);
+
+        $superviseur = $arbitres->firstWhere('est_superviseur', true);
+
+        return response()->json([
+            'success'     => true,
+            'arbitres'    => $arbitres,
+            'superviseur' => $superviseur,
+        ]);
+    }
+
+    // Désigner superviseur
+    public function designerSuperviseur(Request $request, ConfigNotation $config)
+    {
+        $validated = $request->validate([
+            'arbitre_competition_id' => [
+                'required',
+                Rule::exists('rotation_arbitres', 'arbitre_competition_id')
+                    ->where('competition_id', $config->competition_id),
+            ],
+        ]);
+
+        // Retirer ancien superviseur
+        RotationArbitre::where('competition_id', $config->competition_id)
+            ->update(['est_superviseur' => false]);
+
+        // Désigner nouveau
+        RotationArbitre::where('competition_id', $config->competition_id)
+            ->where('arbitre_competition_id', $validated['arbitre_competition_id'])
+            ->update(['est_superviseur' => true]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Superviseur désigné avec succès',
+        ]);
+    }
+
+
+
+
+    // Controller
+    public function vuePublique(ConfigNotation $config)
+    {
+        $enCours = OrdrePassage::where('config_notation_id', $config->id)
+            ->where('statut', 'en_cours')
+            ->with([
+                'inscription.athlete',
+                'inscription.club',
+                'inscription.competition.category',
+                'inscription.competition.evenement',
+                'inscription.kata'
+            ])
+            ->first();
+
+        $notes = [];
+        $score = null;
+
+        if ($enCours) {
+            $notesData = Note::where('ordre_passage_id', $enCours->id)
+                ->with([
+                    'rotationArbitre.arbitreCompetition.user:id,fullname',
+                    'ordrePassage.inscription.athlete:id,fullname'
+                ])
+                ->get()
+                ->map(fn($n) => [
+                    'valeur' => (float) $n->valeur,
+                    'poste'   => $n->rotationArbitre?->poste ?? "Inconnu",
+                    'arbitre' => $n->rotationArbitre?->arbitreCompetition?->user?->fullname ?? "Inconnu",
+                ])
+                ->sortBy('poste')
+                ->values();
+
+            $notes = $notesData;
+
+            if ($notesData->count() === $config->getNbJuges()) {
+                $valeurs  = $notesData->pluck('valeur')->toArray();
+                $score    = $this->calculerScore($valeurs, $config->getNbJuges());
+            }
+        }
+
+        // Classement provisoire
+        $classement = OrdrePassage::where('config_notation_id', $config->id)
+            ->where('statut', 'termine')
+            ->with(['inscription.athlete', 'inscription.club'])
+            ->get()
+            ->map(function ($passage) use ($config) {
+                $valeurs = Note::where('ordre_passage_id', $passage->id)
+                    ->pluck('valeur')
+                    ->map(fn($v) => (float) $v)
+                    ->toArray();
+                return [
+                    'athlete' => $passage->inscription?->athlete?->fullname ?? '—',
+                    'club'    => $passage->inscription?->club?->name ?? '—',
+                    'score'   => $this->calculerScore($valeurs, $config->getNbJuges()) ?? null,
+                ];
+            })
+            ->filter(fn($item) => $item['score'] !== null)
+            ->sortByDesc('score')
+            ->values();
+        return response()->json([
+            'success'    => true,
+            'config'     => [
+                'id'          => $config->id,
+                'competition' => $config->competition->nom ?? 'Compétition',
+                'nb_juges'    => $config->getNbJuges(),
+            ],
+            'enCours'    => $enCours,
+            'notes'      => $notes,
+            'score'      => $score ?? null,
+            'classement' => $classement,
+        ]);
+    }
+
+
+    private function calculerScore(array $valeurs, int $nbJugesAttendus): ?float
+    {
+        // On ne calcule que si TOUS les juges ont noté
+        if (count($valeurs) < $nbJugesAttendus) return null;
+
+        sort($valeurs);
+
+
+        $nbAEnlever = ($nbJugesAttendus === 7) ? 2 : 1;
+
+        $retenues = array_slice($valeurs, $nbAEnlever, count($valeurs) - ($nbAEnlever * 2));
+
+        return (float) array_sum($retenues);
+    }
+}
