@@ -52,9 +52,9 @@ return [
     |
     */
 
-    'url' => env('APP_URL', 'http://localhost'),
+    'url' => env('APP_URL', 'https://intellino-frontend-lxzzz7sqv-devcodeur.vercel.app'),
     // config/app.php
-    'frontend_url' => env('FRONTEND_URL', 'http://localhost:5173'),
+    'frontend_url' => env('FRONTEND_URL', 'https://intellino-frontend-lxzzz7sqv-devcodeur.vercel.app'),
 
     /*
     |--------------------------------------------------------------------------

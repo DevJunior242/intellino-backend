@@ -19,7 +19,7 @@ return [
 
     'allowed_methods' => ['*'],
 
-    'allowed_origins' => ['https://intellino-frontend-qb45m86f7-devcodeur.vercel.app'],
+    'allowed_origins' => ['https://intellino-frontend-lxzzz7sqv-devcodeur.vercel.app'],
 
     'allowed_origins_patterns' => [],
 
