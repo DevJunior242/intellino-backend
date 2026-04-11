@@ -42,7 +42,6 @@ return [
             'synchronous' => null,
             'transaction_mode' => 'DEFERRED',
         ],
-
         'mysql' => [
             'driver' => 'mysql',
             'url' => env('DB_URL'),
