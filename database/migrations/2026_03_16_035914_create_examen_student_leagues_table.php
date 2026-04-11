@@ -16,6 +16,7 @@ return new class extends Migration
             $table->foreignUuid('student_id')->constrained('students')->cascadeOnDelete();
             $table->decimal('average', 5, 2)->nullable();
             $table->boolean('passed')->default(false);
+            $table->primary(['examen_league_id', 'student_id']);
             $table->timestamps();
         });
     }
