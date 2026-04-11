@@ -24,12 +24,12 @@ class RegisterRequest extends FormRequest
         return [
             'club_id' => ['nullable', 'exists:clubs,id'],
             'fullname' => ['bail', 'required', 'regex:/^[\pL\s\d\-]+$/u', 'max:50'],
-            'phone' => [
-                'bail',
-                'required',
-                'regex:/^(\+226|00226)?(01|05|06|07)\d{6}$/',
-                'unique:users,phone'
-            ],
+          'phone' => [
+    'bail',
+    'required',
+    'regex:/^(\+226|00226)?(01|06|07|70|71|77|78)\d{6}$/',
+    'unique:users,phone'
+],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users'],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
         ];
