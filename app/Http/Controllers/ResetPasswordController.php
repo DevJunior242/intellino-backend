@@ -12,26 +12,44 @@ use Illuminate\Auth\Events\PasswordReset;
 class ResetPasswordController extends Controller
 {
     // 
-
     public function forgotPassword(Request $request)
     {
-
         $request->validate(['email' => 'required|email']);
 
-        $status = Password::sendResetLink(
-            $request->only('email')
-        );
+        try {
+            $status = Password::sendResetLink(
+                $request->only('email')
+            );
 
-        return $status === Password::ResetLinkSent
-            ? response()->json([
-                'success' => true,
-                'message' => __('passwords.sent')
-            ], 200)
-            :  response()->json([
+            return $status === Password::ResetLinkSent
+                ? response()->json(['success' => true, 'message' => 'Email envoyé !'], 200)
+                : response()->json(['success' => false, 'message' => 'Email introuvable'], 422);
+        } catch (\Exception $e) {
+            return response()->json([
                 'success' => false,
-                'message' => __('passwords.user')
-            ], 422);
+                'message' => 'Erreur SMTP: ' . $e->getMessage()
+            ], 500);
+        }
     }
+    // public function forgotPassword(Request $request)
+    // {
+
+    //     $request->validate(['email' => 'required|email']);
+
+    //     $status = Password::sendResetLink(
+    //         $request->only('email')
+    //     );
+
+    //     return $status === Password::ResetLinkSent
+    //         ? response()->json([
+    //             'success' => true,
+    //             'message' => __('passwords.sent')
+    //         ], 200)
+    //         :  response()->json([
+    //             'success' => false,
+    //             'message' => __('passwords.user')
+    //         ], 422);
+    // }
 
 
     public function sentToken(Request $request, string $token)
