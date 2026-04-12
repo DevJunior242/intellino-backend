@@ -17,17 +17,35 @@ class ResetPasswordController extends Controller
         $request->validate(['email' => 'required|email']);
 
         try {
+            Log::info('FORGOT PASSWORD START', [
+                'email' => $request->email
+            ]);
+
             $status = Password::sendResetLink(
                 $request->only('email')
             );
 
+            Log::info('FORGOT PASSWORD STATUS', [
+                'status' => $status
+            ]);
+
             return $status === Password::ResetLinkSent
-                ? response()->json(['success' => true, 'message' => 'Email envoyé !'], 200)
-                : response()->json(['success' => false, 'message' => 'Email introuvable'], 422);
-        } catch (\Exception $e) {
+                ? response()->json([
+                    'success' => true,
+                    'message' => 'Email envoyé !'
+                ], 200)
+                : response()->json([
+                    'success' => false,
+                    'message' => 'Email introuvable'
+                ], 422);
+        } catch (\Throwable $e) {
+            Log::error('FORGOT PASSWORD ERROR', [
+                'message' => $e->getMessage()
+            ]);
+
             return response()->json([
                 'success' => false,
-                'message' => 'Erreur SMTP: ' . $e->getMessage()
+                'message' => 'Erreur SMTP'
             ], 500);
         }
     }

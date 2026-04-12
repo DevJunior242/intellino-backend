@@ -77,6 +77,7 @@ class ClubController extends Controller
                ...$request->validated(),
                'logo' => isset($path) ? $path : null,
             ]);
+            Log::infos('club', [$club]);
             $user->update([
                'current_club_id' => $club->id,
             ]);
