@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Models\Grade;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use App\Http\Requests\storeGradeReq;
 use Illuminate\Database\QueryException;
@@ -16,7 +15,7 @@ class GradeController extends Controller
 
 
 
-        $grades = Grade::select('id', 'name');
+        $grades = Grade::select('id', 'name')->get();
 
         return response()->json([
             'message' => 'La liste des grades',
