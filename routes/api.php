@@ -151,7 +151,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::prefix('membres')->group(function () {
         Route::get('leagues/getRoles', [LeagueMemberController::class, 'getRoles']);
 
-        Route::apiResource('leagues', LeagueMemberController::class);
+        Route::apiResource('league', LeagueMemberController::class);
     });
 
     //affiliations
