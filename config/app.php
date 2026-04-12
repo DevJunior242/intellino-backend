@@ -52,9 +52,9 @@ return [
     |
     */
 
-    'url' => env('APP_URL', 'https://cozy-florentine-1c8fd9.netlify.app'),
+    'url' => env('APP_URL', 'https://intellino-app.netlify.app'),
     // config/app.php
-    'frontend_url' => env('FRONTEND_URL', 'https://cozy-florentine-1c8fd9.netlify.app'),
+    'frontend_url' => env('FRONTEND_URL', 'https://intellino-app.netlify.app'),
 
     /*
     |--------------------------------------------------------------------------
