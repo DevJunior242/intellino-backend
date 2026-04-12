@@ -15,6 +15,7 @@ class ResetPasswordController extends Controller
     // 
     public function forgotPassword(Request $request)
     {
+            Log::info('🔥 FORGOT PASSWORD HIT');
         $request->validate(['email' => 'required|email']);
 
         try {
