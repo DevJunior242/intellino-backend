@@ -11,14 +11,12 @@ use Illuminate\Database\QueryException;
 class GradeController extends Controller
 {
 
-    public function index(Request $request)
+    public function index()
     {
 
-        $user = auth()->user();
 
-        $clubId = $request->validated_club_id;
 
-        $grades = Grade::where('club_id', $clubId)->get();
+        $grades = Grade::select('id', 'name');
 
         return response()->json([
             'message' => 'La liste des grades',
@@ -30,7 +28,7 @@ class GradeController extends Controller
         try {
 
             $validated = $request->validated();
-             $clubId = $request->validated_club_id;
+            $clubId = $request->validated_club_id;
             Log::info('club_id', ['clubId' => $clubId]);
 
             $grade = \App\Models\Grade::create([
