@@ -15,7 +15,6 @@ class Grade extends Model
     protected $table = 'grades';
 
     protected $fillable = [
-        'club_id',
         'name',
         'description',
     ];
@@ -26,10 +25,7 @@ class Grade extends Model
     {
         return $this->hasMany(StudentGrade::class);
     }
-    public function club()
-    {
-        return $this->belongsTo(Club::class);
-    }
+
 
     public function examen()
     {
