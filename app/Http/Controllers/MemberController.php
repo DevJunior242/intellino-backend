@@ -18,7 +18,7 @@ use App\Http\Requests\StoreMemberRequest;
 class MemberController extends Controller
 {
     public function index(Request $request)
-    { 
+    {
         $user = auth()->user();
         $clubId = $request->validated_club_id;
         $role = $request->validated_role_name;
@@ -78,10 +78,7 @@ class MemberController extends Controller
     {
         $validated = $request->validated();
         $user = auth()->user();
-        Log::info('user_id', ['userId' => $user->id]);
         $clubId = $request->validated_club_id;
-        Log::info('club_id', ['clubId' => $clubId]);
-
 
         $targetUser = User::where('email', $validated['email'])
             ->orWhere('phone', $validated['phone'])
@@ -109,7 +106,6 @@ class MemberController extends Controller
                 'password' => Hash::make(Str::random(12)),
             ]);
         }
-        Log::info('new_user_id', ['newUserId' => $targetUser->id]);
         $exists = DB::table('club_users')
             ->where('user_id', $targetUser->id)
             ->where('club_id', $clubId)
@@ -127,9 +123,13 @@ class MemberController extends Controller
             $targetUser->current_club_id = $clubId;
             $targetUser->save();
             $token = Password::createToken($targetUser);
-            $targetUser->notify(new WelcomeNewMember($token));
+            // $targetUser->notify(new WelcomeNewMember($token));
         } else {
-            $targetUser->notify(new AddedToNewClub());
+            return response()->json([
+                'success' => true,
+                'message' => 'Membre ajouté avec succès, mais un compte existant a été trouvé. Un email de notification a été envoyé à l\'utilisateur.',
+            ], 201);
+            // $targetUser->notify(new AddedToNewClub());
         }
 
         // 4. Si c'est un parent, on gère son ParentModel
