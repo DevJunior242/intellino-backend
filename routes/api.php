@@ -283,6 +283,9 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::delete('inscriptions/{inscription}',               [InscriptionController::class, 'destroy']);
     //adin inscription index
     Route::get('/admin/inscriptions', [InscriptionController::class, 'index']);
+    //student grade 
+    Route::get('/grade', [GradeController::class, 'index']);
+
     Route::middleware('clubrole:instructeur,secretaire,admin_club,parent,karateka')->group(function () {
 
         //inscription 
@@ -318,8 +321,6 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::get('/dashboard/activity', [DashboardController::class, 'getDashboardActivity']);
         Route::get('/attendances/chart', [\App\Http\Controllers\AdminClubController::class, 'presence']);
 
-        //student grade 
-        Route::get('/grade', [GradeController::class, 'index']);
 
         Route::post('/grade/store', [GradeController::class, 'store']);
 
