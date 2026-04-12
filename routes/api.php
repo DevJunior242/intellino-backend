@@ -284,7 +284,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
     //adin inscription index
     Route::get('/admin/inscriptions', [InscriptionController::class, 'index']);
     //student grade 
-    Route::get('/grade', [GradeController::class, 'index']);
+    Route::get('grade', [GradeController::class, 'index']);
 
     Route::middleware('clubrole:instructeur,secretaire,admin_club,parent,karateka')->group(function () {
 
