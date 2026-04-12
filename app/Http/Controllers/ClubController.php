@@ -52,6 +52,8 @@ class ClubController extends Controller
 
       return response()->json($clubs);
    }
+
+
    public function store(ClubStoreRequest $request)
    {
       $user = auth()->user();
@@ -77,8 +79,7 @@ class ClubController extends Controller
                ...$request->validated(),
                'logo' => isset($path) ? $path : null,
             ]);
-            Log::infos('club', [$club]);
-            $user->update([
+             $user->update([
                'current_club_id' => $club->id,
             ]);
 
@@ -111,6 +112,7 @@ class ClubController extends Controller
          Log::error('erreur', ['erreur' => $th->getMessage()]);
          return response()->json([
             'success' => false,
+            'error'=>$th->getMessage(),
             'message' => 'Une erreur est survenue lors de la création du club',
          ], 400);
       }
