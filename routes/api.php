@@ -70,12 +70,8 @@ use App\Http\Controllers\NiveauxCompetitionController;
 
 Route::post('/register', [RegisterController::class, 'register']);
 Route::post('/login', [LoginController::class, 'login']);
-//forgot-password
-Route::post('/forgot-password', function () {
-    Log::info('DIRECT ROUTE HIT');
-    return response()->json(['ok' => true]);
-});
-// Route::post('/forgot-password', [ResetPasswordController::class, 'forgotPassword']);
+
+Route::post('/forgot-password', [ResetPasswordController::class, 'forgotPassword']);
 Route::get('/reset-password/{token}', [ResetPasswordController::class, 'sentToken'])
     ->middleware('guest')
     ->name('password.reset');
