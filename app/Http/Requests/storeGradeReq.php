@@ -22,7 +22,7 @@ class storeGradeReq extends FormRequest
     public function rules(): array
     {
         return [
-            'name' => ['bail', 'required',  'regex:/^[\pL\s\d\-]+$/u', 'max:50'],
+            'name' => ['bail', 'required', 'unique:grades,name', 'regex:/^[\pL\s\d\-]+$/u', 'max:50'],
             'description' => ['nullable', 'string', 'max:255'],
 
         ];

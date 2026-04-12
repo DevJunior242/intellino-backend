@@ -163,7 +163,7 @@ class StudentController extends Controller
                     }
                     //envoi de token 
                     $token = Password::createToken($studentUser);
-                    $studentUser->notify(new WelcomeNewMember($token));
+                    // $studentUser->notify(new WelcomeNewMember($token));
                 }
 
                 // LOGIQUE 2 : Création de la fiche élève  
@@ -185,7 +185,6 @@ class StudentController extends Controller
 
                 ]);
 
-                Log::info('student_parent_id', ['studentParentId' => $parentId]);
                 if ($parentId) {
                     $parent = ParentModel::find($parentId);
 
