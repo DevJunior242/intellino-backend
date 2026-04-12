@@ -19,7 +19,7 @@ class ResetPasswordController extends Controller
 
         try {
            
-
+ 
             $status = Password::sendResetLink(
                 $request->only('email')
             );
