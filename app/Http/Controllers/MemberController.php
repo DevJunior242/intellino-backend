@@ -19,11 +19,9 @@ class MemberController extends Controller
 {
     public function index(Request $request)
     {
-        $user = auth()->user();
         $clubId = $request->validated_club_id;
         $role = $request->validated_role_name;
 
-        // Vérification du Super Admin (via le rôle global de l'user)
         $isSuperAdmin = ($role === 'super_admin');
         if ($isSuperAdmin) {
             $query = User::with(['clubs' => function ($q) {
@@ -123,13 +121,13 @@ class MemberController extends Controller
             $targetUser->current_club_id = $clubId;
             $targetUser->save();
             $token = Password::createToken($targetUser);
-            // $targetUser->notify(new WelcomeNewMember($token));
+            $targetUser->notify(new WelcomeNewMember($token));
         } else {
             return response()->json([
                 'success' => true,
                 'message' => 'Membre ajouté avec succès, mais un compte existant a été trouvé. Un email de notification a été envoyé à l\'utilisateur.',
             ], 201);
-            // $targetUser->notify(new AddedToNewClub());
+            $targetUser->notify(new AddedToNewClub());
         }
 
         // 4. Si c'est un parent, on gère son ParentModel
