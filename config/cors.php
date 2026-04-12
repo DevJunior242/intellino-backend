@@ -19,7 +19,7 @@ return [
 
     'allowed_methods' => ['*'],
 
-    'allowed_origins' => ['https://intellino-frontend-zq3n.vercel.app'],
+    'allowed_origins' => ['https://cozy-florentine-1c8fd9.netlify.app'],
 
     'allowed_origins_patterns' => [],
 
