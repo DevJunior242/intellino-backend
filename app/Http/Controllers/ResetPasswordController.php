@@ -15,13 +15,10 @@ class ResetPasswordController extends Controller
     // 
     public function forgotPassword(Request $request)
     {
-            Log::info('🔥 FORGOT PASSWORD HIT');
         $request->validate(['email' => 'required|email']);
 
         try {
-            Log::info('FORGOT PASSWORD START', [
-                'email' => $request->email
-            ]);
+           
 
             $status = Password::sendResetLink(
                 $request->only('email')
@@ -41,13 +38,12 @@ class ResetPasswordController extends Controller
                     'message' => 'Email introuvable'
                 ], 422);
         } catch (\Throwable $e) {
-            Log::error('FORGOT PASSWORD ERROR', [
-                'message' => $e->getMessage()
-            ]);
-
+ 
             return response()->json([
                 'success' => false,
-                'message' => 'Erreur SMTP'
+                'message' => 'Erreur SMTP',
+                'value' => $e->getMessage()
+
             ], 500);
         }
     }
