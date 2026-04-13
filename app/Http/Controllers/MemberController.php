@@ -120,14 +120,14 @@ class MemberController extends Controller
         if ($targetUser->wasRecentlyCreated) {
             $targetUser->current_club_id = $clubId;
             $targetUser->save();
-            $token = Password::createToken($targetUser);
-            $targetUser->notify(new WelcomeNewMember($token));
+            // $token = Password::createToken($targetUser);
+            // $targetUser->notify(new WelcomeNewMember($token));
         } else {
             return response()->json([
                 'success' => true,
                 'message' => 'Membre ajouté avec succès, mais un compte existant a été trouvé. Un email de notification a été envoyé à l\'utilisateur.',
             ], 201);
-            $targetUser->notify(new AddedToNewClub());
+            // $targetUser->notify(new AddedToNewClub());
         }
 
         // 4. Si c'est un parent, on gère son ParentModel

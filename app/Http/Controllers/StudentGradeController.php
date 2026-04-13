@@ -57,12 +57,12 @@ class StudentGradeController extends Controller
         $clubId = request()->validated_club_id;
 
         return response()->json([
-            'all_club_grades' => Grade::where('club_id', $clubId)
-                ->orderBy('name', 'asc')
+            'all_club_grades' => Grade::select('id', 'name', 'description')
                 ->get(),
 
             // Tous les passages de grades de cet élève
             'student_history' => StudentGrade::where('student_id', $student->id)
+                ->where('club_id', $clubId)
                 ->with('instructor')
                 ->orderBy('awarded_at', 'desc')
                 ->get()

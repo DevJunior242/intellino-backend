@@ -10,6 +10,7 @@ use App\Http\Controllers\LikeController;
 use App\Http\Controllers\NoteController;
 use App\Http\Controllers\PlanController;
 use App\Http\Controllers\RoleController;
+use App\Http\Controllers\UserController;
 use App\Http\Controllers\GradeController;
 use App\Http\Controllers\MedalController;
 use App\Http\Controllers\CombatController;
@@ -103,6 +104,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::apiResource('/clubs', ClubController::class);
         Route::get('/getClubs', [ClubController::class, 'getClubs']);
         Route::get('/getClubsAvailable', [ClubController::class, 'getClubsAvailable']);
+        Route::get('/count', [ClubController::class, 'count']);
     });
 
     //likes
@@ -284,6 +286,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::get('/admin/inscriptions', [InscriptionController::class, 'index']);
     //student grade 
     Route::get('grade', [GradeController::class, 'index']);
+    Route::apiResource('/users', UserController::class);
 
     Route::middleware('clubrole:instructeur,secretaire,admin_club,parent,karateka')->group(function () {
 
@@ -336,7 +339,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::get('/students', [StudentController::class, 'index']);
         Route::get('/students/latest', [StudentController::class, 'latestStudent']);
         Route::get('/parents-users', [StudentController::class, 'getParent']);
-        Route::post('/parent-eleven/store ', [StudentController::class, 'store']);
+        Route::post('/parent-eleven/store-multiple ', [StudentController::class, 'store']);
         Route::post('/student/parent', [StudentController::class, 'studentParent']);
         Route::post('/student/{student}', [StudentController::class, 'updateStudent']);
         Route::delete('/student/{student}', [StudentController::class, 'destroy']);

@@ -19,7 +19,7 @@ return new class extends Migration
             $table->string('country');
             $table->string('city');
             $table->string('address')->nullable();
-            $table->string('phone')->unique();
+            $table->string('phone');
             $table->timestamps();
         });
     }

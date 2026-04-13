@@ -50,7 +50,7 @@ class RolesTableSeeder extends Seeder
                 ],
                 [
                     'id' => (string) Str::uuid(),
-                    'name' => 'etudiant',
+                    'name' => 'karateka',
                     'created_at' => now(),
                     'updated_at' => now()
                 ],

@@ -27,12 +27,10 @@ class StudentController extends Controller
     {
         $user = auth()->user();
 
-        $clubId = $request->query('club_id', $user->current_club_id);
-        Log::info('club_id', ['clubId' => $clubId]);
-        $role = $user?->globalRole?->name;
-        Log::info('user_role', ['role' => $role]);
+        $clubId = $request->validated_club_id;
+        $role = $request->validated_role_name;
         //retourner les eleves pour super admin
-        $superAdmin = ($role == 'super_admin');
+        $superAdmin = ($role === 'super_admin');
 
 
         if ($superAdmin) {
@@ -116,102 +114,198 @@ class StudentController extends Controller
     {
 
         $this->authorize('create', Student::class);
-        $user = auth()->user();
         $clubId = $request->validated_club_id;
         $validated = $request->validated();
         try {
-            return  DB::transaction(function () use ($validated, $request, $user, $clubId) {
+            return DB::transaction(function () use ($validated, $clubId, $request) {
+                $parentId = null;
 
-                $studentUserId = null;
-                $parentId      = null;
+                // --- GESTION DU PARENT ---
+                if (!$validated['is_own_responsible']) {
+                    $parentUser = User::firstOrCreate(
+                        ['email' => $validated['parent_email']],
+                        [
+                            'id'       => (string) Str::uuid(),
+                            'fullname' => $validated['parent_fullname'],
+                            'phone'    => $validated['parent_phone'] ?? null,
+                            'password' => Hash::make(Str::random(16)),
+                            'current_club_id' => $clubId,
+                        ]
+                    );
 
+                    // Attribution rôle parent
+                    $parentRole = cache()->rememberForever('role_parent', fn() => Role::where('name', 'parent')->first());
+                    $parentUser->clubs()->syncWithoutDetaching([$clubId => ['role_id' => $parentRole->id]]);
 
-                if ($request->user_id) {
-                    $parent = ParentModel::where('user_id', $request->user_id)->first();
-
-                    if ($parent) {
-                        $parentId = $parent->id;
-                    } else {
-                        Log::error("ParentModel introuvable", [
-                            'user_id' => $request->user_id
-                        ]);
-                    }
+                    $parentProfile = ParentModel::firstOrCreate(['user_id' => $parentUser->id]);
+                    $parentId = $parentProfile->id;
                 }
 
-                if ($request->is_own_responsible || $request->create_account) {
-                    $studentUser = User::create([
-                        'id'       => (string) Str::uuid(),
-                        'fullname' => $validated['fullname'],
-                        'email'    => $validated['email'],
-                        'phone'    => $validated['phone'],
-                        'password' => Hash::make(Str::random(32)),
-                        'current_club_id' => $clubId,
+                // --- GESTION DES ÉLÈVES ---
+                foreach ($validated['students'] as $index => $studentData) {
+                    $studentUserId = null;
+                    $currentStudentParentId = $parentId;
+
+                    // 1. Création du compte User (si responsable ou si accès demandé)
+                    if ($validated['is_own_responsible'] || ($studentData['create_account'] ?? false)) {
+                        $studentUser = User::create([
+                            'id'       => (string) Str::uuid(),
+                            'fullname' => $studentData['fullname'],
+                            'email'    => $studentData['email'],
+                            'phone'    => $studentData['phone'] ?? null,
+                            'password' => Hash::make(Str::random(32)),
+                            'current_club_id' => $clubId,
+                        ]);
+
+                        $studentUserId = $studentUser->id;
+
+                        // Déterminer le rôle
+                        $roleName = $validated['is_own_responsible'] ? 'parent' : 'karateka';
+                        $role = cache()->rememberForever("role_$roleName", fn() => Role::where('name', $roleName)->first());
+
+                        if ($role) {
+                            $studentUser->clubs()->attach($clubId, ['role_id' => $role->id]);
+                        }
+
+                        // Si l'élève est son propre responsable, il devient son propre "ParentModel"
+                        if ($validated['is_own_responsible']) {
+                            $pProfile = ParentModel::firstOrCreate(['user_id' => $studentUserId]);
+                            $currentStudentParentId = $pProfile->id;
+                        }
+                    }
+
+                    // 2. Gestion de la photo
+                    $photoPath = null;
+                    $photoFile = $request->file("students.$index.photo");
+
+                    if ($photoFile) {
+                        $photoPath = $photoFile->store('students', 'public');
+                    }
+
+                    // 3. Création de la fiche Student
+                    $student = Student::create([
+                        'fullname'  => $studentData['fullname'],
+                        'birthdate' => $studentData['birthdate'],
+                        'sex'       => $studentData['sex'],
+                        'club_id'   => $clubId,
+                        'user_id'   => $studentUserId,
+                        'is_adult'  => Carbon::parse($studentData['birthdate'])->age >= 18,
+                        'photo'     => $photoPath,
                     ]);
-                    $studentUserId = $studentUser->id;
 
-
-                    $studentRole = cache()->rememberForever('role_student', fn() => Role::where('name', 'karateka')->first());
-                    $studentUser->clubs()->attach($clubId, ['role_id' => $studentRole->id]);
-
-
-
-                    if ($request->is_own_responsible) {
-                        $parentProfile = ParentModel::firstOrCreate(
-                            ['user_id' => $studentUserId]
-                        );
-                        $parentId = $parentProfile->id;
+                    // 4. Liaison avec le responsable (Le parent créé au début OU l'élève lui-même)
+                    if ($currentStudentParentId) {
+                        $student->parents()->syncWithoutDetaching([$currentStudentParentId]);
                     }
-                    //envoi de token 
-                    $token = Password::createToken($studentUser);
-                    // $studentUser->notify(new WelcomeNewMember($token));
+
+                    $createdStudents[] = $student->load('user');
                 }
-
-                // LOGIQUE 2 : Création de la fiche élève  
-                $file = $request->file('photo');
-                if ($file) {
-                    $ext = $file->getClientOriginalExtension();
-                    $fileName = uniqid() . '.' . $ext;
-                    $validated['photo'] = $file->storeAs('students', $fileName, 'public');
-                }
-                $birthdate = Carbon::parse($validated['birthdate']);
-                $isAdult = $birthdate->age >= 18;
-
-                $student = Student::create([
-                    ...$validated,
-                    'club_id'    => $clubId,
-                    'user_id'    => $studentUserId,
-                    'is_adult'   => $isAdult,
-
-
-                ]);
-
-                if ($parentId) {
-                    $parent = ParentModel::find($parentId);
-
-                    if ($parent) {
-                        $student->parents()->syncWithoutDetaching([$parent->id]);
-                    } else {
-                        Log::error("Parent non trouvé lors de l'attachement", [
-                            'parent_id' => $parentId
-                        ]);
-                    }
-                }
-
 
                 return response()->json([
                     'success' => true,
-                    'message' => 'Élève enregistré avec succès.',
-                    'data'    => $student->load('parents', 'user')
+                    'message' => count($createdStudents) . ' élève(s) enregistré(s) avec succès.',
+                    'data'    => $createdStudents
                 ], 201);
             });
-        } catch (\Throwable $th) {
-            //throw $th;
-            Log::error('erreur', ['erreur' => $th->getMessage()]);
-            return response()->json([
-                'success' => false,
-                'message' => 'Une erreur est survenue lors de l\'enregistrement de l\'élève',
-            ], 400);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 400);
         }
+        // $user = auth()->user();
+        // $clubId = $request->validated_club_id;
+        // $validated = $request->validated();
+        // try {
+        //     return  DB::transaction(function () use ($validated, $request, $user, $clubId) {
+
+        //         $studentUserId = null;
+        //         $parentId      = null;
+
+
+        //         if ($request->user_id) {
+        //             $parent = ParentModel::where('user_id', $request->user_id)->first();
+
+        //             if ($parent) {
+        //                 $parentId = $parent->id;
+        //             } else {
+        //                 Log::error("ParentModel introuvable", [
+        //                     'user_id' => $request->user_id
+        //                 ]);
+        //             }
+        //         }
+
+        //         if ($request->is_own_responsible || $request->create_account) {
+        //             $studentUser = User::create([
+        //                 'id'       => (string) Str::uuid(),
+        //                 'fullname' => $validated['fullname'],
+        //                 'email'    => $validated['email'],
+        //                 'phone'    => $validated['phone'],
+        //                 'password' => Hash::make(Str::random(32)),
+        //                 'current_club_id' => $clubId,
+        //             ]);
+        //             $studentUserId = $studentUser->id;
+
+
+        //             $studentRole = cache()->rememberForever('role_student', fn() => Role::where('name', 'karateka')->first());
+        //             $studentUser->clubs()->attach($clubId, ['role_id' => $studentRole->id]);
+
+
+
+        //             if ($request->is_own_responsible) {
+        //                 $parentProfile = ParentModel::firstOrCreate(
+        //                     ['user_id' => $studentUserId]
+        //                 );
+        //                 $parentId = $parentProfile->id;
+        //             }
+        //             //envoi de token 
+        //             $token = Password::createToken($studentUser);
+        //             // $studentUser->notify(new WelcomeNewMember($token));
+        //         }
+
+        //         // LOGIQUE 2 : Création de la fiche élève  
+        //         $file = $request->file('photo');
+        //         if ($file) {
+        //             $ext = $file->getClientOriginalExtension();
+        //             $fileName = uniqid() . '.' . $ext;
+        //             $validated['photo'] = $file->storeAs('students', $fileName, 'public');
+        //         }
+        //         $birthdate = Carbon::parse($validated['birthdate']);
+        //         $isAdult = $birthdate->age >= 18;
+
+        //         $student = Student::create([
+        //             ...$validated,
+        //             'club_id'    => $clubId,
+        //             'user_id'    => $studentUserId,
+        //             'is_adult'   => $isAdult,
+
+
+        //         ]);
+
+        //         if ($parentId) {
+        //             $parent = ParentModel::find($parentId);
+
+        //             if ($parent) {
+        //                 $student->parents()->syncWithoutDetaching([$parent->id]);
+        //             } else {
+        //                 Log::error("Parent non trouvé lors de l'attachement", [
+        //                     'parent_id' => $parentId
+        //                 ]);
+        //             }
+        //         }
+
+
+        //         return response()->json([
+        //             'success' => true,
+        //             'message' => 'Élève enregistré avec succès.',
+        //             'data'    => $student->load('parents', 'user')
+        //         ], 201);
+        //     });
+        // } catch (\Throwable $th) {
+        //     //throw $th;
+        //     Log::error('erreur', ['erreur' => $th->getMessage()]);
+        //     return response()->json([
+        //         'success' => false,
+        //         'message' => 'Une erreur est survenue lors de l\'enregistrement de l\'élève',
+        //     ], 400);
+        // }
     }
     public function updateStudent(UpdatedStudentReq $request, Student $student)
     {

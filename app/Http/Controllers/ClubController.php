@@ -19,7 +19,6 @@ class ClubController extends Controller
          ->with(['discipline:id,name'])
          ->withCount('users')
          ->latest()
-         ->take(10)
          ->get()
          ->map(function ($club) {
             $club->logo = $club->logo ? url('storage/' . $club->logo) : null;
@@ -79,7 +78,7 @@ class ClubController extends Controller
                ...$request->validated(),
                'logo' => isset($path) ? $path : null,
             ]);
-             $user->update([
+            $user->update([
                'current_club_id' => $club->id,
             ]);
 
@@ -112,9 +111,15 @@ class ClubController extends Controller
          Log::error('erreur', ['erreur' => $th->getMessage()]);
          return response()->json([
             'success' => false,
-            'error'=>$th->getMessage(),
+            'error' => $th->getMessage(),
             'message' => 'Une erreur est survenue lors de la création du club',
          ], 400);
       }
+   }
+
+   public function count()
+   {
+      $clubs = Club::count();
+      return response()->json($clubs);
    }
 }
