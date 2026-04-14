@@ -370,6 +370,8 @@ Route::middleware(['auth:sanctum'])->group(function () {
             Route::put('/{id}', [CourseController::class, 'update']);
             Route::delete('/{id}', [CourseController::class, 'destroy']);
             Route::get('session-stats', [SessionController::class, '__invoke']);
+            Route::put('/edit/{session}', [SessionController::class, 'editSession']);
+            Route::delete('remove/{session}', [SessionController::class, 'removeSession']);
         });
 
 

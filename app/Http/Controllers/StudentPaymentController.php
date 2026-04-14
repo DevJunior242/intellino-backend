@@ -258,7 +258,7 @@ class StudentPaymentController extends Controller
 
         $debts = StudentPayment::where('club_id', $clubId)
             ->where('balance', '>', 0)
-            ->with(['student.user:id,fullname,phone', 'pricingPlan:id,label'])
+            ->with(['student.user:id,fullname,phone', 'pricingPlan:id,label', 'student.parents.user:id,fullname,phone', 'student.club:id,name,logo'])
             ->select('student_id', 'pricing_plan_id', 'balance', 'updated_at', 'total_amount')
             ->whereIn('id', function ($query) {
                 $query->selectRaw('max(id)')

@@ -9,27 +9,11 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use App\Http\Requests\CourseRequest;
- 
+
 class CourseController extends Controller
 {
     public function index(Request $request)
     {
-        $isSuperAdmin = ($request->validated_role_name === 'super_admin');
-        Log::info('isSuperAdmin', ['isSuperAdmin' => $isSuperAdmin]);
-        $role = $request->validated_role_name;
-        Log::info('role dans course controller', ['role dans course controller' => $role]);
-        //affichons tout  pou supe admin
-        if ($isSuperAdmin) {
-            $sessions = SessionModel::with(['course.club', 'course.grade'])
-                ->latest()
-                ->paginate(8);
-            return response()->json([
-                'success' => true,
-                'message' => 'listes des cours',
-                'sessions' => $sessions,
-            ]);
-        }
-
 
 
 
@@ -71,7 +55,7 @@ class CourseController extends Controller
 
     public function show(SessionModel $session)
     {
- 
+
         $session->load([
             'course.club',
             'course.grade',

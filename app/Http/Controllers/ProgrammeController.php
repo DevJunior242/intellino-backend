@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Course;
 use App\Models\Examen;
 use App\Models\SessionModel;
 use Illuminate\Http\Request;
@@ -22,7 +23,10 @@ class ProgrammeController extends Controller
             $end = now()->endOfDay();
         }
 
-        $sessions = SessionModel::whereBetween('session_date', [$start, $end])
+        $sessions = SessionModel::whereHas('course', function ($q) use ($clubId) {
+            $q->where('club_id', $clubId);
+        })
+            ->whereBetween('session_date', [$start, $end])
             ->where('status', '!=', 'cancelled')
             ->get();
 

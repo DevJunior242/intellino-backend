@@ -164,4 +164,38 @@ class SessionController extends Controller
         $clubId = $request->validated_club_id;
         return response()->json($stats->getStats($clubId));
     }
+    public function editSession(SessionModel $session, Request $request)
+    {
+        $request->validate([
+            'title' => 'required|string|min:5',
+            'session_date' => 'required|date|after_or_equal:today',
+            'start_time' => 'required|date_format:H:i:s',
+            'end_time' => 'required|after:start_time',
+        ], [
+            'title.required' => 'Le titre de la session est requis.',
+            'session_date.required' => 'La date de la session est requise.',
+            'start_time.required' => 'L\'heure de début est requise.',
+            'end_time.required' => 'L\'heure de fin est requise.',
+            'end_time.after' => 'L\'heure de fin doit être après l\'heure de début.',
+        ]);
+        $session->update([
+            'title' => $request->title,
+            'session_date' => $request->session_date,
+            'start_time' => $request->start_time,
+            'end_time' => $request->end_time,
+        ]);
+        return response()->json([
+            'success' => true,
+            'message' => 'Session mise à jour avec succès'
+        ], 201);
+    }
+
+    public function removeSession(SessionModel $session)
+    {
+        $session->delete();
+        return response()->json([
+            'success' => true,
+            'message' => 'Session supprimée avec succès',
+        ]);
+    }
 }
