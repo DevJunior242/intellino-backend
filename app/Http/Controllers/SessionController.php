@@ -18,7 +18,6 @@ class SessionController extends Controller
 
 
         $role = $request->validated_role_name;
-        Log::info('role', ['role' => $role]);
         $clubId = $request->validated_club_id;
 
         $session = SessionModel::with('course')->findOrFail($sessionId);
@@ -166,6 +165,7 @@ class SessionController extends Controller
     }
     public function editSession(SessionModel $session, Request $request)
     {
+        $this->authorize('update', $session);
         $request->validate([
             'title' => 'required|string|min:5',
             'session_date' => 'required|date|after_or_equal:today',
@@ -192,6 +192,7 @@ class SessionController extends Controller
 
     public function removeSession(SessionModel $session)
     {
+        $this->authorize('delete', $session);
         $session->delete();
         return response()->json([
             'success' => true,

@@ -74,7 +74,7 @@ class ExamenController extends Controller
     public function store(StoreExamenRequest $request)
     {
 
-        //
+        $this->authorize('create', Examen::class);
 
         try {
             $user = auth()->user();
@@ -317,7 +317,3 @@ class ExamenController extends Controller
         return response()->json($stats->getExamenStats($clubId));
     }
 }
-
-
-
-

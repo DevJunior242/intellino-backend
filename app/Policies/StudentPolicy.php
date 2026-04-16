@@ -75,6 +75,6 @@ class StudentPolicy
             return true;
         }
 
-        return $user->hasClubRole(['instructeur', 'secretaire', 'admin_club']);
+        return $user->hasClubRole(['secretaire', 'admin_club']);
     }
 }

@@ -34,7 +34,7 @@ class SessionPolicy
      */
     public function create(User $user): bool
     {
-        return false;
+        return $this->hasSessionRole($user);
     }
 
     /**
@@ -42,7 +42,7 @@ class SessionPolicy
      */
     public function update(User $user, SessionModel $sessionModel): bool
     {
-        return false;
+        return $this->hasSessionRole($user);
     }
 
     /**
@@ -50,7 +50,7 @@ class SessionPolicy
      */
     public function delete(User $user, SessionModel $sessionModel): bool
     {
-        return false;
+        return $this->hasSessionRole($user);
     }
 
     /**
@@ -74,6 +74,6 @@ class SessionPolicy
             return true;
         }
 
-        return $user->hasClubRole(['instructeur', 'secretaire', 'admin_club']);
+        return $user->hasClubRole(['instructeur', 'admin_club']);
     }
 }

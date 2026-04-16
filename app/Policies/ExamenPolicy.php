@@ -73,6 +73,6 @@ class ExamenPolicy
             return true;
         }
 
-        return $user->hasClubRole(['instructeur', 'secretaire', 'admin_club']);
+        return $user->hasClubRole(['instructeur', 'admin_club']);
     }
 }

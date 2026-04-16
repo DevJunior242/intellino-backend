@@ -266,7 +266,8 @@ class StudentPaymentController extends Controller
                     ->groupBy('student_id', 'pricing_plan_id');
             })
             ->orderBy('balance', 'desc')
-            ->get();
+            ->latest()
+            ->paginate(6);
 
         return response()->json([
             'success' => true,
