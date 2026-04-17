@@ -1,5 +1,6 @@
 <?php
 
+use Sentry\Laravel\Integration;
 use App\Http\Middleware\IsClubAdmin;
 use App\Http\Middleware\IsSuperAdmin;
 use Illuminate\Foundation\Application;
@@ -20,7 +21,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'clubrole'        => \App\Http\Middleware\CheckClubRole::class,
         ]);
     })
-    ->withExceptions(function (Exceptions $exceptions): void {
-        //
+    ->withExceptions(function (Exceptions $exceptions) {
+        Integration::handles($exceptions);
     })->create();
 $app->register(\Barryvdh\DomPDF\ServiceProvider::class);
