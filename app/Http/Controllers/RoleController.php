@@ -24,7 +24,7 @@ class RoleController extends Controller
 
         Log::info('club_id', ['clubId' => $clubId]);
 
-        $roleOut = ['super_admin', 'admin_club', 'admin_league', 'arbitre_league', 'secretaire_league', 'instructeur_league', 'student'];
+        $roleOut = ['super_admin', 'admin_club', 'admin_league', 'arbitre_league', 'secretaire_league', 'instructeur_league', 'karateka'];
 
         $roles = Role::whereNotIn('name', $roleOut)->get();
         return response()->json(['success' => true, 'roles' => $roles]);

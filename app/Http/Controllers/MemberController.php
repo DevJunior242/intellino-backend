@@ -21,44 +21,52 @@ class MemberController extends Controller
     {
         $clubId = $request->validated_club_id;
         $role = $request->validated_role_name;
-
         $isSuperAdmin = ($role === 'super_admin');
+
+        $query = User::query()
+            ->select('id', 'fullname', 'phone');
+        $excludedRoleId = Role::where('name', 'karateka')->value('id');
+
         if ($isSuperAdmin) {
-            $query = User::with(['clubs' => function ($q) {
-                $q->withPivot('role_id');
+            $query->whereHas('clubs', function ($q) use ($excludedRoleId, $clubId) {
+                $q->where('clubs.id', $clubId);
+                if ($excludedRoleId) {
+                    $q->where('club_users.role_id', '!=', $excludedRoleId);
+                }
+            });
+
+            $query->with(['clubs' => function ($q) {
+                $q->select('clubs.id', 'clubs.name')
+                    ->withPivot('role_id');
             }]);
         } else {
-            $query = User::whereHas('clubs', function ($q) use ($clubId) {
-                $q->where('clubs.id', $clubId);
-            })->with(['clubs' => function ($q) use ($clubId) {
+
+
+
+            $query->whereHas('clubs', function ($q) use ($clubId, $excludedRoleId) {
+                $q->where('clubs.id', $clubId)
+                    ->where('club_users.role_id', '!=', $excludedRoleId);
+            });
+
+            $query->with(['clubs' => function ($q) use ($clubId) {
                 $q->where('clubs.id', $clubId)->withPivot('role_id');
             }]);
         }
 
 
-        $members = $query->latest()->paginate(8);
+        $members = $query->latest()->paginate();
+        $roles = Role::pluck('name', 'id');
 
-        $membersTransformed = $members->through(function ($member) use ($isSuperAdmin, $clubId) {
-            if ($isSuperAdmin) {
-                // Pour le Super Admin, on prend le premier club trouvé ou on liste tout
-                $firstClub = $member->clubs->first();
-                return [
-                    'id' => $member->id,
-                    'fullname' => $member->fullname,
-                    'phone' => $member->phone,
-                    'role' => $firstClub && $firstClub->pivot->role ? $firstClub->pivot->role->name : 'Aucun',
-                    'club' => $firstClub ? $firstClub->name : 'Aucun',
-                ];
-            } else {
-                $specificClub = $member->clubs->first();
-                return [
-                    'id' => $member->id,
-                    'fullname' => $member->fullname,
-                    'phone' => $member->phone,
-                    'role' => $specificClub && $specificClub->pivot->role ? $specificClub->pivot->role->name : 'N/A',
-                    'club' => null,
-                ];
-            }
+        $membersTransformed = $members->through(function ($member) use ($isSuperAdmin, $roles, $clubId) {
+            $club = $member->clubs->first();
+            $roleId = $club?->pivot?->role_id;
+            return [
+                'id' => $member->id,
+                'fullname' => $member->fullname,
+                'phone' => $member->phone,
+                'role' => $roles[$roleId] ?? 'N/A',
+                'club' => $isSuperAdmin ? ($club?->name ?? 'Aucun') : null,
+            ];
         });
 
         return response()->json([

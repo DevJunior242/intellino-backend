@@ -160,8 +160,8 @@ class StudentController extends Controller
                         $studentUserId = $studentUser->id;
 
                         // Déterminer le rôle
-                        $roleName = $validated['is_own_responsible'] ? 'parent' : 'karateka';
-                        $role = cache()->rememberForever("role_$roleName", fn() => Role::where('name', $roleName)->first());
+                        // $roleName = $validated['is_own_responsible'] ? 'parent' : 'karateka';
+                        $role = cache()->rememberForever("role_karateka", fn() => Role::where('name', 'karateka')->first());
 
                         if ($role) {
                             $studentUser->clubs()->attach($clubId, ['role_id' => $role->id]);
@@ -210,7 +210,7 @@ class StudentController extends Controller
                 ], 201);
             });
         } catch (\Exception $e) {
-            return response()->json(['success' => false, 'message' => $e->getMessage()], 400);
+            return response()->json(['success' => false, 'message' => 'Une erreur est survenue lors de l\'enregistrement de l\'élève'], 400);
         }
         // $user = auth()->user();
         // $clubId = $request->validated_club_id;
