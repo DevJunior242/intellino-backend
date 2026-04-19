@@ -2,8 +2,11 @@
 
 namespace App\Providers;
 
+use App\Models\SessionModel;
 use Laravel\Sanctum\Sanctum;
+use App\Policies\SessionPolicy;
 use App\Models\PersonalAccessToken;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Database\Eloquent\Relations\Relation;
 
@@ -35,5 +38,6 @@ class AppServiceProvider extends ServiceProvider
         \App\Models\SessionModel::observe(\App\Observers\SessionObserver::class);
         \App\Models\Equipment::observe(\App\Observers\EquipmentObserver::class);
         \App\Models\Course::observe(\App\Observers\CourseObserver::class);
+        Gate::policy(SessionModel::class, SessionPolicy::class);
     }
 }

@@ -19,8 +19,8 @@ class MemberController extends Controller
 {
     public function index(Request $request)
     {
-        $clubId = $request->validated_club_id;
-        $role = $request->validated_role_name;
+        $clubId = $request->attributes->get('club_id');
+        $role = $request->attributes->get('role');
         $isSuperAdmin = ($role === 'super_admin');
 
         $query = User::query()
@@ -84,7 +84,7 @@ class MemberController extends Controller
     {
         $validated = $request->validated();
         $user = auth()->user();
-        $clubId = $request->validated_club_id;
+        $clubId = $request->attributes->get('club_id');
 
         $targetUser = User::where('email', $validated['email'])
             ->orWhere('phone', $validated['phone'])
@@ -164,7 +164,7 @@ class MemberController extends Controller
     //retirer un utilisateur de mon club
     public function deleteUser(Request $request, User $user)
     {
-        $clubId = $request->validated_club_id;
+        $clubId = $request->attributes->get('club_id');
         Log::info('clubId', ['clubId' => $clubId]);
         $role = $request->validated_role_name;
         $me = $request->user();
@@ -207,8 +207,8 @@ class MemberController extends Controller
     {
         // 1. L'admin connecté et les infos du middleware
         $admin = $request->user();
-        $adminRole = $request->validated_role_name;
-        $clubId = $request->validated_club_id;
+        $adminRole = $request->attributes->get('role');
+        $clubId = $request->attributes->get('club_id'); 
 
 
         if ($adminRole !== 'admin_club') {

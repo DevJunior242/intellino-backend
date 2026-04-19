@@ -26,9 +26,8 @@ class EvaluationController extends Controller
 
         Log::info('examenId', ['examenId' => $examen->id]);
         $user = auth()->user();
-        $clubId = $request->validated_club_id;
-        $role = $request->validated_role_name;
-        //
+        $clubId = $request->attributes->get('club_id');
+        $role = $request->attributes->get('role');
 
         if ($examen->club_id != $clubId) {
             return response()->json([

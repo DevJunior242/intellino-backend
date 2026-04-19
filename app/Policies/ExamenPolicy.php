@@ -2,6 +2,7 @@
 
 namespace App\Policies;
 
+use App\Models\Role;
 use App\Models\User;
 use App\Models\Examen;
 
@@ -41,7 +42,20 @@ class ExamenPolicy
      */
     public function update(User $user, Examen $examen): bool
     {
-        return $this->hasExamenRole($user);
+        if ($user->isSuperAdmin()) {
+            return true;
+        }
+
+        $clubId = $examen->club_id;
+
+        if (!$clubId) {
+            return false;
+        }
+
+        return $user->clubs()
+            ->where('clubs.id', $clubId)
+            ->whereIn('club_users.role_id', Role::clubAdminRoles())
+            ->exists();
     }
 
     /**
@@ -49,7 +63,19 @@ class ExamenPolicy
      */
     public function delete(User $user, Examen $examen): bool
     {
-        return $this->hasExamenRole($user);
+
+        if ($user->isSuperAdmin()) {
+            return true;
+        }
+        $clubId = $examen->club_id;
+        if (!$clubId) {
+            return false;
+        }
+
+        return $user->clubs()
+            ->where('clubs.id', $clubId)
+            ->whereIn('club_users.role_id', Role::clubAdminRoles())
+            ->exists();
     }
 
     /**

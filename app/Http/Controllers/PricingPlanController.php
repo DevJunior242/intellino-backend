@@ -11,8 +11,7 @@ class PricingPlanController extends Controller
 {
     public function index(Request $request)
     {
-        $clubId = $request->validated_club_id;
-        $role = $request->validated_role_name;
+        $clubId = $request->attributes->get('club_id');
 
         Log::info('clubId', ['clubId' => $clubId]);
         $plans = PricingPlan::with('paymentCategory')
@@ -33,8 +32,10 @@ class PricingPlanController extends Controller
 
     public function destroy(Request $request, $id)
     {
+        $clubId = $request->attributes->get('club_id');
+
         $plan = PricingPlan::where('id', $id)
-            ->where('club_id', $request->validated_club_id)
+            ->where('club_id', $clubId)
             ->firstOrFail();
 
         if ($plan->paiements()->exists()) {

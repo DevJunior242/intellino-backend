@@ -2,6 +2,7 @@
 
 namespace App\Policies;
 
+use App\Models\Role;
 use App\Models\User;
 use App\Models\SessionModel;
 use Illuminate\Auth\Access\Response;
@@ -34,23 +35,55 @@ class SessionPolicy
      */
     public function create(User $user): bool
     {
-        return $this->hasSessionRole($user);
+        if ($user->isSuperAdmin()) {
+            return true;
+        }
+
+        return $user->clubs()
+            ->wherePivotIn('role', ['admind_club', 'instructeur'])
+            ->exists();
     }
 
     /**
      * Determine whether the user can update the model.
      */
-    public function update(User $user, SessionModel $sessionModel): bool
+    public function update(User $user, SessionModel $session): bool
     {
-        return $this->hasSessionRole($user);
+        if ($user->isSuperAdmin()) {
+            return true;
+        }
+        $session->load('course');
+        $clubId = $session->course?->club_id;
+
+        if (!$clubId) {
+            return false;
+        }
+
+        return $user->clubs()
+            ->where('clubs.id', $clubId)
+            ->whereIn('club_users.role_id', Role::clubAdminRoles())
+            ->exists();
     }
 
     /**
      * Determine whether the user can delete the model.
      */
-    public function delete(User $user, SessionModel $sessionModel): bool
+    public function delete(User $user, SessionModel $session): bool
     {
-        return $this->hasSessionRole($user);
+        if ($user->isSuperAdmin()) {
+            return true;
+        }
+
+        $clubId = $session->course?->club_id;
+
+        if (!$clubId) {
+            return false;
+        }
+
+        return $user->clubs()
+            ->where('clubs.id', $clubId)
+            ->whereIn('club_users.role_id', Role::clubAdminRoles())
+            ->exists();
     }
 
     /**
@@ -67,13 +100,5 @@ class SessionPolicy
     public function forceDelete(User $user, SessionModel $sessionModel): bool
     {
         return false;
-    }
-    private function hasSessionRole(User $user): bool
-    {
-        if ($user->isSuperAdmin()) {
-            return true;
-        }
-
-        return $user->hasClubRole(['instructeur', 'admin_club']);
     }
 }

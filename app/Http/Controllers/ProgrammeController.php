@@ -12,7 +12,7 @@ class ProgrammeController extends Controller
 {
     public function index(Request $request)
     {
-        $clubId = $request->validated_club_id;
+        $clubId = $request->attributes->get('club_id');
         $range = $request->get('range', 'today');
 
         if ($range === 'week') {

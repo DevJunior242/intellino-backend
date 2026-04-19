@@ -23,8 +23,8 @@ class DashboardController extends Controller
     {
         $data = $this->statsService->getStatsByUserRole(
             $request->user(),
-            $request->validated_club_id,
-            $request->validated_role_name
+            $request->attributes->get('club_id'),
+            $request->attributes->get('role')
         );
 
         if (isset($data['message'])) {
@@ -36,7 +36,7 @@ class DashboardController extends Controller
 
     public function getDashboardActivity(Request $request)
     {
-        $activeOrgId = $request->validated_club_id;
+        $activeOrgId = $request->attributes->get('club_id');
         $activeOrgType = 'Club';
 
         if (!$activeOrgId) {

@@ -136,7 +136,7 @@ class User extends Authenticatable implements MustVerifyEmail
         if ($this->isSuperAdmin()) {
             return true;
         }
-        return in_array(request()->validated_role_name, $roles, true);
+        return in_array(request()->attributes->get('role'), $roles, true);
     }
 
     public function getPhotoUrlAttribute()

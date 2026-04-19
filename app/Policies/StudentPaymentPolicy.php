@@ -2,6 +2,7 @@
 
 namespace App\Policies;
 
+use App\Models\Role;
 use App\Models\User;
 use App\Models\StudentPayment;
 
@@ -40,7 +41,18 @@ class StudentPaymentPolicy
      */
     public function update(User $user, StudentPayment $studentPayment): bool
     {
-        return  $this->hasStudentPaymentRole($user);
+        if ($user->isSuperAdmin()) {
+            return true;
+        }
+        $clubId = $studentPayment->club_id;
+
+        if (!$clubId) {
+            return false;
+        }
+        return $user->clubs()
+            ->where('clubs.id', $clubId)
+            ->whereIn('club_users.role_id', Role::clubAdminRoles())
+            ->exists();
     }
 
     /**
@@ -48,7 +60,18 @@ class StudentPaymentPolicy
      */
     public function delete(User $user, StudentPayment $studentPayment): bool
     {
-        return  $this->hasStudentPaymentRole($user);
+        if ($user->isSuperAdmin()) {
+            return true;
+        }
+        $clubId = $studentPayment->club_id;
+
+        if (!$clubId) {
+            return false;
+        }
+        return $user->clubs()
+            ->where('clubs.id', $clubId)
+            ->whereIn('club_users.role_id', Role::clubAdminRoles())
+            ->exists();
     }
 
     /**

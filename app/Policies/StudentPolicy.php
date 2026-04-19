@@ -2,6 +2,7 @@
 
 namespace App\Policies;
 
+use App\Models\Role;
 use App\Models\User;
 use App\Models\Student;
 
@@ -28,11 +29,11 @@ class StudentPolicy
      */
     public function viewStats(User $user): bool
     {
-        return $this->hasStudentRole($user);
+        // return $this->hasStudentRole($user);
     }
     public function create(User $user): bool
     {
-        return $this->hasStudentRole($user);
+        //return $this->hasStudentRole($user);
     }
 
     /**
@@ -40,7 +41,18 @@ class StudentPolicy
      */
     public function update(User $user, Student $student): bool
     {
-        return $this->hasStudentRole($user);
+        if ($user->isSuperAdmin()) {
+            return true;
+        }
+        $clubId = $student->club_id;
+
+        if (!$clubId) {
+            return false;
+        }
+        return $user->clubs()
+            ->where('clubs.id', $clubId)
+            ->whereIn('club_users.role_id', Role::clubAdminRoles())
+            ->exists();
     }
 
     /**
@@ -48,7 +60,18 @@ class StudentPolicy
      */
     public function delete(User $user, Student $student): bool
     {
-        return $this->hasStudentRole($user);
+        if ($user->isSuperAdmin()) {
+            return true;
+        }
+        $clubId = $student->club_id;
+
+        if (!$clubId) {
+            return false;
+        }
+        return $user->clubs()
+            ->where('clubs.id', $clubId)
+            ->whereIn('club_users.role_id', Role::clubAdminRoles())
+            ->exists();
     }
 
     /**
@@ -65,16 +88,5 @@ class StudentPolicy
     public function forceDelete(User $user, Student $student): bool
     {
         return false;
-    }
-
-    private function hasStudentRole(User $user): bool
-    {
-
-
-        if ($user->isSuperAdmin()) {
-            return true;
-        }
-
-        return $user->hasClubRole(['secretaire', 'admin_club']);
     }
 }

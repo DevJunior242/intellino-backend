@@ -98,6 +98,7 @@ class ClubController extends Controller
 
             return response()->json([
                'success'     => true,
+               'message'     => 'Le club a été créé avec succès',
                'user'        => $user,
                'memberships' => $memberships,
                'new_club'    => [

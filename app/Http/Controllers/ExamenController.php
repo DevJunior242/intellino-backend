@@ -25,7 +25,7 @@ class ExamenController extends Controller
     {
 
         $user = auth()->user();
-        $clubId = $request->validated_club_id;
+        $clubId = $request->attributes->get('club_id');
         //super_admin 
         if ($user?->globalRole?->name == 'super_admin') {
             $examen = Examen::with(['club.users', 'currentGrade:id,name'])
@@ -78,7 +78,7 @@ class ExamenController extends Controller
 
         try {
             $user = auth()->user();
-            $clubId = $request->validated_club_id;
+            $clubId = $request->attributes->get('club_id');
             $validated = $request->validated();
 
             $curentGrade = Grade::where('id', $request->current_grade_id)
@@ -313,7 +313,7 @@ class ExamenController extends Controller
     public function stats(ExamenStatService $stats, Request $request)
     {
         $this->authorize('viewStats', Examen::class);
-        $clubId = $request->validated_club_id;
+        $clubId = $request->attributes->get('club_id');
         return response()->json($stats->getExamenStats($clubId));
     }
 }

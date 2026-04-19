@@ -18,4 +18,12 @@ class Role extends Model
     {
         return $this->hasMany(User::class);
     }
+
+    public static function clubAdminRoles()
+    {
+        return self::whereIn('name', [
+            'admin_club',
+            'instructeur'
+        ])->pluck('id');
+    }
 }

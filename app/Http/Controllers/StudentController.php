@@ -27,7 +27,7 @@ class StudentController extends Controller
     {
         $user = auth()->user();
 
-        $clubId = $request->validated_club_id;
+        $clubId = $request->attributes->get('club_id');
         $role = $request->validated_role_name;
         //retourner les eleves pour super admin
         $superAdmin = ($role === 'super_admin');
@@ -71,7 +71,7 @@ class StudentController extends Controller
     public function getParent(Request $request)
     {
         $user = auth()->user();
-        $clubId = $request->validated_club_id;
+        $clubId = $request->attributes->get('club_id');
         Log::info('club_id', ['clubId' => $clubId]);
         $authorizedRoles = ['admin_club', 'secretaire', 'instructeur'];
 
@@ -114,7 +114,7 @@ class StudentController extends Controller
     {
 
         $this->authorize('create', Student::class);
-        $clubId = $request->validated_club_id;
+        $clubId = $request->attributes->get('club_id');
         $validated = $request->validated();
         try {
             return DB::transaction(function () use ($validated, $clubId, $request) {
@@ -312,10 +312,9 @@ class StudentController extends Controller
     public function updateStudent(UpdatedStudentReq $request, Student $student)
     {
         $this->authorize('update', $student);
-        $user = auth()->user();
 
         $validated = $request->validated();
-        $clubId = $request->validated_club_id;
+        $clubId = $request->attributes->get('club_id');
         $studentData = [
             ...$validated,
             'club_id' => $clubId,
@@ -375,7 +374,7 @@ class StudentController extends Controller
     public function StudentStatsDashboard(StudentGradeService $gradeService, Request $request)
     {
         $this->authorize('viewStats', Student::class);
-        $clubId = $request->validated_club_id;
+        $clubId = $request->attributes->get('club_id');
         Log::info('club_id', ['clubId' => $clubId]);
 
         $stats = $gradeService->getGlobalStats($clubId);
@@ -390,7 +389,7 @@ class StudentController extends Controller
     public function latestStudent(Request $request)
     {
         $this->authorize('viewStats', Student::class);
-        $clubId = $request->validated_club_id;
+        $clubId = $request->attributes->get('club_id');
         Log::info('club_id', ['clubId' => $clubId]);
 
         $latestStudents = Student::where('club_id', $clubId)

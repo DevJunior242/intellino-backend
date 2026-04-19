@@ -25,7 +25,7 @@ class EnchainementController extends Controller
                 'order' => $order,
                 'examen_id' => $examen->id,
                 'current_grade_id' => $examen->current_grade_id,
-                'club_id' => $request->validated_club_id,
+                'club_id' => $request->attributes->get('club_id'),
             ]);
 
             return response()->json([
@@ -58,7 +58,7 @@ class EnchainementController extends Controller
         $enchainements = GradeEnchainement::where('examen_id', $examenId)
             ->with('grade')
             ->where('current_grade_id', $examen->current_grade_id)
-            ->where('club_id', $request->validated_club_id)
+            ->where('club_id', $request->attributes->get('club_id'))
             ->orderBy('order', 'asc')
             ->get();
 
@@ -78,7 +78,7 @@ class EnchainementController extends Controller
 
     public function destroy(Examen $examen, string $id, Request $request)
     {
-        $clubId= $request->validated_club_id;
+        $clubId= $request->attributes->get('club_id');
         $enchainement = GradeEnchainement::where('id', $id)
             ->where('club_id', $clubId)
             ->where('examen_id', $examen->id)

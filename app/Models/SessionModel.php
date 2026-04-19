@@ -37,4 +37,12 @@ class SessionModel extends Model
     {
         return $this->belongsTo(Course::class, 'course_id');
     }
+
+    public static function clubAdminRoles()
+    {
+        return self::whereIn('name', [
+            'admxin_club',
+            'instructeur'
+        ])->pluck('id');
+    }
 }

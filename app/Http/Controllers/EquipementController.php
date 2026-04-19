@@ -15,7 +15,7 @@ class EquipementController extends Controller
 {
     public function index(Request $request)
     {
-        $clubId = $request->validated_club_id;
+        $clubId = $request->attributes->get('club_id');
         $equipments = Equipment::where('club_id', $clubId)
             ->with('equipmentCategory')
             ->latest()
@@ -29,7 +29,7 @@ class EquipementController extends Controller
     //recuperer les materiels pretés
     public function getPret(Request $request)
     {
-        $clubId = $request->validated_club_id;
+        $clubId = $request->attributes->get('club_id');
         Log::info('clubId', ['clubId' => $clubId]);
         $equipments = EquipmentLoan::where('club_id', $clubId)
             ->with(['equipment', 'user:id,fullname', 'toClub:id,name'])
@@ -48,9 +48,7 @@ class EquipementController extends Controller
 
     public function getCategories(Request $request)
     {
-        $clubId = $request->validated_club_id;
-        $role = $request->validated_role_name;
-        Log::info('clubId', ['clubId' => $clubId]);
+        $clubId = $request->attributes->get('club_id');
         $equipments = EquipmentCategory::where('club_id', $clubId)
             ->orderBy('name')
             ->get();
@@ -66,7 +64,7 @@ class EquipementController extends Controller
     // Créer la catégorie
     public function storeCategory(Request $request)
     {
-        $clubId = $request->validated_club_id;
+        $clubId = $request->attributes->get('club_id');
 
 
         $request->validate([
@@ -111,7 +109,7 @@ class EquipementController extends Controller
     // Prêter le matériel (Le "Out" temporaire)
     public function loanEquipment(StoreEquipmntLoanReq $request)
     {
-        $clubId = $request->validated_club_id;
+        $clubId = $request->attributes->get('club_id');
         $equipment = Equipment::findOrFail($request->equipment_id);
         Log::info('equipment_id', ['equipmentId' => $equipment->id]);
         if ($equipment->available_quantity < $request->quantity_loaned) {

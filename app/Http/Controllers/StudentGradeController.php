@@ -16,10 +16,10 @@ class StudentGradeController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $role = $request->validated_role_name;
+        $role = $request->attributes->get('role');
         $user = auth()->user();
 
-        $clubId = $request->validated_club_id;
+        $clubId = $request->attributes->get('club_id');
 
         if ($role === 'parent') {
             $parent = ParentModel::where('user_id', $user->id)->first();
@@ -54,7 +54,7 @@ class StudentGradeController extends Controller
 
     public function studentHistory(Student $student): JsonResponse
     {
-        $clubId = request()->validated_club_id;
+        $clubId = request()->attributes->get('club_id');
 
         return response()->json([
             'all_club_grades' => Grade::select('id', 'name', 'description')
@@ -72,7 +72,7 @@ class StudentGradeController extends Controller
     {
         try {
             $user = auth()->user();
-            $clubId = $request->input('club_id');
+            $clubId = $request->attributes->get('club_id');
 
             $validated = $request->validated();
 
@@ -133,7 +133,7 @@ class StudentGradeController extends Controller
                 'is_current' => true,
                 'awarded_at' => now(),
                 'instructor_id' => auth()->id(),
-                'club_id' => request()->validated_club_id,
+                'club_id' => request()->attributes->get('club_id'),
             ]);
 
             return $newGrade;

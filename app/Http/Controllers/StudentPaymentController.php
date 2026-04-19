@@ -21,8 +21,11 @@ class StudentPaymentController extends Controller
     use AuthorizesRequests;
     public function index(Request $request)
     {
-        $clubId = $request->validated_club_id;
-        $role = $request->validated_role_name;
+        $clubId = $request->attributes->get('club_id');
+        $role = $request->attributes->get('role');
+
+
+
         $user = auth()->user();
 
         if ($role == 'parent') {
@@ -90,7 +93,7 @@ class StudentPaymentController extends Controller
     public function store(StorePaymentRequest $request)
     {
         $validated = $request->validated();
-        $clubId = $request->validated_club_id;
+        $clubId = $request->attributes->get('club_id');
         $plan = PricingPlan::with('paymentCategory')->findOrFail($validated['pricing_plan_id']);
         $student = Student::findOrFail($validated['student_id']);
 
@@ -178,7 +181,7 @@ class StudentPaymentController extends Controller
     }
     public function getStudentHistory($studentId, Request $request)
     {
-        $clubId = $request->validated_club_id;
+        $clubId = $request->attributes->get('club_id');
         $payments = StudentPayment::with(['pricingPlan.paymentCategory', 'recorder'])
             ->where('student_id', $studentId)
             ->where('club_id', $clubId)
@@ -190,8 +193,7 @@ class StudentPaymentController extends Controller
 
     public function downloadInvoice(Request $request, $id)
     {
-        $clubId = $request->validated_club_id;
-        $role = $request->validated_role_name;
+        $clubId = $request->attributes->get('club_id');
         Log::info('clubId', ['clubId' => $clubId]);
 
         $payment = StudentPayment::with(['student', 'pricingPlan', 'club'])
@@ -204,8 +206,7 @@ class StudentPaymentController extends Controller
     }
     public function revenueStats(Request $request)
     {
-        $clubId = $request->validated_club_id;
-        $role = $request->validated_role_name;
+        $clubId = $request->attributes->get('club_id');
         $stats = StudentPayment::where('club_id', $clubId)
             ->selectRaw('SUM(amount_paid) as total, DATE_FORMAT(created_at, "%b") as month')
             ->where('created_at', '>=', now()->subMonths(6))
@@ -220,8 +221,7 @@ class StudentPaymentController extends Controller
     public function stats(StudentPaymentService $StudentPaymentService, Request $request)
     {
         $this->authorize('viewStats', StudentPayment::class);
-        $clubId = $request->validated_club_id;
-        Log::info('club_id', ['clubId' => $clubId]);
+        $clubId = $request->attributes->get('club_id');
 
         $stats = $StudentPaymentService->getStudentpaymentStats($clubId);
 
@@ -235,7 +235,7 @@ class StudentPaymentController extends Controller
 
     public function getRemainingDebt(Request $request, Student $student, PricingPlan $pricingPlan)
     {
-        $clubId = $request->validated_club_id;
+        $clubId = $request->attributes->get('club_id');
         $lastPayment = StudentPayment::where('student_id', $student->id)
             ->where('pricing_plan_id', $pricingPlan->id)
             ->where('club_id', $clubId)
@@ -254,7 +254,7 @@ class StudentPaymentController extends Controller
 
     public function getDebtors(Request $request)
     {
-        $clubId = $request->validated_club_id;
+        $clubId = $request->attributes->get('club_id');
 
         $debts = StudentPayment::where('club_id', $clubId)
             ->where('balance', '>', 0)
@@ -280,7 +280,7 @@ class StudentPaymentController extends Controller
     public function getParentDebts(Request $request)
     {
         $user = auth()->user();
-        $clubId = $request->validated_club_id;
+        $clubId = $request->attributes->get('club_id');
         $parent = ParentModel::where('user_id', $user->id)->first();
         $studentIds = $parent->students()->pluck('students.id');
         $debts = StudentPayment::where('club_id', $clubId)

@@ -17,8 +17,7 @@ class SessionController extends Controller
     {
 
 
-        $role = $request->validated_role_name;
-        $clubId = $request->validated_club_id;
+        $clubId = $request->attributes->get('club_id');
 
         $session = SessionModel::with('course')->findOrFail($sessionId);
 
@@ -155,11 +154,7 @@ class SessionController extends Controller
 
     public function __invoke(SessionStatsService $stats, Request $request)
     {
-        Log::info('DEBUG SessionStats', [
-            'user' => auth()->user(),
-            'guard' => auth()->guard(),
-            'validated_role_name' => request()->validated_role_name ?? null,
-        ]);
+
         $clubId = $request->validated_club_id;
         return response()->json($stats->getStats($clubId));
     }

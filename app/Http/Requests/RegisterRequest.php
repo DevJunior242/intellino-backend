@@ -47,6 +47,7 @@ class RegisterRequest extends FormRequest
             'phone.regex' => 'Le numéro de téléphone est invalide',
             'email.required' => 'L\'email est requis',
             'email.email' => 'L\'email est invalide',
+            'email.unique' => 'L\'email est déjà utilisé',
             'email.max' => 'L\'email est trop long',
             'password.required' => 'Le mot de passe est requis',
             'password.min' => 'Le mot de passe doit contenir au moins 8 caractères',

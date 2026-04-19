@@ -49,11 +49,12 @@ class CheckClubRole
             return response()->json(['message' => 'Rôle non autorisé'], 403);
         }
 
-        $request->merge([
-            'validated_club_id' => $clubId,
-            'validated_role_name' => $userRole
-        ]);
-
+        // $request->merge([
+        //     'validated_club_id' => $clubId,
+        //     'validated_role_name' => $userRole
+        // ]);
+        $request->attributes->set('role', $userRole);
+        $request->attributes->set('club_id', $clubId);
         return $next($request);
     }
 }
