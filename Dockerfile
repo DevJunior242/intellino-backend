@@ -1,4 +1,4 @@
-FROM php:8.2-apache
+FROM php:8.4-apache
 
 RUN apt-get update && apt-get install -y \
     libpng-dev \
@@ -18,12 +18,11 @@ COPY composer.json composer.lock ./
 RUN php -d memory_limit=-1 /usr/bin/composer install \
     --no-dev \
     --no-scripts \
-    --no-autoloader \
-    --verbose
+    --no-autoloader
 
 COPY . .
 
-RUN composer dump-autoload --optimize --no-dev
+RUN composer dump-autoload --optimize --no-dev --no-scripts
 
 RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
 
