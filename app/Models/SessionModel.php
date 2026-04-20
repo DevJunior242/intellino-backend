@@ -29,6 +29,14 @@ class SessionModel extends Model
         'replacement_end_time',
     ];
 
+
+
+    const STATUS_SCHEDULED = 0;
+    const STATUS_ONGOING = 1;
+    const STATUS_COMPLETED = 2;
+    const STATUS_CANCELLED = 3;
+    const STATUS_POSTPONED = 4;
+
     protected $attributes = ['status' => 'scheduled'];
     public $incrementing = false;
     protected $keyType = 'string';
@@ -44,5 +52,17 @@ class SessionModel extends Model
             'admxin_club',
             'instructeur'
         ])->pluck('id');
+    }
+
+    public function getStatutLabelAttribute()
+    {
+        return match ($this->status) {
+            self::STATUS_SCHEDULED => 'Planifié',
+            self::STATUS_ONGOING   => 'En cours',
+            self::STATUS_COMPLETED => 'Terminé',
+            self::STATUS_CANCELLED => 'Annulé',
+            self::STATUS_POSTPONED => 'Postponé',
+            default                => 'Inconnu',
+        };
     }
 }

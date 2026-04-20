@@ -82,7 +82,6 @@ class ExamenController extends Controller
             $validated = $request->validated();
 
             $curentGrade = Grade::where('id', $request->current_grade_id)
-                ->where('club_id', $clubId)
                 ->first();
             if (!$curentGrade) {
                 return response()->json([
@@ -92,7 +91,6 @@ class ExamenController extends Controller
             }
             //current_dade_id " next_grade_id
             $nextGrade = Grade::where('id', $request->next_grade_id)
-                ->where('club_id', $clubId)
                 ->first();
             if (!$nextGrade) {
                 return response()->json([
@@ -111,14 +109,13 @@ class ExamenController extends Controller
             $examenData = DB::transaction(function () use ($validated, $user, $clubId, $request) {
 
                 $students = Student::where('club_id', $clubId)
-                    ->where('status', 'actif')
+                    // ->where('status', Student::STATUS_ACTIV)
                     ->whereHas('currentGrade', function ($q) use ($request) {
                         $q->where('current_grade_id', $request->current_grade_id)
                             ->whereDate('awarded_at', '<=', $request->start_date);
                     })
                     ->with('currentGrade')
                     ->get();
-                Log::info('students', ['students' => $students]);
                 if ($students->isEmpty()) {
                     return null;
                 }
@@ -160,9 +157,8 @@ class ExamenController extends Controller
                 'data' => $examenData
             ], 201);
         } catch (QueryException $e) {
-            Log::error('erreur', ['erreur' => $e->getMessage()]);
+            Log::error('QueryException', ['message' => $e->getMessage()]);
 
-            echo $e->getMessage();
             return response()->json([
                 'success' => false,
                 'message' => 'Une erreur est survenue lors de la création de l\'examen',
@@ -190,10 +186,12 @@ class ExamenController extends Controller
     public function cancel(Examen $examen, Request $request)
     {
         $request->validate([
-            'cancel_reason' => 'required|string|min:5'
+            'cancel_reason' => ['required', 'string', 'regex:/^[a-zA-Z0-9\s\.,\'\"\-!?éèàùûô]+$/u', 'min:5', 'max:1000']
         ], [
             'cancel_reason.required' => 'La raison de l\'annulation est requise.',
             'cancel_reason.min' => 'La raison de l\'annulation doit comporter au moins 5 caractères.',
+            'cancel_reason.max' => 'La raison de l\'annulation doit comporter au plus 1000 caractères.',
+            'cancel_reason.regex' => 'La raison de l\'annulation doit être une chaîne de caractères alphanumériques.',
         ]);
 
         if ($examen->status === 'cancelled') {
@@ -203,7 +201,7 @@ class ExamenController extends Controller
         }
 
         $examen->update([
-            'status' => 'cancelled',
+            'status' => 3,
             'cancel_reason' => $request->cancel_reason,
             'cancelled_at' => now(),
         ]);
@@ -222,9 +220,9 @@ class ExamenController extends Controller
         $request->validate([
             'start_date' => 'required|date|after_or_equal:today',
             'end_date' => 'required|date|after_or_equal:today',
-            'start_time' => 'required|date_format:H:i:s',
-            'end_time' => 'required|after:start_time',
-            'replacement_start_time' => 'nullable|date_format:H:i:s',
+            'start_time' => 'required|date_format:H:i,H:i:s',
+            'end_time'   => 'required|date_format:H:i,H:i:s|after:start_time',
+            'replacement_start_time' => 'nullable|date_format:H:i',
             'replacement_end_time' => 'nullable|after:replacement_start_time',
         ], [
             'start_date.required' => 'La date de la séance est requise.',
@@ -244,7 +242,7 @@ class ExamenController extends Controller
             'end_time' => $request->end_time,
             'replacement_start_time' => $examen->start_time,
             'replacement_end_time' => $examen->end_time,
-            'status' => 'scheduled',
+            'status' => 0,
             'created_by' => $user->id,
 
         ], [
@@ -277,7 +275,7 @@ class ExamenController extends Controller
 
         $examen->update([
             'actual_start_time' => Carbon::now()->format('H:i:s'),
-            'status' => 'ongoing',
+            'status' => 1,
         ]);
         return response()->json([
             'success' => true,
@@ -300,7 +298,7 @@ class ExamenController extends Controller
 
         $examen->update([
             'actual_end_time' => Carbon::now()->format('H:i:s'),
-            'status' => 'completed',
+            'status' => 2,
 
         ]);
 

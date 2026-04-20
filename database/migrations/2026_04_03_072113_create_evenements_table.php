@@ -18,8 +18,8 @@ return new class extends Migration
             $table->string('lieu'); // ex: "Ouagadougou", "Bobo-Dioulasso"
             $table->date('date_debut'); // ex: 2026-05-15
             $table->date('date_fin');
-            $table->tinyInteger('statut'); // 0 = En attente, 1 = En cours, 2 = Terminé
-            $table->index(['statut', 'date_debut', 'date_fin']);
+            $table->tinyInteger('status')->default(0); // 0 = En attente, 1 = En cours, 2 = Terminé
+            $table->index(['status', 'date_debut', 'date_fin']);
             $table->timestamps();
         });
     }

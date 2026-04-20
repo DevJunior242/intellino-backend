@@ -17,15 +17,15 @@ class SessionStatsService
     {
         $total = $this->clubSessionQuery($clubId)->count();
 
-        $scheduled = $this->clubSessionQuery($clubId)->where('status', 'scheduled')->count();
-        $ongoing = $this->clubSessionQuery($clubId)->where('status', 'ongoing')->count();
-        $completed = $this->clubSessionQuery($clubId)->where('status', 'completed')->count();
-        $cancelled = $this->clubSessionQuery($clubId)->where('status', 'cancelled')->count();
-        $postponed = $this->clubSessionQuery($clubId)->where('status', 'postponed')->count();
+        $scheduled = $this->clubSessionQuery($clubId)->where('status', SessionModel::STATUS_SCHEDULED)->count();
+        $ongoing = $this->clubSessionQuery($clubId)->where('status', SessionModel::STATUS_ONGOING)->count();
+        $completed = $this->clubSessionQuery($clubId)->where('status', SessionModel::STATUS_COMPLETED)->count();
+        $cancelled = $this->clubSessionQuery($clubId)->where('status', SessionModel::STATUS_CANCELLED)->count();
+        $postponed = $this->clubSessionQuery($clubId)->where('status', SessionModel::STATUS_POSTPONED)->count();
 
-        $effectiveSessions = $this->clubSessionQuery($clubId)->whereIn('status', [
-            'ongoing',
-            'completed'
+        $effectiveSessions = $this->clubSessionQuery($clubId)->clone()->whereIn('status', [
+            SessionModel::STATUS_ONGOING,
+            SessionModel::STATUS_COMPLETED,
         ])->count();
 
         $reliabilityRate = $total > 0

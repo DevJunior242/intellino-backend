@@ -21,14 +21,9 @@ return new class extends Migration
                 ->nullOnDelete();
             $table->string('title');
             $table->text('description')->nullable();
-            $table->enum('status', [
-                'scheduled',
-                'ongoing',
-                'completed',
-                'cancelled',
-                'postponed',
-            ])->default('scheduled');
+            // 0 - Not started, 1 - In progress, 2 - Finished
 
+            $table->tinyInteger('status')->default(0);
             $table->text('cancel_reason')->nullable();
             $table->timestamp('cancelled_at')->nullable();
             $table->date('session_date');

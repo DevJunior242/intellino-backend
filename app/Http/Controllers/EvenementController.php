@@ -65,7 +65,7 @@ class EvenementController extends Controller
                     ->orderBy('heure_debut_prevu', 'asc');
             }])
             ->withCount('competitions')
-            ->where('statut', 'ouverte')
+            ->where('status', Evenement::STATUT_EN_COURS)
             ->latest()
             ->first();
 
@@ -92,7 +92,7 @@ class EvenementController extends Controller
                     'date_fin'           => $validated['date_fin'],
                     'organisateur_id'    => $validated['organisateur_id'],
                     'organisateur_type'  => $validated['organisateur_type'],
-                    'statut'             => 0,
+                    'status'             => 0,
                 ]);
 
                 // 2. Créer les épreuves
@@ -104,7 +104,7 @@ class EvenementController extends Controller
                         'niveau_id'           => $item['niveau_id'],
                         'heure_debut_prevu'   => $item['heure_debut_prevu'],
                         'heure_fin_prevue'    => $item['heure_fin_prevue'],
-                        'statut'              => 0,
+                        'status'              => 0,
                     ]);
                 }
 
@@ -129,7 +129,7 @@ class EvenementController extends Controller
     public function ouvrir(Evenement $evenement)
     {
         $evenement->update([
-            'statut' => 1,
+            'status' => 1,
 
         ]);
 
@@ -142,7 +142,7 @@ class EvenementController extends Controller
     // Clôturer manuellement
     public function cloturer(Evenement $evenement)
     {
-        $evenement->update(['statut' => 2]);
+        $evenement->update(['status' => 2]);
 
         return response()->json(['message' => 'Les inscriptions ont été clôturées.']);
     }

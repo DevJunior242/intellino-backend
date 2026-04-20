@@ -11,15 +11,15 @@ class ExamenStatService
         $query = Examen::where('club_id', $clubId);
         $total = $query->count();
 
-        $scheduled = $query->where('status', 'scheduled')->count();
-        $ongoing = $query->where('status', 'ongoing')->count();
-        $completed = $query->where('status', 'completed')->count();
-        $cancelled = $query->where('status', 'cancelled')->count();
-        $postponed = $query->where('status', 'postponed')->count();
+        $scheduled = $query->clone()->where('status', Examen::STATUS_SCHEDULED)->count();
+        $ongoing   = $query->clone()->where('status', Examen::STATUS_ONGOING)->count();
+        $completed = $query->clone()->where('status', Examen::STATUS_COMPLETED)->count();
+        $cancelled = $query->clone()->where('status', Examen::STATUS_CANCELLED)->count();
+        $postponed = $query->clone()->where('status', Examen::STATUS_POSTPONED)->count();
 
-        $effectiveExamens = $query->whereIn('status', [
-            'ongoing',
-            'completed'
+        $effectiveExamens = $query->clone()->whereIn('status', [
+            Examen::STATUS_ONGOING,
+            Examen::STATUS_COMPLETED
         ])->count();
 
         $reliabilityRate = $total > 0

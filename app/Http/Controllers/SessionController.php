@@ -22,7 +22,6 @@ class SessionController extends Controller
         $session = SessionModel::with('course')->findOrFail($sessionId);
 
         $gradeId = $session?->course?->current_grade_id;
-        Log::info('gradeId', ['gradeId' => $gradeId]);
         if (!$clubId && $request->validated_role_name === 'super_admin') {
             $clubId = $request->query('club_id') ?? $session?->course?->club_id;
             Log::info('clubId super dmin', ['clubId' => $clubId]);
@@ -44,10 +43,12 @@ class SessionController extends Controller
     public function cancel(SessionModel $session, Request $request)
     {
         $request->validate([
-            'cancel_reason' => 'required|string|min:5'
+            'cancel_reason' => ['required', 'string', 'regex:/^[a-zA-Z0-9\s\.,\'\"\-!?éèàùûô]+$/u', 'min:5', 'max:1000']
         ], [
             'cancel_reason.required' => 'La raison de l\'annulation est requise.',
             'cancel_reason.min' => 'La raison de l\'annulation doit comporter au moins 5 caractères.',
+            'cancel_reason.max' => 'La raison de l\'annulation doit comporter au plus 1000 caractères.',
+            'cancel_reason.regex' => 'La raison de l\'annulation doit être une chaîne de caractères alphanumériques.',
         ]);
 
         if ($session->status === 'cancelled') {
@@ -57,7 +58,7 @@ class SessionController extends Controller
         }
 
         $session->update([
-            'status' => 'cancelled',
+            'status' => 3,
             'cancel_reason' => $request->cancel_reason,
             'cancelled_at' => now(),
         ]);
@@ -74,8 +75,9 @@ class SessionController extends Controller
     {
         $request->validate([
             'session_date' => 'required|date|after_or_equal:today',
-            'start_time' => 'required|date_format:H:i:s',
-            'end_time' => 'required|after:start_time',
+            'start_time' => 'required|date_format:H:i,H:i:s',
+            'end_time'   => 'required|date_format:H:i,H:i:s|after:start_time',
+
         ], [
             'session_date.required' => 'La date de la séance est requise.',
             'start_time.required' => 'L\'heure de début est requise.',
@@ -91,6 +93,7 @@ class SessionController extends Controller
             'end_time' => $request->end_time,
             'replacement_end_time' => $session->end_time,
             'parent_session_id' => $session->id,
+            'status' => 0,
 
         ]);
 
@@ -109,16 +112,16 @@ class SessionController extends Controller
         $request->validate([
             'actual_start_time' => 'nullable|date_format:H:i',
         ]);
-        if ($session->status !== 'scheduled') {
+        if ($session->status !== SessionModel::STATUS_SCHEDULED) {
             return response()->json([
                 'success' => false,
-                'message' => 'Cette session ne peut pas être démarrée (Statut : ' . $session->status . ')'
+                'message' => 'Cette session ne peut pas être démarrée (Statut : ' . $session->getStatutLabelAttribute() . ')'
             ], 400);
         }
 
         $session->update([
             'actual_start_time' => Carbon::now()->format('H:i:s'),
-            'status' => 'ongoing',
+            'status' => SessionModel::STATUS_ONGOING,
         ]);
         return response()->json([
             'success' => true,
@@ -133,16 +136,16 @@ class SessionController extends Controller
             'actual_end_time' => 'nullable|date_format:H:i',
         ]);
 
-        if ($session->status !== 'ongoing') {
+        if ($session->status !== SessionModel::STATUS_ONGOING) {
             return response()->json([
                 'success' => false,
-                'message' => 'Cette session ne peut pas être arrêtée (Statut : ' . $session->status . ')'
+                'message' => 'Cette session ne peut pas être arrêtée (Statut : ' . $session->getStatutLabelAttribute() . ')'
             ], 400);
         }
 
         $session->update([
             'actual_end_time' => Carbon::now()->format('H:i:s'),
-            'status' => 'completed',
+            'status' => SessionModel::STATUS_COMPLETED,
         ]);
 
         return response()->json([
@@ -164,8 +167,8 @@ class SessionController extends Controller
         $request->validate([
             'title' => 'required|string|min:5',
             'session_date' => 'required|date|after_or_equal:today',
-            'start_time' => 'required|date_format:H:i:s',
-            'end_time' => 'required|after:start_time',
+            'start_time' => 'required|date_format:H:i,H:i:s',
+            'end_time'   => 'required|date_format:H:i,H:i:s|after:start_time',
         ], [
             'title.required' => 'Le titre de la session est requis.',
             'session_date.required' => 'La date de la session est requise.',

@@ -21,9 +21,7 @@ return new class extends Migration
             $table->date('birthdate');
             $table->enum('sex', ['M', 'F']);
             $table->string('photo')->nullable();
-            $table->string('status')
-                ->nullable()
-                ->default('inactif');
+            $table->tinyInteger('status')->default(0);
             $table->timestamp('subscription_expires_at')->nullable();
 
             $table->softDeletes();

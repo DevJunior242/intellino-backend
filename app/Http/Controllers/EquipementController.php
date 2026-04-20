@@ -94,7 +94,7 @@ class EquipementController extends Controller
 
         $equipment = Equipment::create([
             ...$data,
-            'club_id' => $request->validated_club_id,
+            'club_id' => $request->attributes->get('club_id'),
             'available_quantity' => $data['total_quantity'],
             'min_stock_alert' => $data['min_stock_alert'] ?? 2,
         ]);
@@ -111,7 +111,6 @@ class EquipementController extends Controller
     {
         $clubId = $request->attributes->get('club_id');
         $equipment = Equipment::findOrFail($request->equipment_id);
-        Log::info('equipment_id', ['equipmentId' => $equipment->id]);
         if ($equipment->available_quantity < $request->quantity_loaned) {
             return response()->json(['message' => 'Plus de stock disponible'], 422);
         }
@@ -148,9 +147,7 @@ class EquipementController extends Controller
         try {
 
 
-            $equipment = $equipmentLoan->equipment;
-            Log::info('EquipmentLoan id : ' . $equipmentLoan->id);
-            Log::info('Equipment id : ' . $equipment->id);
+            $equipment = $equipmentLoan?->equipment;
 
             DB::transaction(function () use ($equipmentLoan, $equipment, $request) {
                 $returnedQty = (int) $request->quantity_returned;
@@ -162,7 +159,6 @@ class EquipementController extends Controller
 
                 $total = (int) $equipmentLoan->quantity_loaned;
 
-                Log::info('total', ['total' => $total]);
                 $status = $equipmentLoan->calculateStatus($returnedQty, $lostQty, $damagedQty, $total);
 
                 $equipmentLoan->update([

@@ -32,13 +32,8 @@ return new class extends Migration
             // Ordre de passage dans la compétition
             $table->integer('ordre_passage')->nullable();
 
-            // Statut du passage
-            $table->enum('statut_passage', [
-                'en_attente',   // pas encore passé
-                'en_cours',     // sur le tatami maintenant
-                'termine',      // a déjà été noté
-                'forfait'       // absent le jour J
-            ])->default('en_attente');
+            // Statut du passage avec tinyInteger
+            $table->tinyInteger('statut_passage')->default(0);
 
             // Index pour récupérer facilement le suivant
             $table->index(['competition_id', 'ordre_passage']);

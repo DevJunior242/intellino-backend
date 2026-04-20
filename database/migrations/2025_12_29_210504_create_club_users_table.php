@@ -16,10 +16,9 @@ return new class extends Migration
             $table->foreignUuid('user_id')->constrained('users')->cascadeOnDelete();
             $table->foreignUuid('role_id')->constrained('roles')->cascadeOnDelete();
             $table->timestamps();
-            $table->index('club_id');
-            $table->index('role_id');
+            $table->softDeletes();
             $table->primary(['user_id', 'club_id']);
-            $table->unique(['user_id', 'club_id'], 'user_club_unique');
+            // $table->unique(['user_id', 'club_id'], 'user_club_unique');
         });
     }
 

@@ -17,10 +17,9 @@ return new class extends Migration
             $table->foreignUuid('niveau_id')->constrained('niveaux_competitions')->cascadeOnDelete();
             $table->foreignUuid('category_id')->constrained('categories')->cascadeOnDelete();
             $table->foreignUuid('disciplineleague_id')->constrained('disciplineleagues')->cascadeOnDelete();
-            $table->tinyInteger('statut');
+            $table->tinyInteger('status')->default(0); // 0 = En attente, 1 = En cours, 2 = Terminé
             $table->dateTime('heure_debut_prevu')->nullable();
-
-            // Exemple : 2026-04-03 20:00:00
+            $table->index(['status', 'heure_debut_prevu', 'heure_fin_prevue']);
             $table->dateTime('heure_fin_prevue')->nullable();
             $table->timestamps();
         });

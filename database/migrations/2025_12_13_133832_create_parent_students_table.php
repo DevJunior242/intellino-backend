@@ -16,7 +16,7 @@ return new class extends Migration
             $table->foreignUuid('parent_model_id')->constrained('parent_models')->onDelete('cascade');
             $table->timestamps();
             $table->primary(['student_id', 'parent_model_id']);
-            $table->unique(['student_id', 'parent_model_id']);
+            // $table->unique(['student_id', 'parent_model_id']);
         });
     }
 

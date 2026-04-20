@@ -33,13 +33,16 @@ class Examen extends Model
         'replacement_end_time',
 
     ];
-    //creer le status 
-    protected $aatributes = [
-        'status' => ['draft'],
-    ];
+
 
     public $incrementing = false;
     public $keyType = 'string';
+
+    const STATUS_SCHEDULED = 0;
+    const STATUS_ONGOING = 1;
+    const STATUS_COMPLETED = 2;
+    const STATUS_CANCELLED = 3;
+    const STATUS_POSTPONED = 4;
 
     public function club()
     {
@@ -67,5 +70,17 @@ class Examen extends Model
     public function examenResult()
     {
         return $this->hasMany(ExamenResult::class);
+    }
+
+    public function getStatutLabelAttribute()
+    {
+        return match ($this->status) {
+            self::STATUS_SCHEDULED => 'Planifié',
+            self::STATUS_ONGOING   => 'En cours',
+            self::STATUS_COMPLETED => 'Terminé',
+            self::STATUS_CANCELLED => 'Annulé',
+            self::STATUS_POSTPONED => 'Postponé',
+            default                => 'Inconnu',
+        };
     }
 }

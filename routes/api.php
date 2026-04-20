@@ -288,7 +288,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::get('grade', [GradeController::class, 'index']);
     Route::apiResource('/users', UserController::class);
 
-    Route::middleware('clubrole:instructeur,secretaire,admin_club,parent,karateka')->group(function () {
+    Route::middleware('clubrole:instructeur,secretaire,admin_club,parent,karateka,super_admin')->group(function () {
 
         //inscription 
         Route::prefix('inscriptions')->group(function () {

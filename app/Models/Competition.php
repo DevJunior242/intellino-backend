@@ -15,7 +15,7 @@ class Competition extends Model
 {
     use HasUuids;
     protected $table = 'competitions';
-    protected $fillable = ['category_id', 'disciplineleague_id', 'niveau_id', 'evenement_id', 'statut', 'heure_debut_prevu', 'heure_fin_prevue', 'id'];
+    protected $fillable = ['category_id', 'disciplineleague_id', 'niveau_id', 'evenement_id', 'status', 'heure_debut_prevu', 'heure_fin_prevue', 'id'];
 
     protected $keyType = 'string';
     public $incrementing = false;

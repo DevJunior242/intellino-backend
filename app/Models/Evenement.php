@@ -17,13 +17,11 @@ class Evenement extends Model
         'lieu',
         'date_debut',
         'date_fin',
-        'statut',
+        'status',
     ];
-    const STATUT_BROUILLON = 'brouillon';
-    const STATUT_OUVERT = 'ouverte';
-    const STATUT_EN_COURS = 'en_cours';
-    const STATUT_CLOTURE = 'cloturee';
-    const STATUT_TERMINE = 'terminee';
+    const STATUT_EN_ATTENTE = 0;
+    const STATUT_EN_COURS = 1;
+    const STATUT_TERMINE = 2;
     protected $keyType = 'string';
     public $incrementing = false;
 
@@ -39,14 +37,12 @@ class Evenement extends Model
 
 
 
-    // Accessor pour récupérer le nom du statut facilement
+    // Accessor pour récupérer le nom du status facilement
     public function getStatutLabelAttribute()
     {
-        return match ($this->statut) {
-            self::STATUT_BROUILLON => 'Brouillon',
-            self::STATUT_OUVERT    => 'Ouvert',
+        return match ($this->status) {
+            self::STATUT_EN_ATTENTE => 'En attente',
             self::STATUT_EN_COURS  => 'En cours',
-            self::STATUT_CLOTURE   => 'Cloture',
             self::STATUT_TERMINE   => 'Terminée',
             default                => 'Inconnu',
         };

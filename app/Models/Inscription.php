@@ -26,7 +26,7 @@ class Inscription extends Model
         'competition_id',
         'athlete_id',
         'kata_id',
-        // 'poids_declare',
+        'poids_declare',
         'poids_officiel',
         'statut_pesee',
         'ordre_passage',

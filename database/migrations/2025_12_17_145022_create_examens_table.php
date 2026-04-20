@@ -17,13 +17,7 @@ return new class extends Migration
             $table->foreignUuid('current_grade_id')->constrained('grades')->onDelete('cascade');
             $table->foreignUuid('next_grade_id')->constrained('grades')->onDelete('cascade');
 
-            $table->enum('status', [
-                'scheduled',
-                'ongoing',
-                'completed',
-                'cancelled',
-                'postponed',
-            ])->default('scheduled');
+            $table->tinyInteger('status')->default(0);
 
             $table->text('cancel_reason')->nullable();
             $table->timestamp('cancelled_at')->nullable();

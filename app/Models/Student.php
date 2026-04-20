@@ -36,9 +36,8 @@ class Student extends Model
         'subscription_expires_at',
     ];
 
-    protected $attributes = [
-        'status' => 'inactif',
-    ];
+    const STATUS_ACTIV = 0;
+    const STATUS_INACTIV = 1;
     protected $casts = [
         'subscription_expires_at' => 'datetime',
     ];
@@ -125,5 +124,14 @@ class Student extends Model
         }
 
         return $this->subscription_expires_at->isFuture();
+    }
+
+    public function getStatutLabelAttribute()
+    {
+        return match ($this->status) {
+            self::STATUS_ACTIV => 'Actif',
+            self::STATUS_INACTIV => 'Inactif',
+            default => 'Inconnu',
+        };
     }
 }
