@@ -15,7 +15,11 @@ WORKDIR /var/www/html
 
 COPY composer.json composer.lock ./
 
-RUN composer install --no-dev --optimize-autoloader --no-scripts --no-autoloader
+RUN php -d memory_limit=-1 /usr/bin/composer install \
+    --no-dev \
+    --no-scripts \
+    --no-autoloader \
+    --verbose
 
 COPY . .
 
