@@ -15,11 +15,9 @@ return new class extends Migration
             $table->uuid('id')->primary();
             $table->foreignUuid('examen_id')->constrained('examens')->onDelete('cascade');
             $table->foreignUuid('student_id')->constrained('students')->onDelete('cascade');
-            $table->enum('status', ['registered', 'absent', 'evaluated'])
-            ->nullable()
-            ->default('registered');
+            $table->tinyInteger('status')->default(0);
             $table->timestamps();
-            $table->unique(['examen_id', 'student_id'],'examen_candidat_unique_idx');
+            $table->unique(['examen_id', 'student_id'], 'examen_candidat_unique_idx');
         });
     }
 

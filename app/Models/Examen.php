@@ -21,6 +21,8 @@ class Examen extends Model
         'next_grade_id',
         'start_date',
         'end_date',
+        'old_start_date',
+        'old_end_date',
         'status',
         'created_by',
         'cancel_reason',
@@ -58,7 +60,7 @@ class Examen extends Model
         return $this->belongsTo(User::class);
     }
 
-    public function candidate()
+    public function candidates()
     {
         return $this->hasMany(ExamenCandidat::class);
     }

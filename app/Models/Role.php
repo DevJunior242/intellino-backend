@@ -26,4 +26,11 @@ class Role extends Model
             'instructeur'
         ])->pluck('id');
     }
+
+    public static function studentRoles()
+    {
+        return self::whereIn('name', [
+            'karateka',
+        ])->pluck('id');
+    }
 }

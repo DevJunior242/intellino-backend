@@ -5,11 +5,12 @@ namespace App\Models;
 use App\Models\Examen;
 use App\Models\Student;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Notifications\Notifiable;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 
 class ExamenCandidat extends Model
 {
-    use HasUuids;
+    use HasUuids, Notifiable;
     protected $fillable = [
         'examen_id',
         'student_id',
@@ -17,6 +18,10 @@ class ExamenCandidat extends Model
     ];
     public $incrementing = false;
     public $keyType = 'string';
+    const STATUS_REGISTERED = 0;
+    const STATUS_ABSENT = 1;
+    const STATUS_EVALUATED = 2;
+
 
     public function examen()
     {

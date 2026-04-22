@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use Carbon\Carbon;
+use App\Models\User;
 use App\Models\Grade;
 use App\Models\Examen;
 use App\Models\Student;
@@ -13,8 +14,12 @@ use Illuminate\Support\Facades\DB;
 use App\Services\ExamenStatService;
 use Illuminate\Support\Facades\Log;
 use App\Http\Controllers\Controller;
+use App\Notifications\ExamenChanged;
+use App\Notifications\ExamenCreated;
+use App\Notifications\ExamenCanceled;
 use Illuminate\Database\QueryException;
 use App\Http\Requests\StoreExamenRequest;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
 class ExamenController extends Controller
@@ -133,7 +138,7 @@ class ExamenController extends Controller
                         'id' => Str::uuid(),
                         'examen_id' => $examen->id,
                         'student_id' => $student->id,
-                        'status' => 'registered',
+                        'status' => ExamenCandidat::STATUS_REGISTERED,
                         'created_at' => now(),
                         'updated_at' => now(),
                     ])->toArray()
@@ -156,8 +161,14 @@ class ExamenController extends Controller
                 'message' => 'Examen et candidats ajoutés avec succès',
                 'data' => $examenData
             ], 201);
+            //envoyer notif aux candidats
+            //load relation
+            $candidats = $examenData->candidates;
+            Log::info('Examen created', ['examen' => $examenData]);
+            if ($candidats->isNotEmpty()) {
+                Notification::send($candidats, new ExamenCreated($examenData));
+            }
         } catch (QueryException $e) {
-            Log::error('QueryException', ['message' => $e->getMessage()]);
 
             return response()->json([
                 'success' => false,
@@ -205,6 +216,12 @@ class ExamenController extends Controller
             'cancel_reason' => $request->cancel_reason,
             'cancelled_at' => now(),
         ]);
+        //envoyer notif aux candidats
+        //load relation
+        $candidats = $examen->candidates;
+        if ($candidats->isNotEmpty()) {
+            Notification::send($candidats, new ExamenCanceled($examen));
+        }
 
         return response()->json([
             'success' => true,
@@ -220,8 +237,8 @@ class ExamenController extends Controller
         $request->validate([
             'start_date' => 'required|date|after_or_equal:today',
             'end_date' => 'required|date|after_or_equal:today',
-            'start_time' => 'required|date_format:H:i,H:i:s',
-            'end_time'   => 'required|date_format:H:i,H:i:s|after:start_time',
+            'start_time' => ['required', 'date_format:H:i'],
+            'end_time'   => ['required', 'date_format:H:i', 'after:start_time'],
             'replacement_start_time' => 'nullable|date_format:H:i',
             'replacement_end_time' => 'nullable|after:replacement_start_time',
         ], [
@@ -242,14 +259,21 @@ class ExamenController extends Controller
             'end_time' => $request->end_time,
             'replacement_start_time' => $examen->start_time,
             'replacement_end_time' => $examen->end_time,
-            'status' => 0,
+            'status' => Examen::STATUS_SCHEDULED,
             'created_by' => $user->id,
 
-        ], [
-            'start_date.required' => 'La date de la séance est requise.',
-            'end_date.required' => 'La date de la séance est requise.',
-            'end_date.after' => 'La date de fin doit être après la date de début.',
         ]);
+
+        //doit passer par user->students->candidates
+        $studentsToNotify = User::whereHas('students.candidates', function ($query) use ($examen) {
+            $query->where('examen_id', $examen->id)
+                ->where('status', ExamenCandidat::STATUS_REGISTERED);
+        })
+            ->get()
+            ->unique('id');
+        if ($studentsToNotify->isNotEmpty()) {
+            Notification::send($studentsToNotify, new ExamenChanged($examen));
+        }
 
         return response()->json(
             [

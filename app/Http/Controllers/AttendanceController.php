@@ -12,15 +12,17 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Database\QueryException;
 use App\Http\Requests\StoreAttendanceRequest;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
 class AttendanceController extends Controller
 {
+    use AuthorizesRequests;
 
     public function index(Request $request)
     {
         $user = auth()->user();
-        $role = $request->validated_role_name;
-        $clubId = $request->validated_club_id;
+        $role = $request->attributes->get('role');
+        $clubId = $request->attributes->get('club_id');
 
         $query = Attendance::with([
             'student.club:id,name,logo',
@@ -71,6 +73,7 @@ class AttendanceController extends Controller
 
     public function update(Request $request, $id)
     {
+        $this->authorize('update', Attendance::class);
         $attendance = Attendance::findOrFail($id);
         $validated = $request->validate([
             'attendance' => 'required|in:present,absent',
@@ -82,6 +85,7 @@ class AttendanceController extends Controller
 
     public function destroy($id)
     {
+        $this->authorize('delete', Attendance::class);
         $attendance = Attendance::findOrFail($id);
         $attendance->delete();
         return response()->json(['message' => 'Attendance deleted']);
@@ -91,7 +95,8 @@ class AttendanceController extends Controller
     public function bulkStore(StoreAttendanceRequest $request)
     {
         // Récupération sécurisée des données
-        $clubId = $request->validated_club_id;
+        $this->authorize('create', Attendance::class);
+        $clubId = $request->attributes->get('club_id');
         $validatedData = $request->validated();
         $attendances = $validatedData['attendances'];
 
@@ -123,7 +128,6 @@ class AttendanceController extends Controller
             // En cas d'erreur, on annule tout ce qui a été fait dans le foreach
             DB::rollBack();
 
-            Log::error("Erreur BulkStore Attendance: " . $e->getMessage());
 
             return response()->json([
                 'success' => false,

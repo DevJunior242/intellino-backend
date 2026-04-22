@@ -51,6 +51,7 @@ use App\Http\Controllers\EnchainementController;
 use App\Http\Controllers\ExamenLeagueController;
 use App\Http\Controllers\KumiteFormatController;
 use App\Http\Controllers\LeagueMemberController;
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\OrdrePassageController;
 use App\Http\Controllers\StudentGradeController;
 use App\Http\Controllers\SubscriptionController;
@@ -287,6 +288,9 @@ Route::middleware(['auth:sanctum'])->group(function () {
     //student grade 
     Route::get('grade', [GradeController::class, 'index']);
     Route::apiResource('/users', UserController::class);
+    //notifications
+    Route::get('/notifications', [NotificationController::class, 'index']);
+    Route::post('/notifications/mark-read', [NotificationController::class, 'markAsRead']);
 
     Route::middleware('clubrole:instructeur,secretaire,admin_club,parent,karateka,super_admin')->group(function () {
 

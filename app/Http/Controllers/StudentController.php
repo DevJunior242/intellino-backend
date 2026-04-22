@@ -159,8 +159,8 @@ class StudentController extends Controller
                             $pProfile = ParentModel::firstOrCreate(['user_id' => $studentUserId]);
                             $currentStudentParentId = $pProfile->id;
                         }
-                        // $token = Password::createToken($studentUser);
-                        // $studentUser->notify(new WelcomeNewMember($token));
+                        $token = Password::createToken($studentUser);
+                        $studentUser->notify(new WelcomeNewMember($token));
                     }
 
                     // 2. Gestion de la photo

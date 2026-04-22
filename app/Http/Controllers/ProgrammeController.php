@@ -27,13 +27,13 @@ class ProgrammeController extends Controller
             $q->where('club_id', $clubId);
         })
             ->whereBetween('session_date', [$start, $end])
-            ->where('status', '!=', 'cancelled')
+            ->where('status', '!=', SessionModel::STATUS_CANCELLED)
             ->get();
 
         $examens = Examen::with('currentGrade')
             ->where('club_id', $clubId)
             ->whereBetween('start_date', [$start, $end])
-            ->where('status', '!=', 'cancelled')
+            ->where('status', '!=', Examen::STATUS_CANCELLED)
             ->get();
         Log::info('examens', ['examens' => $examens]);
 

@@ -54,7 +54,7 @@ class Student extends Model
         return $this->belongsTo(Club::class);
     }
 
-    public function candidate()
+    public function candidates()
     {
         return $this->hasMany(ExamenCandidat::class);
     }

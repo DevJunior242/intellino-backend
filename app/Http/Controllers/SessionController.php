@@ -3,11 +3,15 @@
 namespace App\Http\Controllers;
 
 use Carbon\Carbon;
+use App\Models\Role;
 use App\Models\Student;
 use App\Models\SessionModel;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use App\Notifications\SessionChanged;
 use App\Services\SessionStatsService;
+use App\Notifications\SessionCanceled;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
 class SessionController extends Controller
@@ -22,9 +26,8 @@ class SessionController extends Controller
         $session = SessionModel::with('course')->findOrFail($sessionId);
 
         $gradeId = $session?->course?->current_grade_id;
-        if (!$clubId && $request->validated_role_name === 'super_admin') {
+        if (!$clubId && $request->attributes->get('role') === 'super_admin') {
             $clubId = $request->query('club_id') ?? $session?->course?->club_id;
-            Log::info('clubId super dmin', ['clubId' => $clubId]);
         }
         $students = Student::with(['club', 'currentGrade'])
             ->where('club_id', $clubId)
@@ -63,6 +66,25 @@ class SessionController extends Controller
             'cancelled_at' => now(),
         ]);
 
+        // 1. On récupère les critères de la séance
+        $gradeId = $session->course->current_grade_id;
+        $clubId = $session->course->club_id;
+
+        // 2. On récupère les utilisateurs (ceux qui ont un email)
+        $studentsToNotify = \App\Models\User::whereHas('students', function ($query) use ($gradeId, $clubId) {
+            // On filtre sur le profil étudiant
+            $query->where('club_id', $clubId)
+                ->whereHas('currentGrade', function ($q) use ($gradeId) {
+                    // On filtre sur la table pivot/historique des grades
+                    $q->where('current_grade_id', $gradeId)
+                        ->where('is_current', true);
+                });
+        })->get();
+
+        // 3. Envoi via la file d'attente
+        if ($studentsToNotify->isNotEmpty()) {
+            Notification::send($studentsToNotify, new SessionCanceled($session));
+        }
         return response()->json([
             'success' => true,
             'message' => 'Session annulée avec succès',
@@ -75,8 +97,8 @@ class SessionController extends Controller
     {
         $request->validate([
             'session_date' => 'required|date|after_or_equal:today',
-            'start_time' => 'required|date_format:H:i,H:i:s',
-            'end_time'   => 'required|date_format:H:i,H:i:s|after:start_time',
+            'start_time' => ['required', 'date_format:H:i'],
+            'end_time'   => ['required', 'date_format:H:i', 'after:start_time'],
 
         ], [
             'session_date.required' => 'La date de la séance est requise.',
@@ -97,6 +119,25 @@ class SessionController extends Controller
 
         ]);
 
+        // 1. On récupère les critères de la séance
+        $gradeId = $session->course->current_grade_id;
+        $clubId = $session->course->club_id;
+
+        // 2. On récupère les utilisateurs (ceux qui ont un email)
+        $studentsToNotify = \App\Models\User::whereHas('students', function ($query) use ($gradeId, $clubId) {
+            // On filtre sur le profil étudiant
+            $query->where('club_id', $clubId)
+                ->whereHas('currentGrade', function ($q) use ($gradeId) {
+                    // On filtre sur la table pivot/historique des grades
+                    $q->where('current_grade_id', $gradeId)
+                        ->where('is_current', true);
+                });
+        })->get();
+
+        // 3. Envoi via la file d'attente
+        if ($studentsToNotify->isNotEmpty()) {
+            Notification::send($studentsToNotify, new SessionChanged($session));
+        }
         return response()->json(
             [
                 'success' => true,

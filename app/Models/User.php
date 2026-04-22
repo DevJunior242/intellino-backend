@@ -96,6 +96,10 @@ class User extends Authenticatable implements MustVerifyEmail
     {
         return $this->hasOne(ParentModel::class, 'user_id');
     }
+    public function studentProfile()
+    {
+        return $this->hasOne(Student::class, 'user_id');
+    }
 
 
 
