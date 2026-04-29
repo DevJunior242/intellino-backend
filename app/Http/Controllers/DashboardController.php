@@ -23,7 +23,8 @@ class DashboardController extends Controller
     {
         $data = $this->statsService->getStatsByUserRole(
             $request->user(),
-            $request->attributes->get('club_id'),
+            $request->attributes->get('organisateur_id'),
+            $request->attributes->get('organisateur_type'),
             $request->attributes->get('role')
         );
 
@@ -36,8 +37,8 @@ class DashboardController extends Controller
 
     public function getDashboardActivity(Request $request)
     {
-        $activeOrgId = $request->attributes->get('club_id');
-        $activeOrgType = 'Club';
+        $activeOrgId = $request->attributes->get('organisateur_id');
+        $activeOrgType = $request->attributes->get('organisateur_type');
 
         if (!$activeOrgId) {
             return response()->json(['message' => 'Aucune organisation active trouvée'], 404);

@@ -64,7 +64,6 @@ class EvenementController extends Controller
                     ->withCount('inscriptions')
                     ->orderBy('heure_debut_prevu', 'asc');
             }])
-            ->withCount('competitions')
             ->where('status', Evenement::STATUT_EN_COURS)
             ->latest()
             ->first();

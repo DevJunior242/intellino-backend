@@ -78,9 +78,7 @@ class LeagueMemberController extends Controller
     {
         $validated = $request->validated();
         $user = auth()->user();
-        Log::info('user_id', ['userId' => $user->id]);
         $leagueId = $user->current_league_id;
-        Log::info('league_id', ['leagueId' => $leagueId]);
 
 
         $targetUser = User::where('email', $validated['email'])
@@ -95,7 +93,7 @@ class LeagueMemberController extends Controller
             if ($isAlreadyMember) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Cet utilisateur est déjà inscrit dans ce club. Pour changer son rôle, utilisez le menu de modification.'
+                    'message' => 'Cet utilisateur est deja membre.'
                 ], 422);
             }
         }
@@ -109,7 +107,6 @@ class LeagueMemberController extends Controller
                 'password' => Hash::make('password123'),
             ]);
         }
-        Log::info('new_user_id', ['newUserId' => $targetUser->id]);
         $exists = DB::table('league_users')
             ->where('user_id', $targetUser->id)
             ->where('league_id', $leagueId)
@@ -124,7 +121,7 @@ class LeagueMemberController extends Controller
 
         $targetUser->current_league_id = $leagueId;
         $targetUser->save();
-        $targetUser->notify(new WelcomeToLeague());
+        $targetUser->notify(new WelcomeToLeague($targetUser));
 
 
 
@@ -137,7 +134,8 @@ class LeagueMemberController extends Controller
     public function getRoles(Request $request)
     {
 
-        $roles = Role::whereNotIn('name', ['super_admin', 'admin_club', 'admin_league', 'parent', 'student', 'instructor'])->get();
+        $roles = Role::whereNotIn('name', ['super_admin', 'admin_club', 'admin_league', 'parent', 'karateka', 'instructeur', 'secretaire'])
+            ->get();
         return response()->json(['success' => true, 'roles' => $roles]);
     }
 

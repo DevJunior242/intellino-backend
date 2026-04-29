@@ -292,7 +292,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::get('/notifications', [NotificationController::class, 'index']);
     Route::post('/notifications/mark-read', [NotificationController::class, 'markAsRead']);
 
-    Route::middleware('clubrole:instructeur,secretaire,admin_club,parent,karateka,super_admin')->group(function () {
+    Route::middleware('permission:instructeur,secretaire,admin_club,parent,karateka,super_admin,admin_league')->group(function () {
 
         //inscription 
         Route::prefix('inscriptions')->group(function () {
@@ -409,7 +409,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::prefix('enchainements')->group(function () {
             Route::get('/', [EnchainementController::class, 'index']);
             Route::post('/{examen}', [EnchainementController::class, 'store']);
-            Route::get('/{examen}', [EnchainementController::class, 'show']);
+            Route::get('/{examenId}', [EnchainementController::class, 'show']);
             Route::put('/{id}', [EnchainementController::class, 'update']);
             Route::delete('/{examen}/{id}', [EnchainementController::class, 'destroy']);
         });

@@ -21,7 +21,7 @@ class StudentPaymentController extends Controller
     use AuthorizesRequests;
     public function index(Request $request)
     {
-        $clubId = $request->attributes->get('club_id');
+        $activeId = $request->attributes->get('organisateur_id');
         $role = $request->attributes->get('role');
 
 
@@ -48,7 +48,7 @@ class StudentPaymentController extends Controller
             $studentId = $parent->students()->pluck('students.id');
             $Payments = StudentPayment::with(['pricingPlan.paymentCategory', 'student'])
                 ->whereIn('student_id', $studentId)
-                ->where('club_id', $clubId)
+                ->where('club_id', $activeId)
                 ->latest()
                 ->paginate(8);
             return response()->json([
@@ -76,7 +76,7 @@ class StudentPaymentController extends Controller
         } else {
 
             $Payments = StudentPayment::with(['pricingPlan.paymentCategory', 'student'])
-                ->where('club_id', $clubId)
+                ->where('club_id', $activeId)
                 ->latest()
                 ->paginate(4);
             return response()->json([
@@ -93,14 +93,14 @@ class StudentPaymentController extends Controller
     public function store(StorePaymentRequest $request)
     {
         $validated = $request->validated();
-        $clubId = $request->attributes->get('club_id');
+        $activeId = $request->attributes->get('organisateur_id');
         $plan = PricingPlan::with('paymentCategory')->findOrFail($validated['pricing_plan_id']);
         $student = Student::findOrFail($validated['student_id']);
 
         // 1. RÉCUPÉRATION DE LA DETTE RÉELLE (Basée sur le dernier paiement)
         $lastPayment = StudentPayment::where('student_id', $student->id)
             ->where('pricing_plan_id', $plan->id)
-            ->where('club_id', $clubId)
+            ->where('club_id', $activeId)
             ->latest() // On prend le tout dernier
             ->first();
 
@@ -152,7 +152,7 @@ class StudentPaymentController extends Controller
         $status = ($newBalance <= 0) ? 'paid' : 'partial';
 
         $payment = StudentPayment::create([
-            'club_id' => $clubId,
+            'club_id' => $activeId,
             'student_id' => $student->id,
             'pricing_plan_id' => $plan->id,
             'total_amount' => $plan->price,
@@ -181,10 +181,10 @@ class StudentPaymentController extends Controller
     }
     public function getStudentHistory($studentId, Request $request)
     {
-        $clubId = $request->attributes->get('club_id');
+        $activeId = $request->attributes->get('organisateur_id');
         $payments = StudentPayment::with(['pricingPlan.paymentCategory', 'recorder'])
             ->where('student_id', $studentId)
-            ->where('club_id', $clubId)
+            ->where('club_id', $activeId)
             ->orderBy('created_at', 'desc')
             ->get();
 
@@ -193,11 +193,11 @@ class StudentPaymentController extends Controller
 
     public function downloadInvoice(Request $request, $id)
     {
-        $clubId = $request->attributes->get('club_id');
-        Log::info('clubId', ['clubId' => $clubId]);
+        $activeId = $request->attributes->get('organisateur_id');
+        Log::info('activeId', ['activeId' => $activeId]);
 
         $payment = StudentPayment::with(['student', 'pricingPlan', 'club'])
-            ->where('club_id', $clubId)
+            ->where('club_id', $activeId)
             ->findOrFail($id);
 
         $pdf = Pdf::loadView('invoices.payment', compact('payment'));
@@ -206,8 +206,8 @@ class StudentPaymentController extends Controller
     }
     public function revenueStats(Request $request)
     {
-        $clubId = $request->attributes->get('club_id');
-        $stats = StudentPayment::where('club_id', $clubId)
+        $activeId = $request->attributes->get('organisateur_id');
+        $stats = StudentPayment::where('club_id', $activeId)
             ->selectRaw('SUM(amount_paid) as total, DATE_FORMAT(created_at, "%b") as month')
             ->where('created_at', '>=', now()->subMonths(6))
             ->groupBy('month')
@@ -221,9 +221,9 @@ class StudentPaymentController extends Controller
     public function stats(StudentPaymentService $StudentPaymentService, Request $request)
     {
         $this->authorize('viewStats', StudentPayment::class);
-        $clubId = $request->attributes->get('club_id');
+        $activeId = $request->attributes->get('organisateur_id');
 
-        $stats = $StudentPaymentService->getStudentpaymentStats($clubId);
+        $stats = $StudentPaymentService->getStudentpaymentStats($activeId);
 
         return response()->json([
             'success' => true,
@@ -235,10 +235,10 @@ class StudentPaymentController extends Controller
 
     public function getRemainingDebt(Request $request, Student $student, PricingPlan $pricingPlan)
     {
-        $clubId = $request->attributes->get('club_id');
+        $activeId = $request->attributes->get('organisateur_id');
         $lastPayment = StudentPayment::where('student_id', $student->id)
             ->where('pricing_plan_id', $pricingPlan->id)
-            ->where('club_id', $clubId)
+            ->where('club_id', $activeId)
             ->latest()
             ->first();
 
@@ -254,9 +254,9 @@ class StudentPaymentController extends Controller
 
     public function getDebtors(Request $request)
     {
-        $clubId = $request->attributes->get('club_id');
+        $activeId = $request->attributes->get('organisateur_id');
 
-        $debts = StudentPayment::where('club_id', $clubId)
+        $debts = StudentPayment::where('club_id', $activeId)
             ->where('balance', '>', 0)
             ->with(['student.user:id,fullname,phone', 'pricingPlan:id,label', 'student.parents.user:id,fullname,phone', 'student.club:id,name,logo'])
             ->select('student_id', 'pricing_plan_id', 'balance', 'updated_at', 'total_amount')
@@ -280,10 +280,10 @@ class StudentPaymentController extends Controller
     public function getParentDebts(Request $request)
     {
         $user = auth()->user();
-        $clubId = $request->attributes->get('club_id');
+        $activeId = $request->attributes->get('organisateur_id');
         $parent = ParentModel::where('user_id', $user->id)->first();
         $studentIds = $parent->students()->pluck('students.id');
-        $debts = StudentPayment::where('club_id', $clubId)
+        $debts = StudentPayment::where('club_id', $activeId)
             ->where('balance', '>', 0)
             ->whereIn('student_id', $studentIds)
             ->with(['student.user:id,fullname', 'pricingPlan:id,label'])

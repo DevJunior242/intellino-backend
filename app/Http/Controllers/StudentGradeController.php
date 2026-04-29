@@ -19,14 +19,14 @@ class StudentGradeController extends Controller
         $role = $request->attributes->get('role');
         $user = auth()->user();
 
-        $clubId = $request->attributes->get('club_id');
+        $activeId = $request->attributes->get('organisateur_id');
 
         if ($role === 'parent') {
             $parent = ParentModel::where('user_id', $user->id)->first();
             $studentIds = $parent->students()->pluck('students.id');
             $studentGrades = StudentGrade::with('student:id,fullname', 'currentGrade:id,name,description')
                 ->whereIn('student_id', $studentIds)
-                ->where('club_id', $clubId)
+                ->where('club_id', $activeId)
                 ->get();
         } elseif ($role === 'karateka') {
             $student = Student::where('user_id', $user->id)->first();
@@ -35,11 +35,11 @@ class StudentGradeController extends Controller
                 ->get();
         } else {
             $studentGrades = StudentGrade::with('student:id,fullname', 'currentGrade:id,name,description')
-                ->where('club_id', $clubId)
-                ->whereIn('id', function ($query) use ($clubId) {
+                ->where('club_id', $activeId)
+                ->whereIn('id', function ($query) use ($activeId) {
                     $query->selectRaw('MAX(id)')
                         ->from('student_grades')
-                        ->where('club_id', $clubId)
+                        ->where('club_id', $activeId)
                         ->groupBy('student_id');
                 })
                 ->get();
@@ -54,7 +54,7 @@ class StudentGradeController extends Controller
 
     public function studentHistory(Student $student): JsonResponse
     {
-        $clubId = request()->attributes->get('club_id');
+        $activeId = request()->attributes->get('organisateur_id');
 
         return response()->json([
             'all_club_grades' => Grade::select('id', 'name', 'description')
@@ -62,7 +62,7 @@ class StudentGradeController extends Controller
 
             // Tous les passages de grades de cet élève
             'student_history' => StudentGrade::where('student_id', $student->id)
-                ->where('club_id', $clubId)
+                ->where('club_id', $activeId)
                 ->with('instructor')
                 ->orderBy('awarded_at', 'desc')
                 ->get()
@@ -72,7 +72,7 @@ class StudentGradeController extends Controller
     {
         try {
             $user = auth()->user();
-            $clubId = $request->attributes->get('club_id');
+            $activeId = $request->attributes->get('organisateur_id');
 
             $validated = $request->validated();
 
@@ -83,7 +83,7 @@ class StudentGradeController extends Controller
                 $studentGrade = StudentGrade::create([
                     ...$validated,
                     'instructor_id' => $user->id,
-                    'club_id' => $clubId,
+                    'club_id' => $activeId,
                     'is_current' => true,
 
 
@@ -133,7 +133,7 @@ class StudentGradeController extends Controller
                 'is_current' => true,
                 'awarded_at' => now(),
                 'instructor_id' => auth()->id(),
-                'club_id' => request()->attributes->get('club_id'),
+                'club_id' => request()->attributes->get('organisateur_id'),
             ]);
 
             return $newGrade;

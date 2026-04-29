@@ -29,7 +29,19 @@ class StudentPolicy
      */
     public function viewStats(User $user): bool
     {
-        // return $this->hasStudentRole($user);
+        if ($user->isSuperAdmin()) {
+            return true;
+        }
+        $clubId = request()->attributes->get('organisateur_id');
+
+        if (!$clubId) {
+            return false;
+        }
+
+        return $user->clubs()
+            ->where('clubs.id', $clubId)
+            ->whereIn('club_users.role_id', Role::clubAdminRoles())
+            ->exists();
     }
     public function create(User $user): bool
     {

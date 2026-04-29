@@ -12,28 +12,26 @@ use App\Http\Controllers\Controller;
 class InscriptionController extends Controller
 {
 
-    // public function index(Request $request): JsonResponse
-    // {
-    //     $request->validate([
-    //         'competition_id' => 'required|exists:competitions,id'
-    //     ]);
+    public function index(Request $request)
+    {
+        $request->validate([
+            'competition_id' => 'required|exists:competitions,id'
+        ]);
 
-    //     // On récupère TOUTES les inscriptions pour CETTE compétition
-    //     // On charge les relations pour avoir le nom du club et de l'athlète
-    //     $inscriptions = Inscription::where('competition_id', $request->competition_id)
-    //         ->with([
-    //             'athlete:id,fullname,sex',
-    //             'club:id,name',
-    //             'category:id,nom,sexe',
-    //             'disciplineleague:id,nom'
-    //         ])
-    //         ->orderBy('club_id')
-    //         ->get();
+        // On récupère TOUTES les inscriptions pour CETTE compétition
+        // On charge les relations pour avoir le nom du club et de l'athlète
+        $inscriptions = Inscription::where('competition_id', $request->competition_id)
+            ->with([
+                'athlete:id,fullname,sex',
+                'club:id,name',
+                'category:id,nom,sexe',
+                'disciplineleague:id,nom'
+            ])
+            ->orderBy('club_id')
+            ->get();
 
-    //     return response()->json([
-    //         'data' => $inscriptions
-    //     ]);
-    // }
+        return response()->json($inscriptions);
+    }
     // public function store(InscriptionRequest $request): JsonResponse
     // {
     //     $clubId = $request->validated_club_id;

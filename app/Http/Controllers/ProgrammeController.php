@@ -12,7 +12,7 @@ class ProgrammeController extends Controller
 {
     public function index(Request $request)
     {
-        $clubId = $request->attributes->get('club_id');
+        $orgId = $request->attributes->get('organisateur_id');
         $range = $request->get('range', 'today');
 
         if ($range === 'week') {
@@ -23,19 +23,18 @@ class ProgrammeController extends Controller
             $end = now()->endOfDay();
         }
 
-        $sessions = SessionModel::whereHas('course', function ($q) use ($clubId) {
-            $q->where('club_id', $clubId);
+        $sessions = SessionModel::whereHas('course', function ($q) use ($orgId) {
+            $q->where('club_id', $orgId);
         })
             ->whereBetween('session_date', [$start, $end])
             ->where('status', '!=', SessionModel::STATUS_CANCELLED)
             ->get();
 
         $examens = Examen::with('currentGrade')
-            ->where('club_id', $clubId)
+            ->where('organisateur_id', $orgId)
             ->whereBetween('start_date', [$start, $end])
             ->where('status', '!=', Examen::STATUS_CANCELLED)
             ->get();
-        Log::info('examens', ['examens' => $examens]);
 
         $programmes = collect();
 
@@ -51,7 +50,6 @@ class ProgrammeController extends Controller
         }
 
         foreach ($examens as $e) {
-            Log::info('examen', ['examen' => $e->currentGrade]);
             $programmes->push([
                 'id' => $e->id,
                 'type' => 'examen',

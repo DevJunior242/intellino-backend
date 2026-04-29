@@ -25,14 +25,14 @@ class StudentController extends Controller
 
     public function index(Request $request)
     {
-        $clubId = $request->attributes->get('club_id');
+        $activeId = $request->attributes->get('organisateur_id');
         $role = $request->attributes->get('role');
         $isSuperAdmin = ($role === 'super_admin');
 
         if ($isSuperAdmin) {
             $students = Student::with('club:id,name')->get();
         } else {
-            $students = Student::where('club_id', $clubId)->get();
+            $students = Student::where('club_id', $activeId)->get();
         }
 
         $formattedStudents = $students->map(function ($student) use ($isSuperAdmin) {
@@ -58,15 +58,15 @@ class StudentController extends Controller
     public function getParent(Request $request)
     {
         $user = auth()->user();
-        $clubId = $request->attributes->get('club_id');
-        Log::info('club_id', ['clubId' => $clubId]);
+        $activeId = $request->attributes->get('organisateur_id');
+        Log::info('club_id', ['activeId' => $activeId]);
         $authorizedRoles = ['admin_club', 'secretaire', 'instructeur'];
 
         // 3. On vérifie si l'utilisateur a UN de ces rôles dans CE club précis
         $hasPermission = DB::table('club_users')
             ->join('roles', 'club_users.role_id', '=', 'roles.id')
             ->where('club_users.user_id', $user->id)
-            ->where('club_users.club_id', $clubId)
+            ->where('club_users.club_id', $activeId)
             ->whereIn('roles.name', $authorizedRoles)
             ->exists();
         if (!$hasPermission) {
@@ -78,7 +78,7 @@ class StudentController extends Controller
         $parents = DB::table('club_users')
             ->join('users', 'club_users.user_id', '=', 'users.id')
             ->join('roles', 'club_users.role_id', '=', 'roles.id')
-            ->where('club_users.club_id', $clubId)
+            ->where('club_users.club_id', $activeId)
             ->where('roles.name', 'parent')
             ->select('users.id', 'users.fullname', 'users.phone')
             ->get()
@@ -101,10 +101,10 @@ class StudentController extends Controller
     {
 
         $this->authorize('create', Student::class);
-        $clubId = $request->attributes->get('club_id');
+        $activeId = $request->attributes->get('organisateur_id');
         $validated = $request->validated();
         try {
-            return DB::transaction(function () use ($validated, $clubId, $request) {
+            return DB::transaction(function () use ($validated, $activeId, $request) {
                 $parentId = null;
 
                 // --- GESTION DU PARENT ---
@@ -116,13 +116,13 @@ class StudentController extends Controller
                             'fullname' => $validated['parent_fullname'],
                             'phone'    => $validated['parent_phone'] ?? null,
                             'password' => Hash::make(Str::random(16)),
-                            'current_club_id' => $clubId,
+                            'current_club_id' => $activeId,
                         ]
                     );
 
                     // Attribution rôle parent
                     $parentRole = cache()->rememberForever('role_parent', fn() => Role::where('name', 'parent')->first());
-                    $parentUser->clubs()->syncWithoutDetaching([$clubId => ['role_id' => $parentRole->id]]);
+                    $parentUser->clubs()->syncWithoutDetaching([$activeId => ['role_id' => $parentRole->id]]);
 
                     $parentProfile = ParentModel::firstOrCreate(['user_id' => $parentUser->id]);
                     $parentId = $parentProfile->id;
@@ -141,7 +141,7 @@ class StudentController extends Controller
                             'email'    => $studentData['email'],
                             'phone'    => $studentData['phone'] ?? null,
                             'password' => Hash::make(Str::random(32)),
-                            'current_club_id' => $clubId,
+                            'current_club_id' => $activeId,
                         ]);
 
                         $studentUserId = $studentUser->id;
@@ -151,7 +151,7 @@ class StudentController extends Controller
                         $role = cache()->rememberForever("role_karateka", fn() => Role::where('name', 'karateka')->first());
 
                         if ($role) {
-                            $studentUser->clubs()->attach($clubId, ['role_id' => $role->id]);
+                            $studentUser->clubs()->attach($activeId, ['role_id' => $role->id]);
                         }
 
                         // Si l'élève est son propre responsable, il devient son propre "ParentModel"
@@ -176,7 +176,7 @@ class StudentController extends Controller
                         'fullname'  => $studentData['fullname'],
                         'birthdate' => $studentData['birthdate'],
                         'sex'       => $studentData['sex'],
-                        'club_id'   => $clubId,
+                        'club_id'   => $activeId,
                         'user_id'   => $studentUserId,
                         'is_adult'  => Carbon::parse($studentData['birthdate'])->age >= 18,
                         'photo'     => $photoPath,
@@ -206,10 +206,10 @@ class StudentController extends Controller
         $this->authorize('update', $student);
 
         $validated = $request->validated();
-        $clubId = $request->attributes->get('club_id');
+        $activeId = $request->attributes->get('organisateur_id');
         $studentData = [
             ...$validated,
-            'club_id' => $clubId,
+            'club_id' => $activeId,
         ];
         $file = $request->file('photo');
         if ($file) {
@@ -266,10 +266,9 @@ class StudentController extends Controller
     public function StudentStatsDashboard(StudentGradeService $gradeService, Request $request)
     {
         $this->authorize('viewStats', Student::class);
-        $clubId = $request->attributes->get('club_id');
-        Log::info('club_id', ['clubId' => $clubId]);
+        $activeId = $request->attributes->get('organisateur_id');
 
-        $stats = $gradeService->getGlobalStats($clubId);
+        $stats = $gradeService->getGlobalStats($activeId);
 
         return response()->json([
             'success' => true,
@@ -281,10 +280,9 @@ class StudentController extends Controller
     public function latestStudent(Request $request)
     {
         $this->authorize('viewStats', Student::class);
-        $clubId = $request->attributes->get('club_id');
-        Log::info('club_id', ['clubId' => $clubId]);
+        $activeId = $request->attributes->get('organisateur_id');
 
-        $latestStudents = Student::where('club_id', $clubId)
+        $latestStudents = Student::where('club_id', $activeId)
             ->latest()
             ->take(5)
             ->get()

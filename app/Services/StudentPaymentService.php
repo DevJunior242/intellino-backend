@@ -7,13 +7,13 @@ use App\Models\StudentPayment;
 class StudentPaymentService
 {
 
-    public function getStudentpaymentStats($clubId)
+    public function getStudentpaymentStats($activeId)
     {
-        $totalPaid = StudentPayment::where('club_id', $clubId)->sum('amount_paid');
-        $studentsCount = StudentPayment::where('club_id', $clubId)->distinct('student_id')->count();
-        $monthPayments = StudentPayment::where('club_id', $clubId)->whereMonth('created_at', now()->month)->count();
-        $totalTransactions = StudentPayment::where('club_id', $clubId)->count();
-        $monthlyChart = StudentPayment::where('club_id', $clubId)->selectRaw("
+        $totalPaid = StudentPayment::where('club_id', $activeId)->sum('amount_paid');
+        $studentsCount = StudentPayment::where('club_id', $activeId)->distinct('student_id')->count();
+        $monthPayments = StudentPayment::where('club_id', $activeId)->whereMonth('created_at', now()->month)->count();
+        $totalTransactions = StudentPayment::where('club_id', $activeId)->count();
+        $monthlyChart = StudentPayment::where('club_id', $activeId)->selectRaw("
                 DATE_FORMAT(created_at,'%b') as month,
                 SUM(amount_paid) as total
             ")
@@ -22,7 +22,7 @@ class StudentPaymentService
             ->get();
 
         $recent = StudentPayment::with('student:id,fullname')
-            ->where('club_id', $clubId)
+            ->where('club_id', $activeId)
             ->latest()
             ->take(5)
             ->get()

@@ -14,47 +14,77 @@ class CheckClubRole
     public function handle($request, Closure $next, ...$roles)
     {
         $user = $request->user();
-        $clubId = $request->get('club_id') ?? $request->route('club_id');
 
-        if (blank($clubId) || in_array($clubId, ['null', 'undefined'], true)) {
-            $clubId = null;
+        $activeId = $request->input('organisateur_id')
+            ?? $request->input('club_id')
+            ?? $request->input('league_id');
+
+        $activeType = $request->query('organisateur_type')
+            ?? $request->input('organisateur_type')
+            ?? $request->attributes->get('organisateur_type');
+        if (blank($activeId) || in_array($activeId, ['null', 'undefined'], true)) {
+            $activeId = null;
         }
 
         if ($user?->isSuperAdmin()) {
-            if (!empty($clubId) && $clubId !== 'null' && $clubId !== 'undefined') {
-                if (!\App\Models\Club::where('id', $clubId)->exists()) {
-                    return response()->json(['message' => 'Club introuvable'], 404);
+            if ($activeId) {
+                // Vérification dynamique de l'existence selon le type
+                $modelClass = ($activeType === 'Ligue') ? \App\Models\League::class : \App\Models\Club::class;
+
+                if (!$modelClass::where('id', $activeId)->exists()) {
+                    return response()->json(['message' => ucfirst($activeType) . ' introuvable'], 404);
                 }
-                $request->merge(['validated_club_id' => $clubId]);
             }
 
-            $request->merge(['validated_role_name' => 'super_admin']);
+            $request->merge([
+                'validated_organisateur_id' => $activeId,
+                'validated_organisateur_type' => $activeType,
+                'validated_club_id' => ($activeType === 'Club') ? $activeId : null,
+                'validated_league_id' => ($activeType === 'Ligue') ? $activeId : null,
+            ]);
             return $next($request);
         }
         // 2. Cas des autres rôles liés au club
-        if (!$clubId) {
-            return response()->json(['message' => 'Club ID manquant'], 404);
+        if (!$activeId) {
+            return response()->json(['message' => 'ID de l’organisation manquant'], 404);
         }
         $club = $user->clubs()
             ->withPivot('role_id')
-            ->where('clubs.id', $clubId)
+            ->where('clubs.id', $activeId)
             ->first();
-        if (!$club) {
-            return response()->json(['message' => 'Accès refusé au club'], 403);
+        $league = $user->leagues()
+            ->withPivot('role_id')
+            ->where('leagues.id', $activeId)
+            ->first();
+        if (!$club & !$league) {
+            return response()->json(['message' => 'Accès refusé'], 403);
         }
 
-        $userRole = $club->pivot->role->name;
+        // 1. Identifier l'organisation active 
+        $activeOrg = $club ?: $league;
 
+        // 2. Récupérer le nom du rôle manuellement via l'ID stocké dans le pivot
+        // On accède à l'ID du rôle qui est dans la table pivot
+        $roleId = $activeOrg->pivot->role_id;
+
+        // 3. On va chercher le nom du rôle directement dans la table roles
+        $userRole = \App\Models\Role::where('id', $roleId)->value('name');
+
+        // 4. Sécurité si le rôle n'existe pas
+        if (!$userRole) {
+            return response()->json(['message' => 'Rôle utilisateur introuvable'], 403);
+        }
+
+        // 5. Vérification des permissions
         if (!empty($roles) && !in_array($userRole, $roles)) {
-            return response()->json(['message' => 'Rôle non autorisé'], 403);
+            return response()->json(['message' => "Accès interdit : rôle $userRole non autorisé"], 403);
         }
 
-        // $request->merge([
-        //     'validated_club_id' => $clubId,
-        //     'validated_role_name' => $userRole
-        // ]);
         $request->attributes->set('role', $userRole);
-        $request->attributes->set('club_id', $clubId);
+        $request->attributes->set('organisateur_id', $activeId);
+        $request->attributes->set('organisateur_type', $activeType);
+        $request->attributes->set('club_id', $activeId);
+        $request->attributes->set('league_id', $activeId);
         return $next($request);
     }
 }

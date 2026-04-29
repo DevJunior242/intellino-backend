@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Grade;
+use App\Models\Examen;
 use App\Models\ExamenEvaluation;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -13,14 +14,13 @@ class GradeEnchainement extends Model
 
     protected $fillable = [
         'examen_id',
-        'club_id',
         'current_grade_id',
         'name',
         'description',
         'order',
         'diviseur',
     ];
-//   protected   $guarded=[];
+    //   protected   $guarded=[];
 
     public $incrementing = false;
     public $keyType = 'string';
@@ -29,9 +29,18 @@ class GradeEnchainement extends Model
     {
         return $this->belongsTo(Grade::class);
     }
-    
+
     public function evaluations()
     {
         return $this->hasMany(ExamenEvaluation::class, 'enchainement_id');
+    }
+
+    public function organisateur()
+    {
+        return $this->morphTo();
+    }
+    public function examen()
+    {
+        return $this->belongsTo(Examen::class);
     }
 }

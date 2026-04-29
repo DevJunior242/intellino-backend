@@ -14,7 +14,7 @@ class Category extends Model
     use HasUuids;
     protected $appends = ['licencies_count'];
 
-    protected $fillable = ['nom', 'age_min', 'age_max', 'saison_id', 'league_id'];
+    protected $fillable = ['nom', 'sexe', 'age_min', 'age_max', 'saison_id', 'league_id'];
     protected $keyType = 'string';
     public $incrementing = false;
 

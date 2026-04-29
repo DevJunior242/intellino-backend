@@ -21,7 +21,8 @@ class StoreExamenRequest extends FormRequest
     public function rules(): array
     {
         return [
-
+            'organisateur_id' => 'required|uuid',
+            'organisateur_type' => 'required|string|in:Ligue,Club',
             'current_grade_id' => [
                 'required',
                 'uuid',
@@ -30,8 +31,18 @@ class StoreExamenRequest extends FormRequest
             'next_grade_id' => [
                 'required',
                 'uuid',
-                'exists:grades,id',
+                function ($attribute, $value, $fail) {
+                    $nextGrade = \App\Models\Grade::find($value);
+                    $type = $this->input('organisateur_type');
+
+                    if ($nextGrade && str_contains(strtolower($nextGrade->name), 'noire')) {
+                        if ($type !== 'Ligue') {
+                            $fail("Seules les Ligues peuvent organiser des passages de grade pour la ceinture noire.");
+                        }
+                    }
+                },
             ],
+
             'start_date' => [
                 'required',
                 'date',

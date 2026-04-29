@@ -15,8 +15,8 @@ class EquipementController extends Controller
 {
     public function index(Request $request)
     {
-        $clubId = $request->attributes->get('club_id');
-        $equipments = Equipment::where('club_id', $clubId)
+        $activeId = $request->attributes->get('organisateur_id');
+        $equipments = Equipment::where('club_id', $activeId)
             ->with('equipmentCategory')
             ->latest()
             ->paginate(4);
@@ -29,9 +29,9 @@ class EquipementController extends Controller
     //recuperer les materiels pretés
     public function getPret(Request $request)
     {
-        $clubId = $request->attributes->get('club_id');
-        Log::info('clubId', ['clubId' => $clubId]);
-        $equipments = EquipmentLoan::where('club_id', $clubId)
+        $activeId = $request->attributes->get('organisateur_id');
+        Log::info('activeId', ['activeId' => $activeId]);
+        $equipments = EquipmentLoan::where('club_id', $activeId)
             ->with(['equipment', 'user:id,fullname', 'toClub:id,name'])
             ->latest()
             ->paginate(12);
@@ -48,8 +48,8 @@ class EquipementController extends Controller
 
     public function getCategories(Request $request)
     {
-        $clubId = $request->attributes->get('club_id');
-        $equipments = EquipmentCategory::where('club_id', $clubId)
+        $activeId = $request->attributes->get('organisateur_id');
+        $equipments = EquipmentCategory::where('club_id', $activeId)
             ->orderBy('name')
             ->get();
         return response()->json([
@@ -64,7 +64,7 @@ class EquipementController extends Controller
     // Créer la catégorie
     public function storeCategory(Request $request)
     {
-        $clubId = $request->attributes->get('club_id');
+        $activeId = $request->attributes->get('organisateur_id');
 
 
         $request->validate([
@@ -75,7 +75,7 @@ class EquipementController extends Controller
         ]);
 
         $data = [
-            'club_id' => $clubId,
+            'club_id' => $activeId,
             'name' => $request->name
         ];
         $cat = EquipmentCategory::create($data);
@@ -94,7 +94,7 @@ class EquipementController extends Controller
 
         $equipment = Equipment::create([
             ...$data,
-            'club_id' => $request->attributes->get('club_id'),
+            'club_id' => $request->attributes->get('organisateur_id'),
             'available_quantity' => $data['total_quantity'],
             'min_stock_alert' => $data['min_stock_alert'] ?? 2,
         ]);
@@ -109,7 +109,7 @@ class EquipementController extends Controller
     // Prêter le matériel (Le "Out" temporaire)
     public function loanEquipment(StoreEquipmntLoanReq $request)
     {
-        $clubId = $request->attributes->get('club_id');
+        $activeId = $request->attributes->get('organisateur_id');
         $equipment = Equipment::findOrFail($request->equipment_id);
         if ($equipment->available_quantity < $request->quantity_loaned) {
             return response()->json(['message' => 'Plus de stock disponible'], 422);
@@ -122,7 +122,7 @@ class EquipementController extends Controller
             ...$data,
             'equipment_id' => $equipment->id,
             'loaned_at' => now(),
-            'club_id' => $clubId,
+            'club_id' => $activeId,
             'user_id' => auth()->id(),
         ]);
 
@@ -175,11 +175,6 @@ class EquipementController extends Controller
                 if ($totalLoanReturned > $total) {
                     throw new \Exception('Quantités invalides');
                 }
-
-
-                // 2. On remet le matériel dans le stock disponible
-                Log::info('equipment_id', ['equipmentId' => $equipment->id]);
-                Log::info('returnedQty', ['returnedQty' => $returnedQty]);
                 $equipment->increment('available_quantity', $returnedQty);
 
                 return $equipment;

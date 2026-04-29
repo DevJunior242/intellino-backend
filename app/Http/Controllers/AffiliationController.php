@@ -3,8 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\Affiliation;
+use App\Http\Controllers\Controller;
 
-use Illuminate\Support\Facades\Log;
 use App\Http\Requests\StoreAffiliationRequest;
 
 class AffiliationController extends Controller
@@ -14,7 +14,6 @@ class AffiliationController extends Controller
 
         $user = auth()->user();
         $league = $user->current_league_id;
-        Log::info('leagueId', ['leagueId' => $league]);
         if (!$league) {
             return response()->json([
                 'success' => false,
@@ -22,12 +21,18 @@ class AffiliationController extends Controller
             ], 400);
         }
         $validated = $request->validated();
-        Log::info('validated', ['validated' => $validated]);
+        //verifier si club deja dans une affiliation
+        $affiliation = Affiliation::where('club_id', $validated['club_id'])->where('league_id', $league)->first();
+        if ($affiliation) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Ce club est déjà dans une affiliation',
+            ], 400);
+        }
 
         $affiliation = Affiliation::create(
             $validated + [
                 'league_id' => $league,
-                'status' => 'Affilé'
             ]
         );
 

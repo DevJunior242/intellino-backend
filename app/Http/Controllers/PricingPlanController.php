@@ -11,11 +11,11 @@ class PricingPlanController extends Controller
 {
     public function index(Request $request)
     {
-        $clubId = $request->attributes->get('club_id');
+        $activeId = $request->attributes->get('organisateur_id');
 
-        Log::info('clubId', ['clubId' => $clubId]);
+        Log::info('activeId', ['activeId' => $activeId]);
         $plans = PricingPlan::with('paymentCategory')
-            ->where('club_id', $clubId)
+            ->where('club_id', $activeId)
             ->get();
         return response()->json($plans);
     }
@@ -32,10 +32,10 @@ class PricingPlanController extends Controller
 
     public function destroy(Request $request, $id)
     {
-        $clubId = $request->attributes->get('club_id');
+        $activeId = $request->attributes->get('organisateur_id');
 
         $plan = PricingPlan::where('id', $id)
-            ->where('club_id', $clubId)
+            ->where('club_id', $activeId)
             ->firstOrFail();
 
         if ($plan->paiements()->exists()) {

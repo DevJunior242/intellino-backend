@@ -9,10 +9,11 @@ class AdminClubController extends Controller
 {
     public function presence(Request $request)
     {
+        $activeId = $request->attributes->get('organisateur_id');
         $user = auth()->user();
         $attendances = Attendance::with(['student.club:id,name,logo', 'session'])
             ->whereHas('student', function ($q) use ($request) {
-                $q->where('club_id', $request->validated_club_id);
+                $q->where('club_id', $activeId)
             })
             ->get();
         $chartData = $attendances->groupBy('session.session_date')->map(function ($items, $sessionDate) {

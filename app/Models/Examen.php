@@ -10,13 +10,15 @@ use App\Models\ExamenCandidat;
 use App\Models\ExamenEvaluation;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use App\Models\GradeEnchainement;
 
 class Examen extends Model
 {
     use HasUuids;
 
     protected $fillable = [
-        'club_id',
+        'organisateur_id',
+        'organisateur_type',
         'current_grade_id',
         'next_grade_id',
         'start_date',
@@ -46,14 +48,18 @@ class Examen extends Model
     const STATUS_CANCELLED = 3;
     const STATUS_POSTPONED = 4;
 
-    public function club()
+    public function organisateur()
     {
-        return $this->belongsTo(Club::class);
+        return $this->morphTo();
     }
 
     public function currentGrade()
     {
         return $this->belongsTo(Grade::class, 'current_grade_id');
+    }
+    public function nextGrade()
+    {
+        return $this->belongsTo(Grade::class, 'next_grade_id');
     }
     public function createdBy()
     {
@@ -72,6 +78,10 @@ class Examen extends Model
     public function examenResult()
     {
         return $this->hasMany(ExamenResult::class);
+    }
+    public function enchainements()
+    {
+        return $this->hasMany(GradeEnchainement::class);
     }
 
     public function getStatutLabelAttribute()

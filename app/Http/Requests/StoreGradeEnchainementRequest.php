@@ -12,7 +12,7 @@ class StoreGradeEnchainementRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        return true;  
+        return true;
     }
 
     /**
@@ -21,6 +21,8 @@ class StoreGradeEnchainementRequest extends FormRequest
     public function rules(): array
     {
         return [
+            // 'organisateur_id' => 'required|uuid',
+            // 'organisateur_type' => 'required|string|in:Ligue,Club',
 
             'name' => [
                 'required',

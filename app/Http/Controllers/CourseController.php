@@ -16,10 +16,10 @@ class CourseController extends Controller
     {
 
 
-        $clubId = $request->attributes->get('club_id');
+        $activeId = $request->attributes->get('organisateur_id');
         $sessions = SessionModel::with(['course.club', 'course.grade'])
-            ->whereHas('course', function ($query) use ($clubId) {
-                $query->where('club_id', $clubId);
+            ->whereHas('course', function ($query) use ($activeId) {
+                $query->where('club_id', $activeId);
             })
             ->latest()
             ->paginate(6);
@@ -31,7 +31,7 @@ class CourseController extends Controller
     }
     public function storeFullCourse(CourseRequest $request)
     {
-        $clubId = $request->attributes->get('club_id');
+        $activeId = $request->attributes->get('organisateur_id');
         $role = $request->attributes->get('role');
 
         $hasAcess = ['admin_club', 'instructeur'];
@@ -40,10 +40,10 @@ class CourseController extends Controller
         }
 
         $validated = $request->validated();
-        return DB::transaction(function () use ($validated, $request, $clubId) {
+        return DB::transaction(function () use ($validated, $request, $activeId) {
             $course = Course::create([
                 ...$validated['course'],
-                'club_id' => $clubId,
+                'club_id' => $activeId,
                 'instructor_id' => $request->user()->id,
             ]);
             $session = collect($validated['sessions'])->map(function ($session) {

@@ -22,7 +22,7 @@ class AttendanceController extends Controller
     {
         $user = auth()->user();
         $role = $request->attributes->get('role');
-        $clubId = $request->attributes->get('club_id');
+        $activeId = $request->attributes->get('organisateur_id');
 
         $query = Attendance::with([
             'student.club:id,name,logo',
@@ -30,7 +30,7 @@ class AttendanceController extends Controller
         ]);
 
         if ($role !== 'super_admin') {
-            $query->where('club_id', $clubId);
+            $query->where('club_id', $activeId);
         }
 
         if ($role === 'parent') {
@@ -95,8 +95,8 @@ class AttendanceController extends Controller
     public function bulkStore(StoreAttendanceRequest $request)
     {
         // Récupération sécurisée des données
-        $this->authorize('create', Attendance::class);
-        $clubId = $request->attributes->get('club_id');
+        // $this->authorize('create', Attendance::class);
+        $activeId = $request->attributes->get('organisateur_id');
         $validatedData = $request->validated();
         $attendances = $validatedData['attendances'];
 
@@ -107,7 +107,7 @@ class AttendanceController extends Controller
             foreach ($attendances as $data) {
                 Attendance::updateOrCreate(
                     [
-                        'club_id'    => $clubId,
+                        'club_id'    => $activeId,
                         'student_id' => $data['student_id'],
                         'session_id' => $data['session_id'],
                     ],
@@ -140,9 +140,9 @@ class AttendanceController extends Controller
 
     public function getStudentAttendance(Request $request)
     {
-        $clubId = $request->validated_club_id;
+        $activeId = $request->attributes->get('organisateur_id');
         $attendances = Attendance::with(['session.course:id,name', 'student:id,fullname'])
-            ->where('club_id', $clubId)
+            ->where('club_id', $activeId)
             ->where('status', 'absent')
             ->latest()
             ->take(5)

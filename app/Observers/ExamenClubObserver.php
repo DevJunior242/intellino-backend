@@ -15,7 +15,7 @@ class ExamenClubObserver
     {
         Activity::create([
             'user_id'        => auth()->id(),
-            'organisateur_id' => $examen->club_id,
+            'organisateur_id' => $examen->organisateur_id,
             'organisateur_type' => 'Club',
             'type'           => 'examen',
             'action'         => 'created',
@@ -30,8 +30,8 @@ class ExamenClubObserver
     {
         Activity::create([
             'user_id'        => auth()->id(),
-            'organisateur_id' => $examen->club_id,
-            'organisateur_type' => get_class($examen->club),
+            'organisateur_id' => $examen->organisateur_id,
+            'organisateur_type' => 'Club',
             'type'           => 'examen',
             'action'         => 'updated',
             'description'    => "A mis à jour l'examen " . $examen->name,
@@ -46,7 +46,7 @@ class ExamenClubObserver
         Log::info('Observer Examen déclenché !');
         Activity::create([
             'user_id'        => auth()->id(),
-            'organisateur_id' => $examen->club_id,
+            'organisateur_id' => $examen->organisateur_id,
             'organisateur_type' => 'Club',
             'type'           => 'examen',
             'action'         => 'deleted',

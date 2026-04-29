@@ -27,55 +27,44 @@ class LoginController extends Controller
 
         if (Auth::attempt($credentials)) {
             $user = auth()->user();
-            if ($user) {
-                $token = $user->createToken('auth')->plainTextToken;
-            }
-            // On détermine l'ID et le type dynamiquement
-            $activeId = $user->current_club_id ?? $user->current_league_id ?? $user->current_federation_id;
-            $relation = $user->current_club_id
-                ? 'clubs'
-                : ($user->current_league_id
-                    ? 'leagues'
-                    : ($user->current_federation_id
-                        ? 'federations'
-                        : null
-                    ));
-            if (!$relation) {
-                return response()->json([
-                    'success' => true,
-                    'user' => $user,
-                    'token' => $token,
-                    'roleSuperAdmin' => $user->globalRole?->name ? [$user->globalRole->name] : [],
-                    'memberships' => [],
-                    'role' => [],
-                ]);
-            }
-            $user->load($relation);
+            $token = $user->createToken('auth')->plainTextToken;
 
-            $allRoles =  Role::all()->keyBy('id');
 
-            $organizations = collect($user->$relation)->map(function ($org) use ($allRoles) {
+            $user->load(['clubs', 'leagues', 'globalRole']);
 
+            $allRoles = Role::all()->keyBy('id');
+
+            // 2. Fonction helper pour formater les organisations
+            $formatOrg = function ($org) use ($allRoles) {
                 $roleId = $org->pivot->role_id ?? null;
-                $roleObj = $allRoles->get($roleId);
-
                 return [
                     'id' => $org->id,
                     'name' => $org->name,
-                    'role' => $roleObj ? $roleObj->name : 'Membre',
+                    'role' => $allRoles->get($roleId)->name ?? 'Membre',
                 ];
-            });
+            };
 
-            // $user->load([$relation]);
+            // 3. On prépare les listes séparées
+            $clubs = $user->clubs->map($formatOrg);
+            $leagues = $user->leagues->map($formatOrg);
+            //  $federations = $user->federations->map($formatOrg);
 
-            $roleSuperAdmin = $user->globalRole?->name;
-            $currentRole = $organizations->first()['role'] ?? null;
+            // 4. On détermine le rôle actuel basé sur l'ID actif (priorité Ligue > Club)
+            $currentRole = 'Membre';
+            if ($user->current_league_id) {
+                $currentRole = $leagues->firstWhere('id', $user->current_league_id)['role'] ?? 'Membre';
+            } elseif ($user->current_club_id) {
+                $currentRole = $clubs->firstWhere('id', $user->current_club_id)['role'] ?? 'Membre';
+            }
+
             return response()->json([
                 'success' => true,
                 'user' => $user,
                 'token' => $token,
-                'roleSuperAdmin' => $roleSuperAdmin ? [$roleSuperAdmin] : [],
-                'memberships' => $organizations,
+                'roleSuperAdmin' => $user->globalRole ? [$user->globalRole->name] : [],
+                'clubs' => $clubs, // Liste des clubs
+                'leagues' => $leagues,         // Liste des ligues
+                // 'federations' => $federations, // Liste des fédérations
                 'role' => [$currentRole],
             ]);
         } else {

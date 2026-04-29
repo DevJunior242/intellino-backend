@@ -7,9 +7,11 @@ use App\Models\Role;
 use App\Models\User;
 use App\Models\Grade;
 use App\Models\League;
+use App\Models\Licence;
 use App\Models\Student;
 use App\Models\ClubUser;
 use App\Models\Discipline;
+use App\Models\Affiliation;
 use App\Models\Subscription;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -83,5 +85,15 @@ class Club extends Model
     public function league()
     {
         return $this->belongsTo(League::class);
+    }
+
+    public function affiliations()
+    {
+        return  $this->hasMany(Affiliation::class);
+    }
+
+    public function licences()
+    {
+        return $this->hasMany(Licence::class);
     }
 }

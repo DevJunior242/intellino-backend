@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Club;
 use App\Models\Examen;
 use Illuminate\Http\Request;
 use App\Models\GradeEnchainement;
@@ -20,12 +21,14 @@ class EnchainementController extends Controller
             $validated = $request->validated();
             $order = GradeEnchainement::where('current_grade_id', $request->current_grade_id)->max('order') + 1;
 
+            if ($examen->organisateur_id !== $request->attributes->get('organisateur_id')) {
+                return response()->json(['message' => 'Action non autorisée'], 403);
+            }
             $enchainement = GradeEnchainement::create([
                 ...$validated,
                 'order' => $order,
                 'examen_id' => $examen->id,
                 'current_grade_id' => $examen->current_grade_id,
-                'club_id' => $request->attributes->get('club_id'),
             ]);
 
             return response()->json([
@@ -37,8 +40,7 @@ class EnchainementController extends Controller
         } catch (QueryException $e) {
             $errcode = $e->getCode();
             $errmessage = $e->getMessage();
-            Log::error('erreur', ['code' => $errcode, 'message' => $errmessage]);
-            //erreur 23000
+
             if ($errcode == '23000') {
                 return response()->json([
                     'success' => false,
@@ -52,35 +54,44 @@ class EnchainementController extends Controller
         }
     }
 
-    public function show(Examen $examen, Request $request)
+    public function show(Request $request, $examenId)
     {
-        $examenId = $examen->id;
-        $enchainements = GradeEnchainement::where('examen_id', $examenId)
-            ->with('grade')
-            ->where('current_grade_id', $examen->current_grade_id)
-            ->where('club_id', $request->attributes->get('club_id'))
-            ->orderBy('order', 'asc')
-            ->get();
+        $activeId = $request->attributes->get('organisateur_id');
+        $activeType = $request->attributes->get('organisateur_type');
 
-        if ($enchainements->isEmpty()) {
+        // 2. Charger l'examen avec ses enchaînements
+        $examen = Examen::with(['enchainements' => function ($q) {
+            $q->orderBy('order', 'asc');
+        }])->findOrFail($examenId);
+
+        $isOwner = ($examen->organisateur_id === $activeId);
+
+        $isRattache = ($activeType === 'Club' &&
+            $examen->organisateur_type === 'Ligue' &&
+            Club::where('id', $activeId)->where('league_id', $examen->organisateur_id)->exists());
+
+        if (!$isOwner && !$isRattache) {
             return response()->json([
                 'success' => false,
-                'message' => 'Aucun enchainement trouvé',
-                'data' => []
-            ]);
+                'message' => 'Vous n\'avez pas la permission de voir les détails de cet examen.'
+            ], 403);
         }
+
+        // 4. Retourner les données
         return response()->json([
             'success' => true,
-            'enchainements' => $enchainements,
-            'message' => 'Liste des enchainements',
+            'enchainements' => $examen->enchainements,
+            'is_owner' => $isOwner,
         ], 200);
     }
 
     public function destroy(Examen $examen, string $id, Request $request)
     {
-        $clubId= $request->attributes->get('club_id');
+        $orgdId = $request->attributes->get('organisateur_id');
+        $orgType = $request->attributes->get('organisateur_type');
         $enchainement = GradeEnchainement::where('id', $id)
-            ->where('club_id', $clubId)
+            ->where('organisateur_id', $orgdId)
+            ->where('organisateur_type', $orgType)
             ->where('examen_id', $examen->id)
             ->firstOrFail();
 

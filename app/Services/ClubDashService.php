@@ -15,15 +15,15 @@ use Illuminate\Support\Facades\DB;
 
 class ClubDashService
 {
-    public function getStatsByUserRole($user, $clubId, $role)
+    public function getStatsByUserRole($user, $activeId, $activeType, $role)
     {
         return match ($role) {
             'super_admin' => $this->superAdminStats(),
-            'admin_club'  => $this->clubAdminStats($clubId),
-            'instructeur' => $this->instructorStats($clubId),
-            'secretaire'  => $this->secretaireStats($clubId),
+            'admin_club'  => $this->clubAdminStats($activeId),
+            'instructeur' => $this->instructorStats($activeId, $activeType),
+            'secretaire'  => $this->secretaireStats($activeId, $activeType),
             'parent'      => $this->parentStats($user),
-            'karateka'    => $this->etudiantStats($clubId),
+            'karateka'    => $this->etudiantStats($activeId, $activeType),
             default       => ['stats' => [], 'message' => 'Aucun rôle associé'],
         };
     }
@@ -62,46 +62,46 @@ class ClubDashService
     }
 
 
-    private function clubAdminStats($clubId)
+    private function clubAdminStats($activeId)
     {
         $instructorRoleId = Role::where('name', 'instructeur')->value('id');
         $secretaireRoleId = Role::where('name', 'secretaire')->value('id');
         $totalInstructors = $instructorRoleId
             ? DB::table('club_users')
-            ->where('club_id', $clubId)
+            ->where('club_id', $activeId)
             ->where('role_id', $instructorRoleId)
             ->count()
             : 0;
         $totalSecretaries = $secretaireRoleId
             ? DB::table('club_users')
-            ->where('club_id', $clubId)
+            ->where('club_id', $activeId)
             ->where('role_id', $secretaireRoleId)
             ->count()
             : 0;
 
         $month = now()->month;
         // Total encaissé ce mois-ci
-        $total_collected = StudentPayment::where('club_id', $clubId)
+        $total_collected = StudentPayment::where('club_id', $activeId)
             ->whereMonth('created_at', $month)
             ->sum('amount_paid');
 
         // Somme totale des dettes (tous mois confondus)
-        $total_debts = StudentPayment::where('club_id', $clubId)
+        $total_debts = StudentPayment::where('club_id', $activeId)
             ->sum('balance');
 
         // Répartition par mode de paiement
-        $payment_methods = StudentPayment::where('club_id', $clubId)
+        $payment_methods = StudentPayment::where('club_id', $activeId)
             ->whereMonth('created_at', $month)
             ->select('payment_method', DB::raw('sum(amount_paid) as total'))
             ->groupBy('payment_method')
             ->get();
 
         return [
-            'admin stats pour club' => $clubId,
-            'total_students' => Student::where('club_id', $clubId)->count(),
+            'admin stats pour club' => $activeId,
+            'total_students' => Student::where('club_id', $activeId)->count(),
             'total_instructors' =>  $totalInstructors,
-            'total_parents' => ParentModel::whereHas('students', function ($q) use ($clubId) {
-                $q->where('club_id', $clubId);
+            'total_parents' => ParentModel::whereHas('students', function ($q) use ($activeId) {
+                $q->where('club_id', $activeId);
             })
                 ->distinct()
                 ->count(),
@@ -111,9 +111,10 @@ class ClubDashService
         ];
     }
 
-    private function instructorStats($clubId)
+    private function instructorStats($activeId, $activeType)
     {
-        $baseExamenQuery = Examen::where('club_id', $clubId);
+        $baseExamenQuery = Examen::where('organisateur_id', $activeId)
+            ->where('organisateur_type', $activeType);
         $today = now()->toDateString();
 
 
@@ -122,10 +123,10 @@ class ClubDashService
         $examenTermines = (clone $baseExamenQuery)->where('date', '<', $today)->count();
 
         return [
-            'role' => 'instructeur pour club ' . $clubId,
-            'club_id' => $clubId,
-            'total_students' => Student::where('club_id', $clubId)->count(),
-            'total_courses' => Course::where('club_id', $clubId)->count(),
+            'role' => 'instructeur pour club ' . $activeId,
+            'club_id' => $activeId,
+            'total_students' => Student::where('club_id', $activeId)->count(),
+            'total_courses' => Course::where('club_id', $activeId)->count(),
             'total_examens' => $baseExamenQuery->count(),
             'total_examens_encours' => $examenEncours,
             'total_examens_avenir' => $examenAVenir,
@@ -171,9 +172,10 @@ class ClubDashService
 
 
 
-    private function etudiantStats($clubId)
+    private function etudiantStats($activeId, $activeType)
     {
-        $initExamen = Examen::where('club_id', $clubId);
+        $initExamen = Examen::where('organisateur_id', $activeId)
+            ->where('organisateur_type', $activeType);
         $today = now()->toDateString();
         $examenEncours = (clone $initExamen)
             ->where('date', '<=', $today)
@@ -186,9 +188,9 @@ class ClubDashService
             ->count();
         return [
             'total_students' =>
-            Student::where('club_id', $clubId)->count(),
+            Student::where('club_id', $activeId)->count(),
             'total_courses' =>
-            Course::where('club_id', $clubId)->count(),
+            Course::where('club_id', $activeId)->count(),
             'toltals_examens' => $initExamen->count(),
             'total_examens_encours' => $examenEncours,
             'total_examens_avenir' => $examenAVenir,
@@ -197,10 +199,11 @@ class ClubDashService
     }
 
 
-    private function secretaireStats($clubId)
+    private function secretaireStats($activeId, $activeType)
     {
 
-        $initExamen = Examen::where('club_id', $clubId);
+        $initExamen = Examen::where('organisateur_id', $activeId)
+            ->where('organisateur_type', $activeType);
         $today = now()->toDateString();
 
 
@@ -218,10 +221,10 @@ class ClubDashService
 
         return [
             'total_students' =>
-            Student::where('club_id', $clubId)->count(),
+            Student::where('club_id', $activeId)->count(),
 
             'total_courses' =>
-            Course::where('club_id', $clubId)->count(),
+            Course::where('club_id', $activeId)->count(),
             'toltals_examens' => $initExamen->count(),
             'total_examens_encours' => $examenEncours,
             'total_examens_avenir' => $examenAVenir,

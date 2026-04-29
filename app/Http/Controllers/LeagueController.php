@@ -19,23 +19,15 @@ class LeagueController extends Controller
     public function index()
     {
         //recuperer toutes les ligues
-        $leagues = League::select('id', 'name', 'logo')->get();
+        $leagues = League::with(['clubs.affiliations'])
+            ->select('id', 'name', 'city', 'phone', 'logo')
+            ->get()
+            ->map(function ($league) {
+                $league->logo = $league->logo ? url('storage/' . $league->logo) : null;
+                return $league;
+            });
         return response()->json($leagues);
     }
-    // public function index()
-    // {
-    //     //return les clubs de la ligue
-    //     $user = auth()->user();
-    //     $leagueId = $user->current_league_id;
-    //     if (!$leagueId) {
-    //         return response()->json([
-    //             'success' => false,
-    //             'message' => 'Vous devez être dans une ligue pour accéder à ses clubs',
-    //         ], 400);
-    //     }
-    //     $league = League::findOrFail($leagueId);
-    //     return response()->json($league->clubs);
-    // }
 
 
     public function store(StoreLeagueReq $request)
@@ -125,7 +117,8 @@ class LeagueController extends Controller
             ], 400);
         }
         $clubs = Club::where('league_id', $leagueId)
-            ->with('users')
+            ->with(['users', 'affiliations'])
+            ->withCount('licences')
             ->latest()
             ->paginate(8);
         $clubs->getCollection()->transform(function ($club) {

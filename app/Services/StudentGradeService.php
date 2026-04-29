@@ -10,22 +10,22 @@ use Illuminate\Support\Facades\DB;
 class StudentGradeService
 {
 
-    public function getGlobalStats($clubId)
+    public function getGlobalStats($activeId)
     {
         return [
-            'summary' => $this->getSummary($clubId),
-            'distribution' => $this->getGradeDistribution($clubId),
-            'history' => $this->getProgressionHistory($clubId),
+            'summary' => $this->getSummary($activeId),
+            'distribution' => $this->getGradeDistribution($activeId),
+            'history' => $this->getProgressionHistory($activeId),
         ];
     }
 
-    private function getSummary($clubId)
+    private function getSummary($activeId)
     {
-        $totalStudents = Student::where('club_id', $clubId)->count();
-        $totalAwards = StudentGrade::where('club_id', $clubId)->count();
+        $totalStudents = Student::where('club_id', $activeId)->count();
+        $totalAwards = StudentGrade::where('club_id', $activeId)->count();
 
         // Calcul du taux de passage (exemple: élèves ayant eu un grade cette année)
-        $thisYearAwards = StudentGrade::where('club_id', $clubId)
+        $thisYearAwards = StudentGrade::where('club_id', $activeId)
             ->whereYear('awarded_at', Carbon::now()->year)
             ->distinct('student_id')
             ->count();
@@ -39,11 +39,11 @@ class StudentGradeService
             ['title' => 'Dernière Promo', 'value' => 'Récent', 'trend' => Carbon::now()->format('d M')]
         ];
     }
-    public function getGradeDistribution($clubId)
+    public function getGradeDistribution($activeId)
     {
         return DB::table('student_grades')
             ->join('grades', 'student_grades.current_grade_id', '=', 'grades.id')
-            ->where('student_grades.club_id', $clubId)
+            ->where('student_grades.club_id', $activeId)
             ->where('student_grades.is_current', true)
             ->select(
                 'grades.name',
@@ -54,10 +54,10 @@ class StudentGradeService
             ->get();
     }
 
-    private function getProgressionHistory($clubId)
+    private function getProgressionHistory($activeId)
     {
         // Nombre de grades décernés par mois sur les 5 derniers mois
-        return StudentGrade::where('club_id', $clubId)
+        return StudentGrade::where('club_id', $activeId)
             ->where('awarded_at', '>=', Carbon::now()->subMonths(5))
             ->select(
                 DB::raw("DATE_FORMAT(awarded_at, '%b') as month"),

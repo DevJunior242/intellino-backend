@@ -6,9 +6,10 @@ use App\Models\Examen;
 
 class ExamenStatService
 {
-    public function getExamenStats($clubId)
+    public function getExamenStats($activeId, $activeType)
     {
-        $query = Examen::where('club_id', $clubId);
+        $query = Examen::where('organisateur_id', $activeId)
+            ->where('organisateur_type', $activeType);
         $total = $query->count();
 
         $scheduled = $query->clone()->where('status', Examen::STATUS_SCHEDULED)->count();

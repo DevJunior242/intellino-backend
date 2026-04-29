@@ -28,14 +28,50 @@ class CandidatController extends Controller
         ], 201);
     }
 
-    public function addCandidate(Examen $examen, Student $student)
+    public function addCandidate(Examen $examen, Student $student, Request $request)
     {
         //$this->authorize('create', ExamenCandidat::class);
+        $activeId = $request->attributes->get('organisateur_id');
+        $activeType = $request->attributes->get('organisateur_type');
 
         try {
-            $user = auth()->user();
+
+            // 2. Définition des accès
+            $isOwner = ($examen->organisateur_id === $activeId);
+
+            // Un club peut inscrire si l'examen est organisé par une Ligue
+            $isClubAccessingLeague = ($activeType === 'Club' && $examen->organisateur_type === 'Ligue');
+
+            if (!$isOwner && !$isClubAccessingLeague) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Vous n\'avez pas la permission d\'inscrire des candidats à cet examen.'
+                ], 403);
+            }
+            Log::info('student current grade id', ['student' => $student->currentGrade]);
+            $studentCurrentGradeId = $student->currentGrade?->current_grade_id;
+            // Si l'élève n'a pas exactement le grade requis par l'examen
+            if ($studentCurrentGradeId !== $examen->current_grade_id) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "Ce candidat n'a pas le grade requis pour participer à cet examen. Grade requis : " . ($examen->currentGrade->name ?? 'Inconnu'),
+                ], 422);
+            }
+
+            // --- VÉRIFICATION OPTIONNELLE : Déjà inscrit ? ---
+            $alreadyRegistered = ExamenCandidat::where('examen_id', $examen->id)
+                ->where('student_id', $student->id)
+                ->exists();
+
+            if ($alreadyRegistered) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Cet étudiant est déjà inscrit à cet examen.',
+                ], 422);
+            }
             $examenId = $examen->id;
             $studentId = $student->id;
+
 
 
             $candidat = ExamenCandidat::create([

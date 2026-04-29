@@ -30,9 +30,9 @@ class StoreAffiliationRequest extends FormRequest
                 'regex:/^\d{4,10}-\d{4,10}$/',
                 'unique:affiliations,saison,NULL,id,club_id,' . $this->club_id
             ],
-            'cotisation' => 'required|numeric|min:0',
-            'date_affiliation' => 'required|date',
-            'statut' => 'nullable|string|in:actif,expiré',
+            'cotisation' => 'nullable|numeric|min:0',
+            'date_debut' => 'required|date|before_or_equal:date_fin',
+            'date_fin' => 'required|date|after:date_debut',
         ];
     }
 
@@ -41,6 +41,9 @@ class StoreAffiliationRequest extends FormRequest
         return [
             'saison.regex' => 'Le format de la saison doit être "Début-Fin" (ex: 2024-2025).',
             'saison.unique' => 'Ce club est déjà affilié pour cette saison.',
+            'date_debut.after' => 'La date de début doit être postérieure à la date de fin.',
+            'date_fin.before' => 'La date de fin doit être antérieure à la date de début.',
+            'cotisation.min' => 'La cotisation doit être supérieure à 0.',
         ];
     }
 }

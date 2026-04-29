@@ -18,7 +18,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'superadmin'      => \App\Http\Middleware\IsSuperAdmin::class,
             'clubadmin'       => \App\Http\Middleware\IsClubAdmin::class,
-            'clubrole'        => \App\Http\Middleware\CheckClubRole::class,
+            'permission'        => \App\Http\Middleware\CheckClubRole::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {

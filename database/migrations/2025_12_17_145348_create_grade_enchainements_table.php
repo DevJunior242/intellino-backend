@@ -14,8 +14,6 @@ return new class extends Migration
         Schema::create('grade_enchainements', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->foreignUuid('examen_id')->constrained('examens')->onDelete('cascade');
-            $table->foreignUuid('club_id')->constrained('clubs')->onDelete('cascade')->cascadeOnDelete();
-
             $table->foreignUuid('current_grade_id')->constrained('grades')->onDelete('cascade');
             $table->string('name');
             $table->integer('diviseur');

@@ -21,16 +21,16 @@ class SessionController extends Controller
     {
 
 
-        $clubId = $request->attributes->get('club_id');
-
+        $activeId = $request->attributes->get('organisateur_id');
+        $activeType = $request->attributes->get('organisateur_type');
         $session = SessionModel::with('course')->findOrFail($sessionId);
 
         $gradeId = $session?->course?->current_grade_id;
-        if (!$clubId && $request->attributes->get('role') === 'super_admin') {
-            $clubId = $request->query('club_id') ?? $session?->course?->club_id;
+        if (!$activeId && $request->attributes->get('role') === 'super_admin') {
+            $activeId = $request->query('club_id') ?? $session?->course?->club_id;
         }
         $students = Student::with(['club', 'currentGrade'])
-            ->where('club_id', $clubId)
+            ->where('club_id', $activeId)
             ->whereHas('currentGrade', function ($q) use ($gradeId) {
                 $q->where('current_grade_id', $gradeId);
             })
@@ -68,12 +68,12 @@ class SessionController extends Controller
 
         // 1. On récupère les critères de la séance
         $gradeId = $session->course->current_grade_id;
-        $clubId = $session->course->club_id;
+        $activeId = $session->course->club_id;
 
         // 2. On récupère les utilisateurs (ceux qui ont un email)
-        $studentsToNotify = \App\Models\User::whereHas('students', function ($query) use ($gradeId, $clubId) {
+        $studentsToNotify = \App\Models\User::whereHas('students', function ($query) use ($gradeId, $activeId) {
             // On filtre sur le profil étudiant
-            $query->where('club_id', $clubId)
+            $query->where('club_id', $activeId)
                 ->whereHas('currentGrade', function ($q) use ($gradeId) {
                     // On filtre sur la table pivot/historique des grades
                     $q->where('current_grade_id', $gradeId)
@@ -121,12 +121,12 @@ class SessionController extends Controller
 
         // 1. On récupère les critères de la séance
         $gradeId = $session->course->current_grade_id;
-        $clubId = $session->course->club_id;
+        $activeId = $session->course->club_id;
 
         // 2. On récupère les utilisateurs (ceux qui ont un email)
-        $studentsToNotify = \App\Models\User::whereHas('students', function ($query) use ($gradeId, $clubId) {
+        $studentsToNotify = \App\Models\User::whereHas('students', function ($query) use ($gradeId, $activeId) {
             // On filtre sur le profil étudiant
-            $query->where('club_id', $clubId)
+            $query->where('club_id', $activeId)
                 ->whereHas('currentGrade', function ($q) use ($gradeId) {
                     // On filtre sur la table pivot/historique des grades
                     $q->where('current_grade_id', $gradeId)
@@ -199,8 +199,8 @@ class SessionController extends Controller
     public function __invoke(SessionStatsService $stats, Request $request)
     {
 
-        $clubId = $request->validated_club_id;
-        return response()->json($stats->getStats($clubId));
+        $activeId = $request->attributes->get('organisateur_id');
+        return response()->json($stats->getStats($activeId));
     }
     public function editSession(SessionModel $session, Request $request)
     {

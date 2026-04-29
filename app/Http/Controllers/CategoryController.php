@@ -18,9 +18,7 @@ class CategoryController extends Controller
         $categories = Category::with('disciplines')
             ->orderBy('age_min', 'asc')
             ->get();
-        $test = Licence::whereHas('student')->count();
-        Log::info("test", ['test' => $test]);
-        Log::info("categories", ['categories' => $categories]);
+
         return response()->json($categories);
     }
 
@@ -43,8 +41,11 @@ class CategoryController extends Controller
         // Attacher les disciplines (table pivot)
         $category->disciplines()->sync($request->disciplines);
 
-        return redirect()->route('categories.index')
-            ->with('success', 'Catégorie créée !');
+        return response()->json([
+            'success' => true,
+            'message' => 'Catégorie créée avec succès',
+            'data' => $category
+        ], 201);
     }
 
     public function update(Request $request, Category $category)

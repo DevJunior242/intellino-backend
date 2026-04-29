@@ -7,16 +7,18 @@ use Illuminate\Notifications\Notification;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 
-class WelcomeToLeague extends Notification
+class WelcomeToLeague extends Notification implements ShouldQueue
 {
     use Queueable;
+    public $user;
+
 
     /**
      * Create a new notification instance.
      */
-    public function __construct()
+    public function __construct($user)
     {
-        //
+        $this->user = $user;
     }
 
     /**
@@ -36,10 +38,12 @@ class WelcomeToLeague extends Notification
     {
         //$url = "http://localhost:5173/reset-password/" . $this->token . "?email=" . urlencode($notifiable->email) . "&first=true";
         $baseUrl = config('app.frontend_url');
+
         return (new MailMessage)
-            ->line('Bienvenu dans notre league!.')
-            ->line('vous pouvez vous connecter à votre compte ici : ' . $baseUrl . '/login')
-            ->greeting('Bienvenue ' . $notifiable->fullname);
+            ->subject('Bienvenue dans notre league!')
+            ->greeting('Bonjour ' . $this->user->fullname)
+            ->line('Vous pouvez vous connecter à notre site ici : ' . $baseUrl)
+            ->action('Connexion', $baseUrl);
     }
 
     /**
