@@ -37,10 +37,12 @@ class LoginController extends Controller
             // 2. Fonction helper pour formater les organisations
             $formatOrg = function ($org) use ($allRoles) {
                 $roleId = $org->pivot->role_id ?? null;
+                $roleName = $roleId ? ($allRoles->get($roleId)->name ?? null) : null;
+
                 return [
                     'id' => $org->id,
                     'name' => $org->name,
-                    'role' => $allRoles->get($roleId)->name ?? 'Membre',
+                    'role' => $roleName ? [$roleName] : [],
                 ];
             };
 
@@ -50,11 +52,13 @@ class LoginController extends Controller
             //  $federations = $user->federations->map($formatOrg);
 
             // 4. On détermine le rôle actuel basé sur l'ID actif (priorité Ligue > Club)
-            $currentRole = 'Membre';
+            $currentRole = [];
             if ($user->current_league_id) {
-                $currentRole = $leagues->firstWhere('id', $user->current_league_id)['role'] ?? 'Membre';
+                $role = $leagues->firstWhere('id', $user->current_league_id)['role'] ?? [];
+                $currentRole = $role;
             } elseif ($user->current_club_id) {
-                $currentRole = $clubs->firstWhere('id', $user->current_club_id)['role'] ?? 'Membre';
+                $role = $clubs->firstWhere('id', $user->current_club_id)['role'] ?? [];
+                $currentRole = $role;
             }
 
             return response()->json([
@@ -65,7 +69,7 @@ class LoginController extends Controller
                 'clubs' => $clubs, // Liste des clubs
                 'leagues' => $leagues,         // Liste des ligues
                 // 'federations' => $federations, // Liste des fédérations
-                'role' => [$currentRole],
+                'role' => $currentRole, // Rôle actuel
             ]);
         } else {
             return response()->json(['message' => 'Identifiants invalides'], 401);
