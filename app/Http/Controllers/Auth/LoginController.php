@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Models\Role;
 use App\Models\User;
+use Nyholm\Psr7\Request;
 use App\Http\Requests\LoginRequest;
 use Illuminate\Support\Facades\Log;
 use App\Http\Controllers\Controller;
@@ -11,14 +12,9 @@ use Illuminate\Support\Facades\Auth;
 
 class LoginController extends Controller
 {
-    public function user()
+    public function user(Request $request)
     {
-        $user = auth()->user();
-        $role = $user->role ? [$user->role->name] : [];
-        return response()->json([
-            'user' => $user,
-            'role' => $role,
-        ]);
+        return $request->user();
     }
     public function login(LoginRequest $request)
     {

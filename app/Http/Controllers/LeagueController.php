@@ -61,12 +61,12 @@ class LeagueController extends Controller
                 $user->leagues()->attach($league->id, ['role_id' => $adminRoleName->id]);
                 $user->load('leagues.roles');
 
-                $memberships = $user->leagues->map(function ($c) {
+                $leagues = $user->leagues->map(function ($c) {
                     $role = $c->roles->firstWhere('id', $c->pivot->role_id);
                     return [
-                        'league_id'   => $c->id,
-                        'league_name' => $c->name,
-                        'role_name' => $role?->name,
+                        'id'   => $c->id,
+                        'name' => $c->name,
+                        'role' => $role?->name,
                     ];
                 });
 
@@ -74,9 +74,10 @@ class LeagueController extends Controller
                 return response()->json([
                     'success'     => true,
                     'user'        => $user,
-                    'memberships' => $memberships,
+                    'leagues' => $leagues,
                     'new_league'    => [
                         'id'   => $league->id,
+                        'type' => 'Ligue',
                         'role' => 'admin_league'
                     ]
                 ], 201);

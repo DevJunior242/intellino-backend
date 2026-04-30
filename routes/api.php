@@ -80,7 +80,16 @@ Route::get('/reset-password/{token}', [ResetPasswordController::class, 'sentToke
 
 Route::post('/reset-password', [ResetPasswordController::class, 'resetPassword']);
 
+
 Route::middleware(['auth:sanctum'])->group(function () {
+    Route::get('/user', function (Request $request) {
+        return $request->user();
+    });
+    //discipline 
+    Route::prefix('disciplines')->group(function () {
+        Route::get('/', [\App\Http\Controllers\DisciplineController::class, 'index']);
+        Route::post('/', [\App\Http\Controllers\DisciplineController::class, 'store']);
+    });
     //roles 
     Route::get('/roles', [RoleController::class, 'roles']);
     //register
@@ -88,7 +97,6 @@ Route::middleware(['auth:sanctum'])->group(function () {
     //logout 
     Route::post('/logout', [LoginController::class, 'logout']);
     //user
-    Route::get('/user', [LoginController::class, 'user']);
     Route::get('/plans', [PlanController::class, 'getPlans']);
     //profile
     Route::prefix('setting')->group(function () {
@@ -127,20 +135,20 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::get('/', [PaymentCategoryController::class, 'index']);
     });
     //mandats
-    Route::post('/mandats', [GovernanceController::class, 'storeMandat']);
-    Route::get('/getMandats', [GovernanceController::class, 'getMandats']);
-    Route::post('/postes', [GovernanceController::class, 'storePoste']);
-    Route::get('/getPostes', [GovernanceController::class, 'getPostes']);
+    // Route::post('/mandats', [GovernanceController::class, 'storeMandat']);
+    // Route::get('/getMandats', [GovernanceController::class, 'getMandats']);
+    // Route::post('/postes', [GovernanceController::class, 'storePoste']);
+    // Route::get('/getPostes', [GovernanceController::class, 'getPostes']);
 
     //candidats
-    Route::apiResource('/candidatures', CandidatureController::class);
-    Route::get('/my-jury-status', [JuryController::class, 'myOrganization']);
-    Route::apiResource('/jurys', JuryController::class);
+    // Route::apiResource('/candidatures', CandidatureController::class);
+    // Route::get('/my-jury-status', [JuryController::class, 'myOrganization']);
+    // Route::apiResource('/jurys', JuryController::class);
 
     //federations
-    Route::prefix('federations')->group(function () {
-        Route::apiResource('/federations', FederationController::class);
-    });
+    // Route::prefix('federations')->group(function () {
+    //     Route::apiResource('/federations', FederationController::class);
+    // });
     //leagues
     Route::prefix('leagues')->group(function () {
         Route::apiResource('/leagues', LeagueController::class);
@@ -176,9 +184,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::prefix('categories')->group(function () {
         Route::apiResource('/categories', CategoryController::class);
     });
-    Route::prefix('disciplines')->group(function () {
-        Route::apiResource('/disciplines', DisciplineConfigController::class);
-    });
+
     //setup
     Route::prefix('setup')->group(function () {
         Route::apiResource('/setup', LeagueSetupController::class);
@@ -253,11 +259,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::post('notes', [NoteController::class, 'store']);
     Route::post('notes/centralise', [NoteController::class, 'storeCentralise']);
     Route::get('inscriptions/{ordrePassage}/notes', [NoteController::class, 'notesInscription']);
-    //discipline 
-    Route::prefix('disciplines')->group(function () {
-        Route::get('/', [\App\Http\Controllers\DisciplineController::class, 'index']);
-        Route::post('/', [\App\Http\Controllers\DisciplineController::class, 'store']);
-    });
+
     Route::patch(
         'inscriptions/{inscription}/assigner-tatami',
         [InscriptionController::class, 'assignerTatami']

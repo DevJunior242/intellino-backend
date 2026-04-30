@@ -85,7 +85,7 @@ class ClubController extends Controller
             $user->clubs()->attach($club->id, ['role_id' => $adminRoleName->id]);
             $user->load('clubs.roles');
 
-            $memberships = $user->clubs->map(function ($c) {
+            $clubs = $user->clubs->map(function ($c) {
                $role = $c->roles->firstWhere('id', $c->pivot->role_id);
                return [
                   'id'   => $c->id,
@@ -100,10 +100,12 @@ class ClubController extends Controller
                'success'     => true,
                'message'     => 'Le club a été créé avec succès',
                'user'        => $user,
-               'memberships' => $memberships,
+               'clubs' => $clubs,
                'new_club'    => [
                   'id'   => $club->id,
+                  'type' => 'Club',
                   'role' => 'admin_club'
+
                ]
             ], 201);
          });
