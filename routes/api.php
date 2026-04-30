@@ -62,7 +62,6 @@ use App\Http\Controllers\StudentPaymentController;
 use App\Http\Controllers\PaymentCategoryController;
 use App\Http\Controllers\RotationArbitreController;
 use App\Http\Controllers\DisciplineConfigController;
-use App\Http\Controllers\DisciplineConfigControllerr;
 use App\Http\Controllers\Auth\AdminRegisterController;
 use App\Http\Controllers\NiveauxCompetitionController;
 
@@ -295,6 +294,10 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::post('/notifications/mark-read', [NotificationController::class, 'markAsRead']);
 
     Route::middleware('permission:instructeur,secretaire,admin_club,parent,karateka,super_admin,admin_league')->group(function () {
+
+        Route::prefix('disciplines')->group(function () {
+            Route::apiResource('/disciplines', DisciplineConfigController::class);
+        });
 
         //inscription 
         Route::prefix('inscriptions')->group(function () {
