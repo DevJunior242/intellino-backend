@@ -8,9 +8,9 @@ use App\Models\Grade;
 use App\Models\ExamenResult;
 use App\Models\ExamenCandidat;
 use App\Models\ExamenEvaluation;
+use App\Models\GradeEnchainement;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
-use App\Models\GradeEnchainement;
 
 class Examen extends Model
 {
@@ -19,6 +19,7 @@ class Examen extends Model
     protected $fillable = [
         'organisateur_id',
         'organisateur_type',
+        'saison_id',
         'current_grade_id',
         'next_grade_id',
         'start_date',

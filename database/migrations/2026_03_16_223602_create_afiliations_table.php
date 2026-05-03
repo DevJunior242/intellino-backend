@@ -15,13 +15,14 @@ return new class extends Migration
             $table->uuid('id')->primary();
             $table->foreignUuid('league_id')->constrained('leagues')->cascadeOnDelete();
             $table->foreignUuid('club_id')->constrained('clubs')->cascadeOnDelete();
-            $table->string('saison', 20);              // "2024-2025"
             $table->tinyInteger('status')->default(1);
             $table->decimal('cotisation', 10, 2)->nullable();
+
+
             $table->date('date_debut');
             $table->date('date_fin');
             $table->timestamps();
-            $table->unique(['club_id', 'saison']);    // 1 affiliation par saison
+            $table->unique(['club_id']);    // 1 affiliation par saison
         });
     }
 

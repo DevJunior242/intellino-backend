@@ -19,14 +19,20 @@ class Licence extends Model
         'league_id',
         'club_id',
         'student_id',
-        'saison',
+        'saison_id',
         'numero',
         'type',
         'grade_au_moment',
         'montant',
         'date_emission',
         'date_expiration',
+        'status',
     ];
+    const STATUS_ACTIVE = 0;
+    const STATUS_EXPIRED = 1;
+    protected $keyType = 'string';
+    public $incrementing = false;
+
 
     public function student()
     {
@@ -62,5 +68,14 @@ class Licence extends Model
             $key = "licencies_count_cat_{$id}_league_{$leagueId}";
             Cache::forget($key);
         }
+    }
+
+    public function getStatusLabelAttribute()
+    {
+        return match ($this->status) {
+            self::STATUS_ACTIVE => 'Actif',
+            self::STATUS_EXPIRED => 'Expiré',
+            default => 'Inconnu',
+        };
     }
 }

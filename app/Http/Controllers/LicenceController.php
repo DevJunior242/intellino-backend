@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Saison;
 use App\Models\Licence;
 use App\Models\Student;
 use Illuminate\Http\Request;
@@ -14,20 +15,25 @@ class LicenceController extends Controller
 
     public function index(Request $request)
     {
-
+        $activeId = $request->attributes->get('organisateur_id');
         $search = $request->search;
         $status = $request->status;
+        $saisonActive =  Saison::where('active', true)->first();
 
         $licenses = Licence::with(['student', 'club'])
-            ->when($status, function ($query) use ($status) {
-                $query->where('statut', $status);
-            })
-            ->when($search, function ($query) use ($search) {
-                $query->where('numero', 'like', "%$search%")
-                    ->orWhereHas('student', function ($q) use ($search) {
-                        $q->where('nom', 'like', "%$search%");
-                    });
-            })
+            ->where('saison_id', $saisonActive->id)
+            ->where('league_id', $activeId)
+            ->when($status, fn($q) => $q->where('status', $status))
+            ->when(
+                $search,
+                fn($q) => $q
+                    ->where('numero', 'like', "%$search%")
+                    ->orWhereHas(
+                        'student',
+                        fn($sq) =>
+                        $sq->where('fullname', 'like', "%$search%")
+                    )
+            )
             ->latest()
             ->paginate(10);
 
@@ -40,31 +46,31 @@ class LicenceController extends Controller
     public function LicenceStat()
     {
         $user = auth()->user();
-        $leagueId = $user->current_league_id;
-        Log::info('leagueId', ['leagueId' => $leagueId]);
-        if (!$leagueId) {
+        $activeId = $user->current_league_id;
+        Log::info('activeId$activeId', ['activeId$activeId' => $activeId]);
+        if (!$activeId) {
             return response()->json([
                 'success' => false,
                 'message' => 'Vous devez être dans une ligue pour accéder à ses clubs',
             ], 400);
         }
         //licences actives count 
-        $activeLicences = Licence::where('league_id', $leagueId)
+        $activeLicences = Licence::where('league_id', $activeId)
             ->where('date_expiration', '>=', now())
             ->count();
 
         //licences expirees count
-        $expiredLicences = Licence::where('league_id', $leagueId)
+        $expiredLicences = Licence::where('league_id', $activeId)
             ->where('date_expiration', '<', now())
             ->count();
         //licence en attente count
-        $pendingLicences = Licence::where('league_id', $leagueId)
-            ->where('statut', 'pending')
+        $pendingLicences = Licence::where('league_id', $activeId)
+            ->where('status', Licence::STATUS_ACTIVE)
             ->count();
 
 
         //somme des montants des licences actives
-        $totalActiveLicences = Licence::where('league_id', $leagueId)
+        $totalActiveLicences = Licence::where('league_id', $activeId)
             ->where('date_expiration', '>=', now())
             ->sum('montant');
         $totalActiveLicences = $totalActiveLicences / 100;
@@ -82,42 +88,40 @@ class LicenceController extends Controller
 
 
 
-
-
-
-
-
-
-
-
-
-
     public function store(StoreLicenceReq $request)
     {
 
-        $user = auth()->user();
-        $leagueId = $user->current_league_id;
-        Log::info('leagueId', ['leagueId' => $leagueId]);
-        if (!$leagueId) {
+        $activeId = $request->attributes->get('organisateur_id');
+        if (!$activeId) {
             return response()->json([
                 'success' => false,
                 'message' => 'Vous devez être dans une ligue pour créer une licence',
-            ], 400);
+            ], 422);
         }
         // Validation des données
         $validated = $request->validated();
+        $saisonActive =  Saison::where('active', true)->first();
 
         // 1. Génération du numéro de licence unique 
-        $annee = explode('-', $validated['saison'])[0]; // On prend 2025 de "2025-2026"
+        $annee = explode('-', $saisonActive->libelle)[0];
         $validated['numero'] = $this->generateLicenceNumber($annee);
 
         $student = Student::with('currentGrade.grade')->findOrFail($validated['student_id']);
-        $gradeName = $student->currentGrade->grade->name;
-        Log::info('gradeName', ['gradeName' => $gradeName]);
-        $validated['grade_au_moment'] = $gradeName;
+        $gradeName = $student?->currentGrade?->grade->name;
+        if (!$activeId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Vous devez définir une saison pour créer une licence',
+            ], 422);
+        }
+
+
+
         $licence = Licence::create($validated + [
-            'club_id' => $request->validated_club_id,
-            'league_id' => $leagueId,
+            'club_id' => $request->input('club_id'),
+            'league_id' => $activeId,
+            'grade_au_moment' => $gradeName,
+            'saison_id' => $saisonActive->id,
         ]);
 
         return response()->json([

@@ -2,20 +2,17 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Club;
-use App\Models\Role;
+
 use App\Models\Competition;
 use Illuminate\Http\Request;
-use App\Models\ArbitreCompetition;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
+
 use App\Http\Controllers\Controller;
-use Illuminate\Support\Facades\Auth;
 use App\Http\Requests\CompetitionRequest;
-use App\Services\ArbitreVerificationService;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
 class CompetitionController extends Controller
 {
+    use AuthorizesRequests;
     public function index()
     {
         try {
@@ -45,7 +42,7 @@ class CompetitionController extends Controller
     public function store(CompetitionRequest $request)
     {
 
-
+        $this->authorize('create', Competition::class);
         $competition = Competition::create($request->validated());
 
         return response()->json([
@@ -92,5 +89,31 @@ class CompetitionController extends Controller
         }
 
         return response()->json($competition);
+    }
+
+
+
+    // Ouvrir les inscriptions
+    public function ouvrir(Competition $competition)
+    {
+        $this->authorize('open', $competition);
+        $competition->update([
+            'status' => 1,
+
+        ]);
+
+        return response()->json([
+            'event' => $competition,
+            'message' => 'Les inscriptions sont maintenant ouvertes !'
+        ]);
+    }
+
+    // Clôturer manuellement
+    public function cloturer(Competition $competition)
+    {
+        $this->authorize('close', $competition);
+        $competition->update(['status' => 2]);
+
+        return response()->json(['message' => 'Les inscriptions ont été clôturées.']);
     }
 }

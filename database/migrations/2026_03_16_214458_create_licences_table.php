@@ -24,10 +24,9 @@ return new class extends Migration
             $table->string('type', 30)->default('competiteur');
             // competiteur, loisir, dirigeant, arbitre, entraineur...
 
-            $table->string('saison', 9);
             $table->string('numero')->unique();
             $table->decimal('montant', 10, 2)->nullable(); // prix payé
-            $table->string('statut')->default('active');
+            $table->tinyInteger('status')->default(0);
             $table->date('date_emission');
             $table->date('date_expiration');
             $table->timestamps();

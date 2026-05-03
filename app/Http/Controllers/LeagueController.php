@@ -42,7 +42,7 @@ class LeagueController extends Controller
                     return response()->json([
                         'success' => false,
                         'message' => 'Le role  n\'existe pas',
-                    ], 400);
+                    ], 422);
                 }
 
                 $file = $request->logo;
@@ -84,48 +84,56 @@ class LeagueController extends Controller
             });
         } catch (\Throwable $th) {
             //throw $th;
-            Log::error('erreur', ['erreur' => $th->getMessage()]);
             return response()->json([
                 'success' => false,
                 'message' => 'Une erreur est survenue lors de la création du league',
-            ], 400);
+            ], 422);
         }
     }
 
 
-    public function addClub($clubId)
+    public function addClub($clubId, Request $request)
     {
-        $user = auth()->user();
-        $leagueId = $user->current_league_id;
-        Log::info('clubId', ['clubId' => $clubId]);
-        Log::info('leagueId', ['leagueId' => $leagueId]);
+        $activeId = $request->attributes->get('organisateur_id');
+
 
         $club = Club::findOrFail($clubId);
-        $club->league_id = $leagueId;
+        $club->league_id = $activeId;
         $club->save();
 
         return response()->json(['success' => true, 'message' => 'Le club a bien été ajouté à la ligue']);
     }
 
-    public function myClubs()
+    public function myClubs(Request $request)
     {
-        $user = auth()->user();
-        $leagueId = $user->current_league_id;
-        if (!$leagueId) {
+        $activeId = $request->attributes->get('organisateur_id');
+        if (!$activeId) {
             return response()->json([
                 'success' => false,
                 'message' => 'Vous devez être dans une ligue pour accéder à ses clubs',
-            ], 400);
+            ], 422);
         }
-        $clubs = Club::where('league_id', $leagueId)
+
+        $search = $request->search;
+        $status = $request->status;
+
+        $clubs = Club::where('league_id', $activeId)
             ->with(['users', 'affiliations'])
             ->withCount('licences')
+            ->when($search, fn($q) => $q->where('name', 'like', "%$search%"))
+            ->when($status, fn($q) => $q->whereHas(
+                'affiliations',
+                fn($sq) =>
+                $sq->where('status', $status)
+            ))
             ->latest()
             ->paginate(8);
+
         $clubs->getCollection()->transform(function ($club) {
             $club->logo = $club->logo ? url('storage/' . $club->logo) : null;
             return $club;
         });
+
         return response()->json($clubs);
     }
 

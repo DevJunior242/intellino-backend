@@ -59,6 +59,7 @@ use App\Http\Controllers\Auth\RegisterController;
 use App\Http\Controllers\ResetPasswordController;
 use App\Http\Controllers\ConfigNotationController;
 use App\Http\Controllers\StudentPaymentController;
+use App\Http\Controllers\DashBoardLeagueController;
 use App\Http\Controllers\PaymentCategoryController;
 use App\Http\Controllers\RotationArbitreController;
 use App\Http\Controllers\DisciplineConfigController;
@@ -133,29 +134,13 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::prefix('payment-categories')->group(function () {
         Route::get('/', [PaymentCategoryController::class, 'index']);
     });
-    //mandats
-    // Route::post('/mandats', [GovernanceController::class, 'storeMandat']);
-    // Route::get('/getMandats', [GovernanceController::class, 'getMandats']);
-    // Route::post('/postes', [GovernanceController::class, 'storePoste']);
-    // Route::get('/getPostes', [GovernanceController::class, 'getPostes']);
+    Route::get('/getCategories', [CategoryController::class, 'getCategories']);
+    Route::post('/categories', [CategoryController::class, 'store']);
 
-    //candidats
-    // Route::apiResource('/candidatures', CandidatureController::class);
-    // Route::get('/my-jury-status', [JuryController::class, 'myOrganization']);
-    // Route::apiResource('/jurys', JuryController::class);
-
-    //federations
-    // Route::prefix('federations')->group(function () {
-    //     Route::apiResource('/federations', FederationController::class);
-    // });
-    //leagues
-    Route::prefix('leagues')->group(function () {
-        Route::apiResource('/leagues', LeagueController::class);
-        Route::get('/myClubs', [LeagueController::class, 'myClubs']);
-
-
-        Route::post('/addClub/{clubId}', [LeagueController::class, 'addClub']);
+    Route::prefix('disciplines')->group(function () {
+        Route::apiResource('/disciplines', DisciplineConfigController::class);
     });
+
     //ajout membre league
     Route::prefix('membres')->group(function () {
         Route::get('leagues/getRoles', [LeagueMemberController::class, 'getRoles']);
@@ -163,14 +148,8 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::apiResource('league', LeagueMemberController::class);
     });
 
-    //affiliations
-    Route::prefix('affiliations')->group(function () {
-        Route::apiResource('/affiliations', AffiliationController::class);
-    });
-    //licences
-    Route::prefix('licences')->group(function () {
-        Route::apiResource('/licences', LicenceController::class);
-    });
+
+
     //league students 
     Route::prefix('league/students')->group(function () {
         Route::get('/', [LeagueController::class, 'getLeagueStudents']);
@@ -178,10 +157,6 @@ Route::middleware(['auth:sanctum'])->group(function () {
     //examen leagues
     Route::prefix('examen-leagues')->group(function () {
         Route::apiResource('/examen-leagues', ExamenLeagueController::class);
-    });
-    //categories
-    Route::prefix('categories')->group(function () {
-        Route::apiResource('/categories', CategoryController::class);
     });
 
     //setup
@@ -219,25 +194,8 @@ Route::middleware(['auth:sanctum'])->group(function () {
         // Route
         Route::get('configs/{config}/vue-publique', [SeanceController::class, 'vuePublique']);
     });
-    //evenements
-    Route::prefix('evenements')->group(function () {
-        //ouvrir et cloturer evenement
-        Route::post('/ouvrir/{evenement}', [EvenementController::class, 'ouvrir']);
-        Route::post('/cloturer/{evenement}', [EvenementController::class, 'cloturer']);
-        //arbitrer
-        Route::post('/arbitrer/{evenement}', [EvenementController::class, 'arbitrer']);
-        Route::apiResource('/evenements', EvenementController::class);
-        Route::get('/getEventActive', [EvenementController::class, 'getEventActive']);
-    });
-    //competitions
 
-    Route::prefix('competitions')->group(function () {
-        Route::get('/getActiveCompetition', [CompetitionController::class, 'getActiveCompetition']);
-        Route::get('/getCompetitions', [CompetitionController::class, 'getCompetitions']);
 
-        Route::post('/arbitrer/{competition}', [CompetitionController::class, 'arbitrer']);
-        Route::apiResource('/competitions', CompetitionController::class);
-    });
     //arbitre dispo
     Route::get('/arbitres/disponibles/{evenementId}/{configId}', [ArbitreController::class, 'getDisponibles']);
     //rotation arbitres
@@ -269,7 +227,8 @@ Route::middleware(['auth:sanctum'])->group(function () {
         'competitions/{competition}/inscriptions-non-assignees',
         [InscriptionController::class, 'nonAssignees']
     );
-
+    Route::get('evenements/ouverts',                          [InscriptionController::class, 'getEvenementsOuverts']);
+    Route::get('inscriptions/epreuve/{competition}',          [InscriptionController::class, 'parEpreuve']);
     // Athlètes d'un tatami
     Route::get(
         'configs/{config}/inscriptions',
@@ -280,32 +239,65 @@ Route::middleware(['auth:sanctum'])->group(function () {
     });
     Route::get('configs/{config}/bracket', [CombatController::class, 'bracket']);
 
-    Route::get('evenements/ouverts',                          [InscriptionController::class, 'getEvenementsOuverts']);
-    Route::get('inscriptions/epreuve/{competition}',          [InscriptionController::class, 'parEpreuve']);
-    Route::post('inscriptions',                               [InscriptionController::class, 'store']);
-    Route::delete('inscriptions/{inscription}',               [InscriptionController::class, 'destroy']);
-    //adin inscription index
-    Route::get('/admin/inscriptions', [InscriptionController::class, 'index']);
+
     //student grade 
     Route::get('grade', [GradeController::class, 'index']);
     Route::apiResource('/users', UserController::class);
     //notifications
     Route::get('/notifications', [NotificationController::class, 'index']);
     Route::post('/notifications/mark-read', [NotificationController::class, 'markAsRead']);
-
+    Route::prefix('leagues')->group(function () {
+        Route::apiResource('/leagues', LeagueController::class);
+    });
     Route::middleware('permission:instructeur,secretaire,admin_club,parent,karateka,super_admin,admin_league')->group(function () {
 
-        Route::prefix('disciplines')->group(function () {
-            Route::apiResource('/disciplines', DisciplineConfigController::class);
-        });
+        //ligues
+        Route::get('leagues/myClubs', [LeagueController::class, 'myClubs']);
 
+        Route::post('leagues/addClub/{clubId}', [LeagueController::class, 'addClub']);
+        //licences
+        Route::prefix('licences')->group(function () {
+            Route::apiResource('/licences', LicenceController::class);
+        });
+        //categories
+        Route::get('/categories', [CategoryController::class, 'index']);
+
+
+        //affiliations
+        Route::prefix('affiliations')->group(function () {
+            Route::apiResource('/affiliations', AffiliationController::class);
+        });
         //inscription 
+
+        Route::post('inscriptions',                               [InscriptionController::class, 'store']);
+        Route::delete('inscriptions/{inscription}',               [InscriptionController::class, 'destroy']);
+        //adin inscription index
+        Route::get('/admin/inscriptions', [InscriptionController::class, 'index']);
         Route::prefix('inscriptions')->group(function () {
             Route::apiResource('/inscriptions', InscriptionController::class);
         });
 
         Route::get('/inscriptions/competition/{competitionId}', [InscriptionController::class, 'getByCompetition']);
+        //evenements
+        Route::prefix('evenements')->group(function () {
+            //ouvrir et cloturer evenement
+            Route::post('/ouvrir/{evenement}', [EvenementController::class, 'ouvrir']);
+            Route::post('/cloturer/{evenement}', [EvenementController::class, 'cloturer']);
+            //arbitrer
+            Route::post('/arbitrer/{evenement}', [EvenementController::class, 'arbitrer']);
+            Route::apiResource('/evenements', EvenementController::class);
+            Route::get('/getEventActive', [EvenementController::class, 'getEventActive']);
+        });
+        //competitions
 
+        Route::prefix('competitions')->group(function () {
+            Route::get('/getActiveCompetition', [CompetitionController::class, 'getActiveCompetition']);
+            Route::get('/getCompetitions', [CompetitionController::class, 'getCompetitions']);
+            Route::post('/ouvrir/{competition}', [CompetitionController::class, 'ouvrir']);
+            Route::post('/cloturer/{competition}', [CompetitionController::class, 'cloturer']);
+            Route::post('/arbitrer/{competition}', [CompetitionController::class, 'arbitrer']);
+            Route::apiResource('/competitions', CompetitionController::class);
+        });
         //plan controller
         Route::post('/plan/store', [PlanController::class, 'storePlan']);
 
@@ -331,6 +323,10 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::get('/dashboard/stats', [DashboardController::class, 'stats']);
         Route::get('/dashboard/activity', [DashboardController::class, 'getDashboardActivity']);
         Route::get('/attendances/chart', [\App\Http\Controllers\AdminClubController::class, 'presence']);
+        //dashboard league
+        Route::get('/dashboard/league/stats', [DashBoardLeagueController::class, 'stats']);
+        Route::get('/dashboard/league/alert', [DashBoardLeagueController::class, 'Alert']);
+        Route::get('/dashboard/league/exmenstates', [DashBoardLeagueController::class, 'exmenstates']);
 
 
         Route::post('/grade/store', [GradeController::class, 'store']);

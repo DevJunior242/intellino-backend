@@ -13,7 +13,7 @@ class Affiliation extends Model
     protected $fillable = [
         'league_id',
         'club_id',
-        'saison',
+        'saison_id',
         'cotisation',
         'date_debut',
         'date_fin',
@@ -23,7 +23,7 @@ class Affiliation extends Model
     protected $keyType = 'string';
     public $incrementing = false;
 
-    const STATUS_EN_ENTETTE = 0;
+    const STATUS_EN_ATTENTE = 0;
     const STATUS_EN_ACTIF = 1;
     const STATUS_EN_EXPIRE = 2;
     const STATUS_SUSPENDU = 3;
@@ -35,5 +35,16 @@ class Affiliation extends Model
     public function club()
     {
         return $this->belongsTo(Club::class);
+    }
+
+    public function getStatusLabelAttribute()
+    {
+        return match ($this->status) {
+            self::STATUS_EN_ATTENTE => 'En attente',
+            self::STATUS_EN_ACTIF => 'Active',
+            self::STATUS_EN_EXPIRE => 'Expirée',
+            self::STATUS_SUSPENDU => 'Suspendue',
+            default => 'Inconnu',
+        };
     }
 }

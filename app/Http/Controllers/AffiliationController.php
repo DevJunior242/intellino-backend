@@ -2,9 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Saison;
 use App\Models\Affiliation;
-use App\Http\Controllers\Controller;
 
+use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreAffiliationRequest;
 
 class AffiliationController extends Controller
@@ -12,27 +13,38 @@ class AffiliationController extends Controller
     public function store(StoreAffiliationRequest $request)
     {
 
-        $user = auth()->user();
-        $league = $user->current_league_id;
-        if (!$league) {
+        $activeId = $request->attributes->get('organisateur_id');
+
+        $saisonActive =  Saison::where('active', true)->first();
+        if (!$saisonActive) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Vous devez définir une saison pour créer une affiliation',
+            ], 422);
+        }
+
+        if (!$activeId) {
             return response()->json([
                 'success' => false,
                 'message' => 'Vous devez être dans une ligue pour créer une affiliation',
-            ], 400);
+            ], 422);
         }
         $validated = $request->validated();
         //verifier si club deja dans une affiliation
-        $affiliation = Affiliation::where('club_id', $validated['club_id'])->where('league_id', $league)->first();
+        $affiliation = Affiliation::where('club_id', $validated['club_id'])
+            ->where('saison_id', $saisonActive->id)
+            ->where('league_id', $activeId)->first();
         if ($affiliation) {
             return response()->json([
                 'success' => false,
                 'message' => 'Ce club est déjà dans une affiliation',
-            ], 400);
+            ], 422);
         }
 
         $affiliation = Affiliation::create(
             $validated + [
-                'league_id' => $league,
+                'league_id' => $activeId,
+                'saison_id' => $saisonActive->id,
             ]
         );
 

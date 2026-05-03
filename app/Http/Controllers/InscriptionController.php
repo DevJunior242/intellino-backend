@@ -24,8 +24,8 @@ class InscriptionController extends Controller
             ->with([
                 'athlete:id,fullname,sex',
                 'club:id,name',
-                'category:id,nom,sexe',
-                'disciplineleague:id,nom'
+                'competition.category:id,nom,sexe',
+                'competition.discipline:id,nom'
             ])
             ->orderBy('club_id')
             ->get();
@@ -148,7 +148,7 @@ class InscriptionController extends Controller
     {
         $evenements = Evenement::with([
             'competitions' => function ($q) {
-                $q->with(['category', 'discipline', 'niveau'])
+                $q->with(['category:id,nom,sexe', 'discipline:id,nom', 'niveau:id,nom'])
                     ->withCount('inscriptions');
             },
         ])
@@ -173,7 +173,7 @@ class InscriptionController extends Controller
         return response()->json([
             'success'      => true,
             'inscriptions' => $inscriptions,
-            'epreuve'      => $competition->load(['category', 'discipline', 'niveau']),
+            'epreuve'      => $competition->load(['category:id,nom,sexe', 'discipline:id,nom', 'niveau:id,nom']),
         ]);
     }
 

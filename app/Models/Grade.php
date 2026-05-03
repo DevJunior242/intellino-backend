@@ -35,4 +35,11 @@ class Grade extends Model
     {
         return $this->hasMany(Course::class);
     }
+
+
+    public function isNoire()
+    {
+        return str_contains(strtolower($this->name), 'noire')
+            || str_contains(strtolower($this->name), '1er dan');
+    }
 }

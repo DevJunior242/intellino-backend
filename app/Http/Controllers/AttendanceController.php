@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Saison;
 use App\Models\Session;
 use App\Models\Student;
 use App\Models\Attendance;
@@ -99,6 +100,13 @@ class AttendanceController extends Controller
         $activeId = $request->attributes->get('organisateur_id');
         $validatedData = $request->validated();
         $attendances = $validatedData['attendances'];
+        $saisonActive =  Saison::where('active', true)->firsts();
+        if (!$saisonActive) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Vous devez définir une saison pour créer des présences',
+            ], 422);
+        }
 
         // Début de la transaction sécurisée
         DB::beginTransaction();
@@ -110,6 +118,7 @@ class AttendanceController extends Controller
                         'club_id'    => $activeId,
                         'student_id' => $data['student_id'],
                         'session_id' => $data['session_id'],
+                        'saison_id' => $saisonActive->id,
                     ],
                     [
                         'status'     => $data['status'],
@@ -140,9 +149,11 @@ class AttendanceController extends Controller
 
     public function getStudentAttendance(Request $request)
     {
+        $saisonActive =  Saison::where('active', true)->firsts();
         $activeId = $request->attributes->get('organisateur_id');
         $attendances = Attendance::with(['session.course:id,name', 'student:id,fullname'])
             ->where('club_id', $activeId)
+            ->where('saison_id', $saisonActive->id)
             ->where('status', 'absent')
             ->latest()
             ->take(5)

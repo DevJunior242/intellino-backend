@@ -6,6 +6,7 @@ use Carbon\Carbon;
 use App\Models\User;
 use App\Models\Grade;
 use App\Models\Examen;
+use App\Models\Saison;
 use App\Models\Student;
 use Illuminate\Support\Str;
 use Illuminate\Http\Request;
@@ -101,13 +102,20 @@ class ExamenController extends Controller
             $curentGrade = Grade::findOrFail($request->current_grade_id);
             $nextGrade = Grade::findOrFail($request->next_grade_id);
             $isNoire = str_contains(strtolower($nextGrade->name), 'noire');
+            $saisonActive =  Saison::where('active', true)->first();
+            if (!$saisonActive) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Vous devez définir une saison pour créer un examen',
+                ], 422);
+            }
 
             // 1. Validation de la hiérarchie
             if ($isNoire && $activeType !== 'Ligue') {
                 return response()->json([
                     'success' => false,
                     'message' => 'L\'examen pour la ceinture noire est réservé aux Ligues.'
-                ], 403);
+                ], 422);
             }
 
             if (!$curentGrade) {
@@ -132,13 +140,14 @@ class ExamenController extends Controller
                 ], 400);
             }
 
-            $examenData = DB::transaction(function () use ($validated, $user, $activeId, $activeType, $request) {
+            $examenData = DB::transaction(function () use ($validated, $user, $activeId, $activeType, $saisonActive, $request) {
 
 
                 // Créer l'examen
                 $examen = Examen::create([
                     ...$validated,
                     'created_by' => $user->id,
+                    'saison_id' => $saisonActive->id,
                 ]);
 
                 // 3. Inscription AUTOMATIQUE uniquement si c'est un CLUB
@@ -165,7 +174,12 @@ class ExamenController extends Controller
 
                 return $examen;
             });
+            $examenData->load('candidates');
+            $candidats = $examenData->candidates;
 
+            if ($candidats->isNotEmpty()) {
+                Notification::send($candidats, new ExamenCreated($examenData));
+            }
             $message = ($activeType === 'Ligue')
                 ? 'Examen de Ligue créé. Les clubs peuvent maintenant inscrire leurs candidats.'
                 : 'Examen de Club créé avec inscriptions automatiques.';
@@ -175,14 +189,6 @@ class ExamenController extends Controller
                 'message' => $message,
                 'data' => $examenData
             ], 201);
-
-            //envoyer notif aux candidats
-            //load relation
-            $candidats = $examenData->candidates;
-            Log::info('Examen created', ['examen' => $examenData]);
-            if ($candidats->isNotEmpty()) {
-                Notification::send($candidats, new ExamenCreated($examenData));
-            }
         } catch (QueryException $e) {
             $errcode = $e->getCode();
             $errmessage = $e->getMessage();

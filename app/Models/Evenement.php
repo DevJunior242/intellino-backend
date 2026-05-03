@@ -14,6 +14,7 @@ class Evenement extends Model
         'nom',
         'organisateur_id',
         'organisateur_type',
+        'saison_id',
         'lieu',
         'date_debut',
         'date_fin',

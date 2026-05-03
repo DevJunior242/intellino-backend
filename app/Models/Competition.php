@@ -56,4 +56,15 @@ class Competition extends Model
     {
         return $this->belongsTo(Evenement::class, 'evenement_id');
     }
+
+    public function getStatutLabelAttribute()
+    {
+        return match ($this->status) {
+            self::STATUT_ATTENTE => 'En attente',
+            self::STATUT_EN_COURS  => 'En cours',
+            self::STATUT_TERMINE   => 'Terminée',
+            self::STATUT_PAUSE => 'En pause',
+            default                => 'Inconnu',
+        };
+    }
 }

@@ -4,24 +4,69 @@ namespace App\Http\Controllers;
 
 use App\Models\Saison;
 use App\Models\Licence;
+use App\Models\Student;
 use App\Models\Category;
 use Illuminate\Http\Request;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Log;
+
 
 class CategoryController extends Controller
 {
-    public function index(): JsonResponse
-    {
-        // On récupère toutes les catégories avec les displines associées, triées par age_min asc
 
-        $categories = Category::with('disciplines')
-            ->orderBy('age_min', 'asc')
+    public function index(Request $request)
+    {
+        $categories = Category::orderBy('age_min', 'asc')->get();
+        $activeId = $request->attributes->get('organisateur_id');
+        $saisonActive =  Saison::where('active', true)->first();
+        $saisonId = $saisonActive->id;
+        $result = $categories->map(function ($cat) use ($activeId, $saisonId) {
+            $dateAujourdhui = \Carbon\Carbon::now();
+            $dateNaissanceMin = $dateAujourdhui->copy()->subYears($cat->age_max)->format('Y-m-d');
+            $dateNaissanceMax = $dateAujourdhui->copy()->subYears($cat->age_min)->format('Y-m-d');
+
+            $studentQuery = Student::whereHas('club', fn($q) => $q->where('league_id', $activeId))
+                ->whereBetween('birthdate', [$dateNaissanceMin, $dateNaissanceMax]);
+
+            if ($cat->sexe !== 'Mixte') {
+                $studentQuery->where('sex', $cat->sexe);
+            }
+
+            $studentCount = $studentQuery->count();
+            $licenciesCount = $cat->getLicenciesCount($activeId, $saisonId);
+
+            return [
+                'id'              => $cat->id,
+                'nom'             => $cat->nom,
+                'age_min'         => $cat->age_min,
+                'age_max'         => $cat->age_max,
+                'sexe'            => $cat->sexe,
+                'licencies_count' => $licenciesCount,
+                'student_count'   => $studentCount,
+                'taux'            => $studentCount > 0
+                    ? round(($licenciesCount / $studentCount) * 100)
+                    : 0,
+            ];
+        });
+
+        $totalLicencies = Licence::where('league_id', $activeId)
+            ->where('saison_id', $saisonId)
+            ->where('status', Licence::STATUS_ACTIVE)
+            ->distinct('student_id')
+            ->count('student_id');
+
+        return response()->json([
+            'categories'      => $result,
+            'total_licencies' => $totalLicencies,
+        ]);
+    }
+
+    public function getCategories(Request $request)
+    {
+        $categories = Category::select('id', 'nom', 'age_min', 'age_max', 'sexe')
             ->get();
 
         return response()->json($categories);
     }
-
 
 
     public function store(Request $request)

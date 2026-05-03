@@ -15,6 +15,9 @@ return new class extends Migration
             $table->uuid('id')->primary();
             $table->string('nom'); // ex: "Open de Karaté 2026"
             $table->uuidMorphs('organisateur');
+            $table->foreignUuid('saison_id')
+                ->nullable()
+                ->constrained('saisons')->nullOnDelete();
             $table->string('lieu'); // ex: "Ouagadougou", "Bobo-Dioulasso"
             $table->date('date_debut'); // ex: 2026-05-15
             $table->date('date_fin');

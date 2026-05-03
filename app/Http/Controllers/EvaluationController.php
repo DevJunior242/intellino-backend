@@ -28,12 +28,6 @@ class EvaluationController extends Controller
         $activeId = $request->attributes->get('organisateur_id');
         $role = $request->attributes->get('role');
 
-        // if ($examen->organisateur_id != $activeId) {
-        //     return response()->json([
-        //         'success' => false,
-        //         'message' => 'Aucun examen trouvé',
-        //     ]);
-        // }
 
         //student
         $examenId = $examen->id;
@@ -66,7 +60,7 @@ class EvaluationController extends Controller
 
             $exam = $evaluations->first()?->examen;
 
-            $students = $evaluations->groupBy('student_id')->map(function ($items) {
+            $students = $evaluations->groupBy('student_id')->map(function ($items, $examen) {
                 $student = $items->first()?->student;
                 $notes = [];
                 $totalScore = 0;
@@ -87,8 +81,11 @@ class EvaluationController extends Controller
 
 
                 $moyenne = round($totalScore, 2);
+                $exam = $items->first()?->examen;
 
-                $passage = $moyenne >= 50 ? 'Passable' : 'Redoublable';
+                $totalPointsPossibles = $exam?->enchainements->sum('diviseur');
+                $seuilAdmission = $totalPointsPossibles / 2;
+                $passage = $moyenne >= $seuilAdmission ? 'Admis' : 'Ajourné';
 
                 return [
                     'id' => $student->id,
@@ -149,7 +146,11 @@ class EvaluationController extends Controller
 
             $moyenne = round($totalScore, 2);
 
-            $passage = $moyenne >= 50 ? 'Passable' : 'Redoublable';
+            $exam = $items->first()?->examen;
+            $totalPointsPossibles = $exam?->enchainements->sum('diviseur');
+
+            $seuilAdmission = $totalPointsPossibles / 2;
+            $passage = $moyenne >= $seuilAdmission ? 'Admis' : 'Ajourné';
             return [
                 'id' => $student->id,
                 'fullname' => $student?->fullname,
@@ -221,7 +222,7 @@ class EvaluationController extends Controller
                 ->keyBy('id');
 
             if ($enchainements->isEmpty()) {
-                return response()->json(['success' => false, 'message' => 'Aucun enchaînement configuré pour cet examen'], 403);
+                return response()->json(['success' => false, 'message' => 'Aucun enchaînement configuré pour cet examen'], 422);
             }
 
             // 3. VALIDATION DES SCORES PAR ENCHAÎNEMENT

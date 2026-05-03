@@ -34,7 +34,7 @@ class StoreLicenceReq extends FormRequest
                         ->where('saison', $this->saison);
                 }),
             ],
-            'saison' => 'required|string|regex:/^\d{4,10}-\d{4,10}$/',
+            // 'saison' => 'required|string|regex:/^\d{4,10}-\d{4,10}$/',
             'type' => 'required|string',
             'grade_au_moment' => 'nullable|string|max:50',
             'montant' => 'nullable|numeric|min:0',

@@ -26,6 +26,13 @@ class Role extends Model
             'instructeur'
         ])->pluck('id');
     }
+    public static function leagueAdminRoles()
+    {
+        return self::whereIn('name', [
+            'admin_league',
+            'arbitre_league',
+        ])->pluck('id');
+    }
 
     public static function studentRoles()
     {

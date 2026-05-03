@@ -24,12 +24,12 @@ class StoreAffiliationRequest extends FormRequest
         return [
             'club_id' => 'required|uuid|exists:clubs,id',
             // Regex : autorise "2024-2025"  
-            'saison' => [
-                'required',
-                'string',
-                'regex:/^\d{4,10}-\d{4,10}$/',
-                'unique:affiliations,saison,NULL,id,club_id,' . $this->club_id
-            ],
+            // 'saison' => [
+            //     'required',
+            //     'string',
+            //     'regex:/^\d{4,10}-\d{4,10}$/',
+            //     'unique:affiliations,saison,NULL,id,club_id,' . $this->club_id
+            // ],
             'cotisation' => 'nullable|numeric|min:0',
             'date_debut' => 'required|date|before_or_equal:date_fin',
             'date_fin' => 'required|date|after:date_debut',

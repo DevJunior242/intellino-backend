@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Saison;
 use App\Models\Evenement;
+use App\Models\Competition;
 use Illuminate\Http\Request;
 use App\Models\ArbitreCompetition;
 use Illuminate\Support\Facades\DB;
@@ -10,25 +12,26 @@ use Illuminate\Support\Facades\Log;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreEvenementRequest;
 use App\Services\ArbitreVerificationService;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
 class EvenementController extends Controller
 {
-    public function index()
+    use AuthorizesRequests;
+    public function index(Request $request)
     {
-        $user = auth()->user();
+        $activeId = $request->attributes->get('organisateur_id');
+        $activeType = $request->attributes->get('organisateur_type');
+        $saisonActive =  Saison::where('active', true)->first();
 
-        // Détermination de l'organisateur (Ligue ou Fédération)
-        $activeOrgId = $user->current_league_id ?? $user->current_federation_id;
 
 
-        $activeOrgType = $user->current_league_id ? 'Ligue' : 'Federation';
-
-        if (!$activeOrgId) {
-            return response()->json(['message' => 'Aucune organisation active trouvée'], 404);
+        if (!$activeId) {
+            return response()->json(['message' => 'Aucune organisation active trouvée'], 422);
         }
 
-        $evenements = Evenement::where('organisateur_id', $activeOrgId)
-            ->where('organisateur_type', $activeOrgType)
+        $evenements = Evenement::where('organisateur_id', $activeId)
+            ->where('organisateur_type', $activeType)
+            ->where('saison_id', $saisonActive->id)
             ->with([
                 'competitions' => function ($query) {
                     $query->with(['niveau', 'category', 'discipline'])
@@ -43,22 +46,22 @@ class EvenementController extends Controller
         return response()->json($evenements);
     }
 
-    public function getEventActive()
+    public function getEventActive(Request $request)
     {
-        $user = auth()->user();
-
-        // Détermination de l'organisateur (Ligue ou Fédération)
-        $activeOrgId = $user->current_league_id ?? $user->current_federation_id;
 
 
-        $activeOrgType = $user->current_league_id ? 'Ligue' : 'Federation';
+        $activeId = $request->attributes->get('organisateur_id');
+        $activeType = $request->attributes->get('organisateur_type');
+        $saisonActive =  Saison::where('active', true)->first();
 
-        if (!$activeOrgId) {
-            return response()->json(['message' => 'Aucune organisation active trouvée'], 404);
+        if (!$activeId) {
+            return response()->json(['message' => 'Aucune organisation active trouvée'], 422);
         }
 
-        $evenement = Evenement::where('organisateur_id', $activeOrgId)
-            ->where('organisateur_type', $activeOrgType)
+
+        $evenement = Evenement::where('organisateur_id', $activeId)
+            ->where('organisateur_type', $activeType)
+            ->where('saison_id', $saisonActive->id)
             ->with(['competitions' => function ($query) {
                 $query->with(['niveau', 'category', 'discipline'])
                     ->withCount('inscriptions')
@@ -72,15 +75,23 @@ class EvenementController extends Controller
             return response()->json([
                 'message' => 'Aucun événement actif trouvé',
                 'data'    => null
-            ], 200);
+            ], 422);
         }
 
         return response()->json($evenement);
     }
     public function store(StoreEvenementRequest $request)
     {
+        $this->authorize('create', Evenement::class);
+        $saisonActive =  Saison::where('active', true)->first();
+        if (!$saisonActive) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Vous devez définir une saison pour créer un événement',
+            ], 422);
+        }
         try {
-            $result = DB::transaction(function () use ($request) {
+            $result = DB::transaction(function () use ($request, $saisonActive) {
                 $validated = $request->validated();
 
                 // 1. Créer l'événement
@@ -91,7 +102,8 @@ class EvenementController extends Controller
                     'date_fin'           => $validated['date_fin'],
                     'organisateur_id'    => $validated['organisateur_id'],
                     'organisateur_type'  => $validated['organisateur_type'],
-                    'status'             => 0,
+                    'status'             => Evenement::STATUT_EN_ATTENTE,
+                    'saison_id' => $saisonActive->id,
                 ]);
 
                 // 2. Créer les épreuves
@@ -103,7 +115,7 @@ class EvenementController extends Controller
                         'niveau_id'           => $item['niveau_id'],
                         'heure_debut_prevu'   => $item['heure_debut_prevu'],
                         'heure_fin_prevue'    => $item['heure_fin_prevue'],
-                        'status'              => 0,
+                        'status'              => Competition::STATUT_ATTENTE,
                     ]);
                 }
 
@@ -127,6 +139,7 @@ class EvenementController extends Controller
     // Ouvrir les inscriptions
     public function ouvrir(Evenement $evenement)
     {
+        $this->authorize('open', Evenement::class);
         $evenement->update([
             'status' => 1,
 
@@ -141,6 +154,7 @@ class EvenementController extends Controller
     // Clôturer manuellement
     public function cloturer(Evenement $evenement)
     {
+        $this->authorize('close', Evenement::class);
         $evenement->update(['status' => 2]);
 
         return response()->json(['message' => 'Les inscriptions ont été clôturées.']);

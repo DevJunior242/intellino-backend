@@ -15,6 +15,7 @@ class Course extends Model
     protected $table = 'courses';
     protected $fillable = [
         'club_id',
+        'saison_id',
         'name',
         'level',
         'instructor_id',
