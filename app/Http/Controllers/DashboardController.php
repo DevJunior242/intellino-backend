@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use App\Services\ClubDashService;
 use Illuminate\Support\Facades\DB;
 
+use Illuminate\Support\Facades\Log;
 use App\Http\Controllers\Controller;
 
 class DashboardController extends Controller
@@ -21,6 +22,11 @@ class DashboardController extends Controller
 
     public function stats(Request $request)
     {
+        $role = $request->attributes->get('role');
+        $activeId = $request->attributes->get('organisateur_id');
+        $activeType = $request->attributes->get('organisateur_type');
+
+        Log::info('role', ['role' => $role]);
         $data = $this->statsService->getStatsByUserRole(
             $request->user(),
             $request->attributes->get('organisateur_id'),

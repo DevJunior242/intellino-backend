@@ -13,9 +13,7 @@ return new class extends Migration
     {
         Schema::create('courses', function (Blueprint $table) {
             $table->uuid('id')->primary();
-
             $table->foreignUuid('club_id')->constrained('clubs')->onDelete('cascade');
-            $table->foreignUuid('saison_id')->constrained('saisons')->onDelete('cascade');
             $table->foreignUuid('instructor_id')
                 ->constrained('users')->cascadeOnDelete();
             $table->string('name');
