@@ -3,13 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Models\Note;
-use App\Models\Inscription;
 use App\Models\OrdrePassage;
 use Illuminate\Http\Request;
 
 use App\Models\ConfigNotation;
 use App\Models\RotationArbitre;
-use App\Models\ArbitreCompetition;
 use App\Http\Controllers\Controller;
 
 class NoteController extends Controller
