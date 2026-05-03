@@ -31,8 +31,7 @@ return new class extends Migration
             $table->date('date_expiration');
             $table->timestamps();
 
-            $table->unique(['student_id', 'saison']);
-        });
+         });
     }
 
     /**
