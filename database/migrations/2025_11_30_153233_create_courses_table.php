@@ -14,7 +14,11 @@ return new class extends Migration
         Schema::create('courses', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->foreignUuid('club_id')->constrained('clubs')->onDelete('cascade');
+<<<<<<< HEAD
+             $table->foreignUuid('instructor_id')
+=======
             $table->foreignUuid('instructor_id')
+>>>>>>> e678c57 (s)
                 ->constrained('users')->cascadeOnDelete();
             $table->string('name');
 

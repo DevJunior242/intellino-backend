@@ -37,7 +37,12 @@ class CheckClubRole
                 }
             }
 
-
+            // $request->merge([
+            //     'validated_organisateur_id' => $activeId,
+            //     'validated_organisateur_type' => $activeType,
+            //     'validated_club_id' => ($activeType === 'Club') ? $activeId : null,
+            //     'validated_league_id' => ($activeType === 'Ligue') ? $activeId : null,
+            // ]); 
             $request->attributes->set('organisateur_id', $activeId);
             $request->attributes->set('organisateur_type', $activeType);
             $request->attributes->set('club_id', $activeId);
