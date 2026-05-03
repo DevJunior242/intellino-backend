@@ -57,7 +57,6 @@ class EventPolicy
      */
     public function delete(User $user, Evenement $evenement): bool
     {
-
         if ($user->isSuperAdmin()) {
             return true;
         }

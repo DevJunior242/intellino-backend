@@ -82,7 +82,6 @@ class EvenementController extends Controller
     }
     public function store(StoreEvenementRequest $request)
     {
-        $this->authorize('create', Evenement::class);
         $saisonActive =  Saison::where('active', true)->first();
         if (!$saisonActive) {
             return response()->json([
