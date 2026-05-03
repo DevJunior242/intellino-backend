@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use Closure;
+use App\Models\Role;
 
 class CheckClubRole
 {
@@ -36,12 +37,18 @@ class CheckClubRole
                 }
             }
 
-            $request->merge([
-                'validated_organisateur_id' => $activeId,
-                'validated_organisateur_type' => $activeType,
-                'validated_club_id' => ($activeType === 'Club') ? $activeId : null,
-                'validated_league_id' => ($activeType === 'Ligue') ? $activeId : null,
-            ]);
+            // $request->merge([
+            //     'validated_organisateur_id' => $activeId,
+            //     'validated_organisateur_type' => $activeType,
+            //     'validated_club_id' => ($activeType === 'Club') ? $activeId : null,
+            //     'validated_league_id' => ($activeType === 'Ligue') ? $activeId : null,
+            // ]); 
+            $request->attributes->set('organisateur_id', $activeId);
+            $request->attributes->set('organisateur_type', $activeType);
+            $request->attributes->set('club_id', $activeId);
+            $request->attributes->set('league_id', $activeId);
+            //assign role super_admin
+            $request->attributes->set('role', 'super_admin');
             return $next($request);
         }
         // 2. Cas des autres rôles liés au club
@@ -68,7 +75,7 @@ class CheckClubRole
         $roleId = $activeOrg->pivot->role_id;
 
         // 3. On va chercher le nom du rôle directement dans la table roles
-        $userRole = \App\Models\Role::where('id', $roleId)->value('name');
+        $userRole = Role::where('id', $roleId)->value('name');
 
         // 4. Sécurité si le rôle n'existe pas
         if (!$userRole) {
