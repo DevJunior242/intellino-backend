@@ -201,7 +201,7 @@ class DashBoardLeagueController extends Controller
             'sessions_a_venir' => $examAVenir,
             'taux_reussite' => round($taux, 1),
             'next_examen_lieu' => $nextExamen ? $nextExamen?->lieu : '',
-            'next_exam_date' => $nextExamen ? $nextExamen->start_date : 'Aucune',
+            'next_exam_date' => $nextExamen ? $nextExamen->start_date : null,
             'next_exam_candidates' => $nextExamen ? $nextExamen?->candidates_count : 0,
             'next_examen_grade' => $nextExamen ? $nextExamen?->currentGrade?->name : 'Aucune',
             'progression' => $progression,
