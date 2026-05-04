@@ -175,11 +175,11 @@ class ExamenController extends Controller
                 return $examen;
             });
             $examenData->load('candidates');
-            $candidats = $examenData->candidates;
+            // $candidats = $examenData->candidates;
 
-            if ($candidats->isNotEmpty()) {
-                Notification::send($candidats, new ExamenCreated($examenData));
-            }
+            // if ($candidats->isNotEmpty()) {
+            //     Notification::send($candidats, new ExamenCreated($examenData));
+            // }
             $message = ($activeType === 'Ligue')
                 ? 'Examen de Ligue créé. Les clubs peuvent maintenant inscrire leurs candidats.'
                 : 'Examen de Club créé avec inscriptions automatiques.';
@@ -241,15 +241,15 @@ class ExamenController extends Controller
             'cancelled_at' => now(),
         ]);
         //envoyer notif aux candidats
-        $studentsToNotify = User::whereHas('students.candidates', function ($query) use ($examen) {
-            $query->where('examen_id', $examen->id)
-                ->where('status', ExamenCandidat::STATUS_REGISTERED);
-        })
-            ->get()
-            ->unique('id');
-        if ($studentsToNotify->isNotEmpty()) {
-            Notification::send($studentsToNotify, new ExamenCanceled($examen));
-        }
+        // $studentsToNotify = User::whereHas('students.candidates', function ($query) use ($examen) {
+        //     $query->where('examen_id', $examen->id)
+        //         ->where('status', ExamenCandidat::STATUS_REGISTERED);
+        // })
+        //     ->get()
+        //     ->unique('id');
+        // if ($studentsToNotify->isNotEmpty()) {
+        //     Notification::send($studentsToNotify, new ExamenCanceled($examen));
+        // }
 
         return response()->json([
             'success' => true,
@@ -293,15 +293,15 @@ class ExamenController extends Controller
         ]);
 
         //doit passer par user->students->candidates
-        $studentsToNotify = User::whereHas('students.candidates', function ($query) use ($examen) {
-            $query->where('examen_id', $examen->id)
-                ->where('status', ExamenCandidat::STATUS_REGISTERED);
-        })
-            ->get()
-            ->unique('id');
-        if ($studentsToNotify->isNotEmpty()) {
-            Notification::send($studentsToNotify, new ExamenChanged($examen));
-        }
+        // $studentsToNotify = User::whereHas('students.candidates', function ($query) use ($examen) {
+        //     $query->where('examen_id', $examen->id)
+        //         ->where('status', ExamenCandidat::STATUS_REGISTERED);
+        // })
+        //     ->get()
+        //     ->unique('id');
+        // if ($studentsToNotify->isNotEmpty()) {
+        //     Notification::send($studentsToNotify, new ExamenChanged($examen));
+        // }
 
         return response()->json(
             [

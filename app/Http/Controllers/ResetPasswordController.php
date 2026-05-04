@@ -18,15 +18,12 @@ class ResetPasswordController extends Controller
         $request->validate(['email' => 'required|email']);
 
         try {
-           
- 
+
+
             $status = Password::sendResetLink(
                 $request->only('email')
             );
 
-            Log::info('FORGOT PASSWORD STATUS', [
-                'status' => $status
-            ]);
 
             return $status === Password::ResetLinkSent
                 ? response()->json([
@@ -38,7 +35,7 @@ class ResetPasswordController extends Controller
                     'message' => 'Email introuvable'
                 ], 422);
         } catch (\Throwable $e) {
- 
+
             return response()->json([
                 'success' => false,
                 'message' => 'Erreur SMTP',
@@ -47,25 +44,6 @@ class ResetPasswordController extends Controller
             ], 500);
         }
     }
-    // public function forgotPassword(Request $request)
-    // {
-
-    //     $request->validate(['email' => 'required|email']);
-
-    //     $status = Password::sendResetLink(
-    //         $request->only('email')
-    //     );
-
-    //     return $status === Password::ResetLinkSent
-    //         ? response()->json([
-    //             'success' => true,
-    //             'message' => __('passwords.sent')
-    //         ], 200)
-    //         :  response()->json([
-    //             'success' => false,
-    //             'message' => __('passwords.user')
-    //         ], 422);
-    // }
 
 
     public function sentToken(Request $request, string $token)
