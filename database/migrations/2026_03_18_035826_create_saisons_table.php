@@ -13,6 +13,7 @@ return new class extends Migration
     {
         Schema::create('saisons', function (Blueprint $table) {
             $table->uuid('id')->primary();
+            $table->uuidMorphs('organisateur');
             $table->string('libele');
             $table->date('dateDebut');
             $table->date('dateFin');

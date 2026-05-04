@@ -72,9 +72,7 @@ class EventPolicy
     }
     public function open(User $user, Evenement $evenement): bool
     {
-        if ($user->isSuperAdmin()) {
-            return true;
-        }
+
         $orgId = $evenement->organisateur_id;
         if (!$orgId) {
             return false;
