@@ -138,7 +138,7 @@ class EvenementController extends Controller
     // Ouvrir les inscriptions
     public function ouvrir(Evenement $evenement)
     {
-        $this->authorize('open', Evenement::class);
+        // $this->authorize('open', Evenement::class);
         $evenement->update([
             'status' => 1,
 
