@@ -85,8 +85,8 @@ class CheckClubRole
         $request->attributes->set('role', $userRole);
         $request->attributes->set('organisateur_id', $activeId);
         $request->attributes->set('organisateur_type', $activeType);
-        $request->attributes->set('club_id', $activeId);
-        $request->attributes->set('league_id', $activeId);
+        $request->attributes->set('club_id', $request->input('club_id'));
+        $request->attributes->set('league_id', $request->input('league_id'));
         return $next($request);
     }
 }

@@ -16,11 +16,13 @@ use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
 class EvenementController extends Controller
 {
+
     use AuthorizesRequests;
     public function index(Request $request)
     {
         $activeId = $request->attributes->get('organisateur_id');
         $activeType = $request->attributes->get('organisateur_type');
+        Log::info('activeId', ['activeId' => $activeId]);
         $saisonActive =  Saison::where('active', true)->first();
 
 

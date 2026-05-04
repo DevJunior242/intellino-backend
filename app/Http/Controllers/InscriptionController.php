@@ -144,8 +144,10 @@ class InscriptionController extends Controller
     //     ]);
     // }
 
-    public function getEvenementsOuverts()
+    public function getEvenementsOuverts(Request $request)
     {
+        $activeId = $request->attributes->get('organisateur_id');
+        $activeType = $request->attributes->get('organisateur_type');
         $evenements = Evenement::with([
             'competitions' => function ($q) {
                 $q->with(['category:id,nom,sexe', 'discipline:id,nom', 'niveau:id,nom'])
@@ -154,6 +156,8 @@ class InscriptionController extends Controller
         ])
             ->whereHas('competitions')
             ->orderByDesc('created_at')
+            ->where('organisateur_id', $activeId)
+            ->where('organisateur_type', $activeType)
             ->get();
 
         return response()->json([

@@ -227,8 +227,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
         'competitions/{competition}/inscriptions-non-assignees',
         [InscriptionController::class, 'nonAssignees']
     );
-    Route::get('evenements/ouverts',                          [InscriptionController::class, 'getEvenementsOuverts']);
-    Route::get('inscriptions/epreuve/{competition}',          [InscriptionController::class, 'parEpreuve']);
+
     // Athlètes d'un tatami
     Route::get(
         'configs/{config}/inscriptions',
@@ -267,6 +266,9 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::prefix('affiliations')->group(function () {
             Route::apiResource('/affiliations', AffiliationController::class);
         });
+
+        Route::get('evenements/ouverts',                          [InscriptionController::class, 'getEvenementsOuverts']);
+        Route::get('inscriptions/epreuve/{competition}',          [InscriptionController::class, 'parEpreuve']);
         //inscription 
 
         Route::post('inscriptions',                               [InscriptionController::class, 'store']);
