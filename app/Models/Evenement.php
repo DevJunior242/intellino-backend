@@ -18,6 +18,7 @@ class Evenement extends Model
         'lieu',
         'date_debut',
         'date_fin',
+
         'status',
     ];
     const STATUT_EN_ATTENTE = 0;

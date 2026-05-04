@@ -2,11 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Club;
+use App\Models\League;
 use App\Models\Evenement;
 use App\Models\Competition;
+
 use App\Models\Inscription;
 use Illuminate\Http\Request;
-
+use Illuminate\Support\Facades\Log;
 use App\Http\Controllers\Controller;
 
 class InscriptionController extends Controller
@@ -147,19 +150,27 @@ class InscriptionController extends Controller
     public function getEvenementsOuverts(Request $request)
     {
         $activeId = $request->attributes->get('organisateur_id');
-        $activeType = $request->attributes->get('organisateur_type');
-        $evenements = Evenement::with([
-            'competitions' => function ($q) {
-                $q->with(['category:id,nom,sexe', 'discipline:id,nom', 'niveau:id,nom'])
-                    ->withCount('inscriptions');
-            },
-        ])
-            ->whereHas('competitions')
-            ->orderByDesc('created_at')
-            ->where('organisateur_id', $activeId)
-            ->where('organisateur_type', $activeType)
-            ->get();
 
+        $clubId = $activeId;
+
+        $leagueId = Club::where('id', $clubId)->value('league_id');
+        $evenements = Evenement::where(function ($q) use ($clubId, $leagueId) {
+            $q->where(function ($q2) use ($clubId) {
+                $q2->where('organisateur_type', 'Club')
+                    ->where('organisateur_id', $clubId);
+            })
+                ->orWhere(function ($q2) use ($leagueId) {
+                    $q2->where('organisateur_type', 'Ligue')
+                        ->where('organisateur_id', $leagueId);
+                });
+        })
+            ->with([
+                'competitions' => function ($q) {
+                    $q->with(['category:id,nom,sexe', 'discipline:id,nom', 'niveau:id,nom'])
+                        ->withCount('inscriptions');
+                }
+            ])
+            ->orderByDesc('created_at')->get();
         return response()->json([
             'success'    => true,
             'evenements' => $evenements,
