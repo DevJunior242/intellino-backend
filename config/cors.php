@@ -19,7 +19,7 @@ return [
 
     'allowed_methods' => ['*'],
 
-    'allowed_origins' => ['https://intellino-frontend.devjunior242.workers.dev', 'http://localhost:5173'],
+    'allowed_origins' => ['https://intellino.pages.dev', 'http://localhost:5173'],
     // 'allowed_origins' => ['http://localhost:5173'],
 
 
