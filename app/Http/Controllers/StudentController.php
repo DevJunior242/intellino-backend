@@ -106,7 +106,7 @@ class StudentController extends Controller
         try {
             return DB::transaction(function () use ($validated, $activeId, $request) {
                 $parentId = null;
-
+                $createdStudents = [];
                 // --- GESTION DU PARENT ---
                 if (!$validated['is_own_responsible']) {
                     $parentUser = User::firstOrCreate(
@@ -159,8 +159,8 @@ class StudentController extends Controller
                             $pProfile = ParentModel::firstOrCreate(['user_id' => $studentUserId]);
                             $currentStudentParentId = $pProfile->id;
                         }
-                        $token = Password::createToken($studentUser);
-                        $studentUser->notify(new WelcomeNewMember($token));
+                        // $token = Password::createToken($studentUser);
+                        // $studentUser->notify(new WelcomeNewMember($token));
                     }
 
                     // 2. Gestion de la photo
@@ -186,9 +186,8 @@ class StudentController extends Controller
                     if ($currentStudentParentId) {
                         $student->parents()->syncWithoutDetaching([$currentStudentParentId]);
                     }
-
-                    $createdStudents[] = $student->load('user');
                 }
+                $createdStudents[] = $student->load('user');
 
                 return response()->json([
                     'success' => true,
