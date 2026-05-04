@@ -30,12 +30,7 @@ return new class extends Migration
             $table->date('date_emission');
             $table->date('date_expiration');
             $table->timestamps();
-<<<<<<< HEAD
-
-         });
-=======
         });
->>>>>>> e678c57 (s)
     }
 
     /**

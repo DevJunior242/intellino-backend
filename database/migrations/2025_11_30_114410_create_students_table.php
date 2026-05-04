@@ -14,7 +14,8 @@ return new class extends Migration
     {
         Schema::create('students', function (Blueprint $table) {
             $table->uuid('id')->primary();
-            $table->foreignUuid('club_id')->constrained();
+            $table->foreignUuid('club_id')->constrained('users')
+                ->cascadeOnDelete();
             $table->foreignUuid('user_id')->nullable()->constrained('users');
             $table->boolean('is_adult')->default(false);
             $table->string('fullname');

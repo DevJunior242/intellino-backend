@@ -3,13 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\Plateau;
-use App\Models\JugeOption;
-use App\Models\ModeSaisie;
 use App\Models\Competition;
-use App\Models\Inscription;
 use Illuminate\Http\Request;
 use App\Models\ConfigNotation;
-use App\Models\JugeCompetition;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\DB;
 use App\Http\Controllers\Controller;
@@ -17,21 +13,23 @@ use Illuminate\Support\Facades\Auth;
 
 class ConfigNotationController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
         $user = auth()->user();
 
-        $activeOrgId = $user->current_league_id ?? $user->current_federation_id;
-        $activeOrgType = $user->current_league_id ? 'Ligue' : 'Federation';
+        $activeId = $request->attributes->get('organisateur_id');
+        $activeRole = $request->attributes->get('role');
 
-        if (!$activeOrgId) {
+        $activeType = $request->attributes->get('organisateur_type');
+
+        if (!$activeId) {
             return response()->json(['message' => 'Aucune organisation active'], 403);
         }
 
 
-        $configs = ConfigNotation::whereHas('competition.evenement', function ($q) use ($activeOrgId, $activeOrgType) {
-            $q->where('organisateur_id', $activeOrgId)
-                ->where('organisateur_type', $activeOrgType);
+        $configs = ConfigNotation::whereHas('competition.evenement', function ($q) use ($activeId, $activeType) {
+            $q->where('organisateur_id', $activeId)
+                ->where('organisateur_type', $activeType);
         })
             ->with([
                 'competition.discipline',
@@ -160,7 +158,7 @@ class ConfigNotationController extends Controller
 
 
                 Competition::where('id', $request->competition_id)->update([
-                    'statut' => 1
+                    'status' => Competition::STATUT_EN_COURS
                 ]);
 
                 return response()->json([
