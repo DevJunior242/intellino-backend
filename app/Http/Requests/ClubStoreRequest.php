@@ -22,31 +22,30 @@ class ClubStoreRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'country_id' => ['bail', 'required', 'exists:countries,id'],
             'discipline_id' => ['bail', 'required', 'exists:disciplines,id'],
+            'city' => ['bail', 'regex:/^[\pL\s\d\-\.,\#\/\(\)\']+$/u', 'max:50'],
             'name' => ['bail', 'required', 'regex:/^[\pL\s\d\-]+$/u', 'max:50'],
             'logo' => ['bail', 'nullable', 'image', 'mimes:jpeg,png,jpg,gif,svg', 'max:2048'],
-            'country' => ['bail', 'required', 'regex:/^[\pL\s\d\-]+$/u', 'max:50'],
-            'city' => ['bail', 'required', 'regex:/^[\pL\s\d\-]+$/u', 'max:50'],
-            'address' => ['bail', 'nullable', 'regex:/^[\pL\s\d\-]+$/u', 'max:50'],
-            'phone' => ['bail', 'required', 'regex:/^(\+226|00226)?[0567]\d{7}$/'],
+            'address' => ['bail', 'nullable', 'regex:/^[\pL\s\d\-\.,\#\/\(\)\']+$/u', 'max:50'],
         ];
     }
 
     public function messages(): array
     {
         return [
+            'country_id.required' => 'Le pays est requis',
+            'country_id.exists' => 'Le pays n\'existe pas',
             'discipline_id.required' => 'Le discipline est requis',
             'discipline_id.exists' => 'Le discipline n\'existe pas',
             'name.required' => 'Le nom est requis',
             'name.max' => 'Le nom est trop long',
+            'city.required' => 'La ville est requise',
+            'city.max' => 'La ville est trop longue',
             'logo.mimes' => 'Le logo doit être un fichier image',
             'logo.max' => 'Le logo est trop grand',
-            'country.required' => 'Le pays est requis',
-            'country.max' => 'Le pays est trop long',
-            'city.required' => 'La ville est requis',
-            'city.max' => 'La ville est trop longue',
+
             'address.max' => 'L\'adresse est trop longue',
-            'phone.required' => 'Le numéro de téléphone est requis',
         ];
     }
 }

@@ -118,7 +118,7 @@ class LeagueController extends Controller
         $status = $request->status;
 
         $clubs = Club::where('league_id', $activeId)
-            ->with(['users', 'affiliations'])
+            ->with(['users', 'affiliations', 'country:id,name'])
             ->withCount('licences')
             ->when($search, fn($q) => $q->where('name', 'like', "%$search%"))
             ->when($status, fn($q) => $q->whereHas(

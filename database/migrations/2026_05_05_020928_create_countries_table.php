@@ -11,9 +11,9 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('niveaux_competitions', function (Blueprint $table) {
+        Schema::create('countries', function (Blueprint $table) {
             $table->uuid('id')->primary();
-            $table->string('nom'); // ex: "Ligue du Centre", "Championnat National", "Coupe de l'Ambassadeur"
+            $table->string('name')->unique();
             $table->timestamps();
         });
     }
@@ -23,6 +23,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('niveaux_competitions');
+        Schema::dropIfExists('countries');
     }
 };

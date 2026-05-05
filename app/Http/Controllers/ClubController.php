@@ -15,8 +15,8 @@ class ClubController extends Controller
    public function index()
    {
       //listes des clubs
-      $clubs = Club::select('id', 'name', 'logo', 'city', 'country', 'discipline_id')
-         ->with(['discipline:id,name'])
+      $clubs = Club::select('id', 'name', 'logo', 'city', 'address')
+         ->with(['discipline:id,name', 'country:id,name'])
          ->withCount('users')
          ->latest()
          ->get()
@@ -30,7 +30,8 @@ class ClubController extends Controller
    //club available
    public function getClubsAvailable()
    {
-      $clubs = Club::whereNull('league_id')
+      $clubs = Club::with(['country:id,name'])
+         ->whereNull('league_id')
          ->latest()
          ->paginate(8);
       $clubs->getCollection()->transform(function ($club) {
@@ -46,7 +47,7 @@ class ClubController extends Controller
 
    public function getClubs()
    {
-      $clubs = Club::select('id', 'name')
+      $clubs = Club::select('id', 'name', 'logo', 'city', 'address')
          ->get();
 
       return response()->json($clubs);
@@ -65,7 +66,7 @@ class ClubController extends Controller
                return response()->json([
                   'success' => false,
                   'message' => 'Le role admin_club n\'existe pas',
-               ], 400);
+               ], 422);
             }
 
             $file = $request->logo;

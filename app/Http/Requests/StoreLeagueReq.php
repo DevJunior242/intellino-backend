@@ -23,7 +23,9 @@ class StoreLeagueReq extends FormRequest
     {
         return [
             'name' =>  ['required', 'string', 'unique:leagues,name'],
-            'phone' => ['bail', 'required', 'regex:/^(\+226|00226)?[0567]\d{7}$/', 'unique:leagues,phone'],
+            'country_id' => ['required', 'exists:countries,id'],
+            'region' => ['bail', 'regex:/^[\pL\s\d\-\.,\#\/\(\)\']+$/u', 'max:50'],
+            'address' => ['bail', 'nullable', 'regex:/^[\pL\s\d\-\.,\#\/\(\)\']+$/u', 'max:50'],
             'logo' => 'nullable|image|mimes:jpeg,png,jpg,svg|max:1024',
         ];
     }
@@ -33,8 +35,13 @@ class StoreLeagueReq extends FormRequest
         return [
             'name.required' => 'Le nom est obligatoire',
             'name.unique' => 'Le nom existe déjà',
-            'phone.required' => 'Le numéro de téléphone est requis',
-            'phone.unique' => 'Le numéro de téléphone est déjà utilisé',
+            'country_id.required' => 'Le pays est obligatoire',
+            'country_id.exists' => 'Le pays n\'existe pas',
+            'region.required' => 'La région est obligatoire',
+            'region.max' => 'La région est trop longue',
+            'region.regex' => 'La région contient des caractères non valides',
+            'address.max' => 'L\'adresse est trop longue',
+            'address.regex' => 'L\'adresse contient des caractères non valides',
 
             'logo.mimes' => 'Le logo doit être un fichier image',
             'logo.max' => 'Le logo doit être inférieur à 1Mo',

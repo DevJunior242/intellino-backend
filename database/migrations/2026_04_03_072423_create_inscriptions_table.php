@@ -19,10 +19,7 @@ return new class extends Migration
 
 
             //kata
-            $table->foreignUuid('kata_id')
-                ->nullable()
-                ->constrained('katas')
-                ->nullOnDelete();
+            $table->string('kata')->nullable();
             // Champs Poids (essentiels même pour le Kata pour le dossier complet)
             $table->decimal('poids_declare', 5, 2)->nullable(); // Saisi par le club
             $table->decimal('poids_officiel', 5, 2)->nullable(); // Saisi par la Ligue le jour J

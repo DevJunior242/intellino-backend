@@ -7,7 +7,6 @@ use App\Models\Licence;
 use App\Models\Student;
 use App\Models\Category;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
 
 
 class CategoryController extends Controller
@@ -15,9 +14,22 @@ class CategoryController extends Controller
 
     public function index(Request $request)
     {
-        $categories = Category::orderBy('age_min', 'asc')->get();
         $activeId = $request->attributes->get('organisateur_id');
-        $saisonActive =  Saison::where('active', true)->first();
+        $activeType = $request->attributes->get('organisateur_type');
+        $categories = Category::whereHas('saison', function ($query) use ($activeId, $activeType) {
+            $query->where('organisateur_id', $activeId)
+                ->where('organisateur_type', $activeType);
+        })
+            ->orderBy('age_min', 'asc')
+            ->get();
+
+        $saisonActive =  Saison::where('active', true)
+            ->where('organisateur_id', $activeId)
+            ->where('organisateur_type', $activeType)
+            ->first();
+        if (!$saisonActive) {
+            return null;
+        }
         $saisonId = $saisonActive->id;
         $result = $categories->map(function ($cat) use ($activeId, $saisonId) {
             $dateAujourdhui = \Carbon\Carbon::now();
@@ -62,36 +74,42 @@ class CategoryController extends Controller
 
     public function getCategories(Request $request)
     {
-        $categories = Category::select('id', 'nom', 'age_min', 'age_max', 'sexe')
+        $activeId = $request->attributes->get('organisateur_id');
+        $activeType = $request->attributes->get('organisateur_type');
+        $categories = Category::whereHas('saison', function ($query) use ($activeId, $activeType) {
+            $query->where('organisateur_id', $activeId)
+                ->where('organisateur_type', $activeType);
+        })
+            ->orderBy('age_min', 'asc')
             ->get();
 
         return response()->json($categories);
     }
 
 
-    public function store(Request $request)
-    {
-        $validated = $request->validate([
-            'nom'           => 'required|string|max:100',
-            'sexe'          => 'required|in:M,F,Mixte',
-            'age_min'       => 'nullable|integer|min:0',
-            'age_max'       => 'nullable|integer|gt:age_min',
-            'saison_id'     => 'required|exists:saisons,id',
-            'disciplines'   => 'required|array',
-            'disciplines.*' => 'exists:disciplines,id',
-        ]);
+    // public function store(Request $request)
+    // {
+    //     $validated = $request->validate([
+    //         'nom'           => 'required|string|max:100',
+    //         'sexe'          => 'required|in:M,F,Mixte',
+    //         'age_min'       => 'nullable|integer|min:0',
+    //         'age_max'       => 'nullable|integer|gt:age_min',
+    //         'saison_id'     => 'required|exists:saisons,id',
+    //         'disciplines'   => 'required|array',
+    //         'disciplines.*' => 'exists:disciplines,id',
+    //     ]);
 
-        $category = Category::create($validated);
+    //     $category = Category::create($validated);
 
-        // Attacher les disciplines (table pivot)
-        $category->disciplines()->sync($request->disciplines);
+    //     // Attacher les disciplines (table pivot)
+    //     $category->disciplines()->sync($request->disciplines);
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Catégorie créée avec succès',
-            'data' => $category
-        ], 201);
-    }
+    //     return response()->json([
+    //         'success' => true,
+    //         'message' => 'Catégorie créée avec succès',
+    //         'data' => $category
+    //     ], 201);
+    // }
 
     public function update(Request $request, Category $category)
     {

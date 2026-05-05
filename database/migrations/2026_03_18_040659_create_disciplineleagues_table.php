@@ -13,6 +13,7 @@ return new class extends Migration
     {
         Schema::create('disciplineleagues', function (Blueprint $table) {
             $table->uuid('id')->primary();
+            $table->uuidMorphs('organisateur');
             $table->string('nom'); // kata, kumite
             $table->string('description')->nullable();
             $table->timestamps();

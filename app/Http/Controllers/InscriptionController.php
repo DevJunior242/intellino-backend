@@ -3,13 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Models\Club;
-use App\Models\League;
 use App\Models\Evenement;
 use App\Models\Competition;
 
 use App\Models\Inscription;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
 use App\Http\Controllers\Controller;
 
 class InscriptionController extends Controller

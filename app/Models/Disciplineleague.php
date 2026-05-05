@@ -10,7 +10,7 @@ class Disciplineleague extends Model
 {
     use HasUuids;
     protected $table = 'disciplineleagues';
-    protected $fillable = ['nom', 'description'];
+    protected $fillable = ['nom', 'description', 'organisateur_id', 'organisateur_type'];
     protected $keyType = 'string';
     public $incrementing = false;
 
@@ -19,5 +19,9 @@ class Disciplineleague extends Model
     {
         return $this->belongsToMany(Category::class, 'category_disciplineleagues')
             ->withTimestamps();
+    }
+    public function organisateur()
+    {
+        return $this->morphTo();
     }
 }

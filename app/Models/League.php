@@ -15,7 +15,9 @@ class League extends Model
 
     protected $fillable = [
         'name',
-        'phone',
+        'country_id',
+        'region',
+        'address',
         'logo',
     ];
 

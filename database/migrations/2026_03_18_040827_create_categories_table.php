@@ -20,6 +20,7 @@ return new class extends Migration
             $table->integer('age_max')->nullable();
             $table->foreignUuid('saison_id')->constrained('saisons')->cascadeOnDelete();
             $table->timestamps();
+            $table->unique(['nom', 'sexe', 'saison_id']);
         });
     }
 

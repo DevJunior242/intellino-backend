@@ -19,9 +19,11 @@ use App\Http\Controllers\ExamenController;
 use App\Http\Controllers\LeagueController;
 use App\Http\Controllers\MemberController;
 use App\Http\Controllers\NbJugeController;
+use App\Http\Controllers\SaisonController;
 use App\Http\Controllers\SeanceController;
 use App\Http\Controllers\ArbitreController;
 use App\Http\Controllers\ContactController;
+use App\Http\Controllers\CountryController;
 use App\Http\Controllers\LicenceController;
 use App\Http\Controllers\SessionController;
 use App\Http\Controllers\StudentController;
@@ -33,6 +35,7 @@ use App\Http\Controllers\EvenementController;
 use App\Http\Controllers\ProgrammeController;
 use App\Http\Controllers\AttendanceController;
 use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\DisciplineController;
 use App\Http\Controllers\EquipementController;
 use App\Http\Controllers\EvaluationController;
 use App\Http\Controllers\FederationController;
@@ -85,11 +88,11 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::get('/user', function (Request $request) {
         return $request->user();
     });
+    //countries
+    Route::apiResource('/countries', CountryController::class);
+
     //discipline 
-    Route::prefix('disciplines')->group(function () {
-        Route::get('/', [\App\Http\Controllers\DisciplineController::class, 'index']);
-        Route::post('/', [\App\Http\Controllers\DisciplineController::class, 'store']);
-    });
+    Route::apiResource('/disciplines', DisciplineController::class);
     //roles 
     Route::get('/roles', [RoleController::class, 'roles']);
     //register
@@ -134,12 +137,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::prefix('payment-categories')->group(function () {
         Route::get('/', [PaymentCategoryController::class, 'index']);
     });
-    Route::get('/getCategories', [CategoryController::class, 'getCategories']);
-    Route::post('/categories', [CategoryController::class, 'store']);
 
-    Route::prefix('disciplines')->group(function () {
-        Route::apiResource('/disciplines', DisciplineConfigController::class);
-    });
 
     //ajout membre league
     Route::prefix('membres')->group(function () {
@@ -159,10 +157,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::apiResource('/examen-leagues', ExamenLeagueController::class);
     });
 
-    //setup
-    Route::prefix('setup')->group(function () {
-        Route::apiResource('/setup', LeagueSetupController::class);
-    });
+
     //niveaux competitions
     Route::prefix('niveaux-competitions')->group(function () {
         Route::apiResource('/niveaux-competitions', NiveauxCompetitionController::class);
@@ -249,7 +244,11 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::apiResource('/leagues', LeagueController::class);
     });
     Route::middleware('permission:instructeur,secretaire,admin_club,parent,karateka,super_admin,admin_league')->group(function () {
-
+        Route::apiResource('/saisons', SaisonController::class);
+        //setup
+        Route::prefix('setup')->group(function () {
+            Route::apiResource('/setup', LeagueSetupController::class);
+        });
         //ligues
         Route::get('leagues/myClubs', [LeagueController::class, 'myClubs']);
 
@@ -260,7 +259,10 @@ Route::middleware(['auth:sanctum'])->group(function () {
         });
         //categories
         Route::get('/categories', [CategoryController::class, 'index']);
+        Route::get('/getCategories', [CategoryController::class, 'getCategories']);
+        Route::post('/categories', [CategoryController::class, 'store']);
 
+        Route::apiResource('/disciplineLeague', DisciplineConfigController::class);
 
         //affiliations
         Route::prefix('affiliations')->group(function () {

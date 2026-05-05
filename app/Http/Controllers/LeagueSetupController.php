@@ -14,16 +14,23 @@ class LeagueSetupController extends Controller
 
     public function store(Request $request)
     {
-
+        $activeId = $request->attributes->get('organisateur_id');
+        $activeType = $request->attributes->get('organisateur_type');
+        $saison = Saison::where('active', true)
+            ->where('organisateur_id', $activeId)
+            ->where('organisateur_type', $activeType)
+            ->first();
+        if (!$saison) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Vous devez avoir une saison active pour configurer la ligue',
+            ], 422);
+        }
         // 1. Validation globale de tout le payload d'un coup
         $validated = $request->validate([
-            // Saison
-            'id' => 'nullable|uuid',
-            'saison.libele'    => 'required|string|max:100',
-            'saison.dateDebut' => 'required|date',
-            'saison.dateFin'   => 'required|date|after:saison.dateDebut',
-            'saison.active'     => 'boolean',
-
+            //organisateur
+            'organisateur_id' => 'required|uuid',
+            'organisateur_type' => 'required|string|in:Ligue,Federation',
             // Disciplines
             'disciplines'         => 'required|array|min:1',
             'disciplines.*.nom'   => 'required|string|max:100',
@@ -39,31 +46,9 @@ class LeagueSetupController extends Controller
         ]);
 
         try {
-            $result = DB::transaction(function () use ($validated, $request) {
+            $result = DB::transaction(function () use ($validated, $saison) {
 
-                // ── Étape 1 : Créer la saison ──────────────────────────────
-                $saisonId = $request->input('saison_id');
 
-                if ($validated['saison']['active']) {
-                    // On désactive toutes les saisons SAUF celle qu'on est en train de traiter
-                    Saison::where('id', '!=', $saisonId)
-                        ->where('active', true)
-                        ->update(['active' => false]);
-                }
-
-                $saison = Saison::updateOrCreate(
-                    ['id' => $saisonId],
-                    [
-                        'libele'    => $validated['saison']['libele'],
-                        'dateDebut' => $validated['saison']['dateDebut'],
-                        'dateFin'   => $validated['saison']['dateFin'],
-                        'active'     => $validated['saison']['active'] ?? true,
-                    ]
-                );
-                if ($request->filled('saison_id')) {
-                    $saison->categories()->delete();
-                }
-                Log::info('saison', ['saison' => $saison]);
 
                 // ── Étape 2 : Créer les disciplines ───────────────────────
                 // On garde un index [0 => discipline, 1 => discipline...]
@@ -75,28 +60,32 @@ class LeagueSetupController extends Controller
                     $discipline = Disciplineleague::firstOrCreate(
                         [
                             'nom' => $disc['nom'],
+                            'organisateur_id' => $validated['organisateur_id'],
                         ],
                         [
-                            'description' => $disc['description'] ?? null
+                            'description' => $disc['description'] ?? null,
+                            'organisateur_type' => $validated['organisateur_type'],
                         ]
 
                     );
                     $disciplinesCreees[$index] = $discipline->id;
-                    Log::info('discipline', ['discipline' => $discipline]);
                 }
 
                 // ── Étape 3 : Créer les catégories + attacher disciplines ──
                 $categoriesCreees = [];
 
                 foreach ($validated['categories'] as $catData) {
-                    $categorie = Category::create([
-                        'nom'       => $catData['nom'],
-                        'sexe'      => $catData['sexe'],
-                        'age_min'   => $catData['age_min'],
-                        'age_max'   => $catData['age_max'],
-                        'saison_id' => $saison->id,
-                    ]);
-                    Log::info('categorie', ['categorie' => $categorie]);
+                    $categorie = Category::firstOrCreate(
+                        [
+                            'nom'       => $catData['nom'],
+                            'sexe'      => $catData['sexe'],
+                            'saison_id' => $saison->id,
+                        ],
+                        [
+                            'age_min' => $catData['age_min'],
+                            'age_max' => $catData['age_max'],
+                        ]
+                    );
 
                     // Convertir les index frontend en vrais IDs MySQL
                     $discIds = collect($catData['disciplines'])

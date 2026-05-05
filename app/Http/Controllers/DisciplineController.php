@@ -10,20 +10,14 @@ class DisciplineController extends Controller
     public function index()
     {
         //
-        $disciplines = Discipline::select('id', 'name', 'description')->get();
-        return response()->json(
-            [
-                'success' => true,
-                'message' => 'discipline listes',
-                'disciplines' => $disciplines,
-            ]
-        );
+        $disciplines = Discipline::select('id', 'name')->get();
+        return response()->json($disciplines);
     }
 
     public function store(Request $request)
     {
         //
-        
+
         $request->validate([
             'name' => 'required|string|unique:disciplines,name',
             'description' => 'nullable|string',

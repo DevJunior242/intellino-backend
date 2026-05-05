@@ -12,8 +12,8 @@ class AdminClubController extends Controller
         $activeId = $request->attributes->get('organisateur_id');
         $user = auth()->user();
         $attendances = Attendance::with(['student.club:id,name,logo', 'session'])
-            ->whereHas('student', function ($q) use ($request) {
-                $q->where('club_id', $activeId)
+            ->whereHas('student', function ($q) use ($request, $activeId) {
+                $q->where('club_id', $activeId);
             })
             ->get();
         $chartData = $attendances->groupBy('session.session_date')->map(function ($items, $sessionDate) {

@@ -4,9 +4,15 @@ namespace Database\Seeders;
 
 use App\Models\User;
 use Illuminate\Database\Seeder;
+use Database\Seeders\GradeSeeder;
+use Database\Seeders\DisciplineSeeder;
+use Database\Seeders\JugeOptionSeeder;
+use Database\Seeders\ModeSaisieSeeder;
 use Database\Seeders\RolesTableSeeder;
 use Database\Seeders\PaymentCategorySeeder;
+use Database\Seeders\NiveauCompetitionSeeder;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
+use Database\Seeders\CountrySeeder;
 
 class DatabaseSeeder extends Seeder
 {
@@ -25,7 +31,14 @@ class DatabaseSeeder extends Seeder
         // ]);
         $this->call([
             RolesTableSeeder::class,
-            PaymentCategorySeeder::class
+            PaymentCategorySeeder::class,
+            JugeOptionSeeder::class,
+            ModeSaisieSeeder::class,
+            DisciplineSeeder::class,
+            NiveauCompetitionSeeder::class,
+            GradeSeeder::class,
+            CountrySeeder::class,
+
         ]);
     }
 }

@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use Illuminate\Support\Str;
+use App\Models\PaymentCategory;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 
@@ -15,7 +16,6 @@ class PaymentCategorySeeder extends Seeder
     {
         $categories = [
             [
-                'id' => (string) Str::uuid(),
                 'name' => 'Inscription / Licence',
                 'slug' => 'registration',
                 'description' => 'Frais d\'adhésion annuelle et licence fédérale',
@@ -23,7 +23,6 @@ class PaymentCategorySeeder extends Seeder
                 'is_system' => true,
             ],
             [
-                'id' => (string) Str::uuid(),
                 'name' => 'Abonnement (Mensualité)',
                 'slug' => 'subscription',
                 'description' => 'Cotisation périodique donnant accès aux cours',
@@ -31,7 +30,6 @@ class PaymentCategorySeeder extends Seeder
                 'is_system' => true,
             ],
             [
-                'id' => (string) Str::uuid(),
                 'name' => 'Réinscription',
                 'slug' => 're_registration',
                 'description' => 'Frais de renouvellement pour ancienne saison',
@@ -39,7 +37,6 @@ class PaymentCategorySeeder extends Seeder
                 'is_system' => true,
             ],
             [
-                'id' => (string) Str::uuid(),
                 'name' => 'Passage de Grade',
                 'slug' => 'belt_exam',
                 'description' => 'Frais de participation aux examens de ceintures',
@@ -47,7 +44,6 @@ class PaymentCategorySeeder extends Seeder
                 'is_system' => true,
             ],
             [
-                'id' => (string) Str::uuid(),
                 'name' => 'Équipement (Kimono/Protections)',
                 'slug' => 'equipment',
                 'description' => 'Achat de matériel de karaté (Dogi, gants, etc.)',
@@ -55,7 +51,6 @@ class PaymentCategorySeeder extends Seeder
                 'is_system' => true,
             ],
             [
-                'id' => (string) Str::uuid(),
                 'name' => 'Évènement / Stage / Compétition',
                 'slug' => 'event',
                 'description' => 'Frais de participation aux activités hors club',
@@ -63,7 +58,6 @@ class PaymentCategorySeeder extends Seeder
                 'is_system' => true,
             ],
             [
-                'id' => (string) Str::uuid(),
                 'name' => 'Sanction / Amende',
                 'slug' => 'penalty',
                 'description' => 'Frais suite à un retard ou manquement',
@@ -72,9 +66,14 @@ class PaymentCategorySeeder extends Seeder
             ],
         ];
         foreach ($categories as $category) {
-            DB::table('payment_categories')->updateOrInsert(
+            PaymentCategory::firstOrCreate(
                 ['slug' => $category['slug']],
-                $category
+                [
+                    'name' => $category['name'],
+                    'description' => $category['description'],
+                    'affects_validity' => $category['affects_validity'],
+                    'is_system' => $category['is_system'],
+                ]
             );
         }
     }

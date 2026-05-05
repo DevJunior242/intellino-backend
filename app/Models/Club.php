@@ -15,6 +15,7 @@ use App\Models\Affiliation;
 use App\Models\Subscription;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use App\Models\Country;
 
 class Club extends Model
 {
@@ -24,10 +25,9 @@ class Club extends Model
         'name',
         'discipline_id',
         'logo',
-        'country',
+        'country_id',
         'city',
         'address',
-        'phone',
     ];
 
     protected $keyType = 'string';
@@ -95,5 +95,9 @@ class Club extends Model
     public function licences()
     {
         return $this->hasMany(Licence::class);
+    }
+    public function country()
+    {
+        return $this->belongsTo(Country::class);
     }
 }
