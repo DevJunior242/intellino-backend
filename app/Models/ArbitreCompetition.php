@@ -6,11 +6,12 @@ use App\Models\User;
 use App\Models\Competition;
 use App\Models\RotationArbitre;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Notifications\Notifiable;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 
 class ArbitreCompetition extends Model
 {
-    use HasUuids;
+    use HasUuids, Notifiable;
 
     protected $fillable = ['user_id', 'evenement_id', 'code_acces', 'connecte'];
 

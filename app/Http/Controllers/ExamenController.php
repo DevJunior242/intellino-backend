@@ -177,12 +177,10 @@ class ExamenController extends Controller
             });
             $examenData->load('candidates');
 
-            $candidats = $examenData->candidates;
             $students = $examenData->candidates()
                 ->with('student')
                 ->get()
                 ->pluck('student');
-            Log::info('examen created', ['students' => $students]);
 
             Notification::send($students, new ExamenCreated($examenData));
             $message = ($activeType === 'Ligue')

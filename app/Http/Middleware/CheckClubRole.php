@@ -48,7 +48,7 @@ class CheckClubRole
         }
         // 2. Cas des autres rôles liés au club
         if (!$activeId) {
-            return response()->json(['message' => 'ID de l’organisation manquant'], 404);
+            return response()->json(['message' => 'Humm, nous sommes desolés, veuillez nous contacter: support@intellino.bf'], 422);
         }
         $club = $user->clubs()
             ->withPivot('role_id')

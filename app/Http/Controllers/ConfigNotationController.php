@@ -150,9 +150,7 @@ class ConfigNotationController extends Controller
                         'kumite_format_id'   => $request->kumite_format_id,
                         'nb_juges_option_id' => $request->nb_juges_option_id,
                         'duration'           => $request->duration ?? 180,
-                        'configuration_validee' => true,
                         'configure_par'      => Auth::id(),
-                        'validee_a'          => now(),
                     ]
                 );
 

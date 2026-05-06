@@ -13,13 +13,16 @@ use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 class CompetitionController extends Controller
 {
     use AuthorizesRequests;
-    public function index()
+    public function index(Request $request)
     {
+        $activeId = $request->attributes->get('organisateur_id');
+        $activeType = $request->attributes->get('organisateur_type');
         try {
-            $epreuves = Competition::with(['discipline', 'evenement', 'category', 'niveau'])
-                // ->whereHas('evenement', function ($query) {
-                //     $query->where('statut', 'actif');
-                // })
+            $epreuves = Competition::with(['discipline:id,nom', 'evenement', 'category:id,nom,sexe', 'niveau:id,nom'])
+                ->whereHas('evenement', function ($query) use ($activeId, $activeType) {
+                    $query->where('organisateur_id', $activeId)
+                        ->where('organisateur_type', $activeType);
+                })
                 ->orderBy('created_at', 'desc')
                 ->get();
 
@@ -30,8 +33,9 @@ class CompetitionController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Erreur lors de la récupération des épreuves : ' . $e->getMessage()
-            ], 500);
+                'message' => 'Erreur lors de la récupération des épreuves',
+                'data' => null
+            ], 422);
         }
     }
 

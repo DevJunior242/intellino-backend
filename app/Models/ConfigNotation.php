@@ -34,6 +34,10 @@ class ConfigNotation extends Model
         'validee_a'             => 'datetime',
     ];
 
+    public function organisateur()
+    {
+        return $this->morphTo();
+    }
     // Relations
     public function competition()
     {

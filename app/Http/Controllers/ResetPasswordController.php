@@ -9,9 +9,10 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Auth\Events\PasswordReset;
- class ResetPasswordController extends Controller
+
+class ResetPasswordController extends Controller
 {
-     // public function forgotPassword(Request $request)
+    // public function forgotPassword(Request $request)
     // {
     //     $request->validate(['email' => 'required|email']);
 
@@ -66,7 +67,7 @@ use Illuminate\Auth\Events\PasswordReset;
             [
                 'email' => $user->email,
                 'token' => bcrypt($token),
-             ]
+            ]
         );
 
         //  Lien reset
@@ -95,7 +96,9 @@ use Illuminate\Auth\Events\PasswordReset;
     public function sentToken(Request $request, string $token)
     {
         $email = $request->query('email');
-        return redirect(config('app.frontend_url') . "/reset-password/$token?email=$email");
+        $tokenUrl = config('app.frontend_url') . "/reset-password?token=$token&email=" . urlencode($email);
+
+        return redirect($tokenUrl);
     }
 
 

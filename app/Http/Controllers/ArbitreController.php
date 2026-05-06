@@ -21,7 +21,7 @@ class ArbitreController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Vous n\'êtes pas arbitre dans cette ligue',
-            ], 403);
+            ], 422);
         }
         $dejaInscrit = ArbitreCompetition::where('competition_id', $competition->id)
             ->where('user_id', auth()->id())
@@ -31,7 +31,7 @@ class ArbitreController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Vous êtes déjà arbitre dans cette compétition',
-            ], 403);
+            ], 422);
         }
 
         $arbitre = ArbitreCompetition::firstOrCreate(

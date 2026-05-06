@@ -13,6 +13,7 @@ return new class extends Migration
     {
         Schema::create('config_notations', function (Blueprint $table) {
             $table->uuid('id')->primary();
+            $table->uuidMorphs('organisateur');
             $table->foreignUuid('competition_id')
                 ->constrained('competitions')->cascadeOnDelete();
             $table->foreignUuid('plateau_id')

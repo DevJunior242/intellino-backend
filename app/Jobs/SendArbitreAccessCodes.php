@@ -6,11 +6,9 @@ use App\Models\ArbitreCompetition;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Foundation\Queue\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
-use App\Notifications\ArbitrePinNotification;
 use Illuminate\Foundation\Events\Dispatchable;
 
-class SendArbitreAccessCodes implements ShouldQueue
+class SendArbitreAccessCodes
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
     /**

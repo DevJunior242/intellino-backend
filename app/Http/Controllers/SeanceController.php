@@ -15,6 +15,8 @@ use App\Services\BracketService;
 use App\Models\ArbitreCompetition;
 use App\Http\Controllers\Controller;
 use App\Services\RotationArbitreService;
+use Illuminate\Support\Facades\Notification;
+use App\Notifications\SendArbitreAccessCodesNotif;
 
 class SeanceController extends Controller
 {
@@ -44,22 +46,26 @@ class SeanceController extends Controller
             app(BracketService::class)->generer($config);
         }
         // Générer les PIN si mode tablettes
-        if ($config->estModeTablettes()) {
-            $evenementId = $config->competition->evenement_id;
 
-            \App\Jobs\SendArbitreAccessCodes::dispatch($evenementId);
-        }
 
         // Générer PIN arbitres
         // load competition
         $config->load('competition');
-        $evenementId = $config->competition->evenement_id;
-        ArbitreCompetition::where('evenement_id', $evenementId)
+        $evenementId = $config?->competition?->evenement_id;
+        $codeAccess = ArbitreCompetition::where('evenement_id', $evenementId)
             ->whereNull('code_acces')
             ->each(fn($a) => $a->update([
                 'code_acces' => str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT)
             ]));
 
+        if ($config->estModeTablettes()) {
+            $evenementId = $config?->competition?->evenement_id;
+            $arbitres = ArbitreCompetition::where('evenement_id', $evenementId)
+                ->whereNotNull('code_acces')
+                ->with('user')
+                ->get();
+            Notification::send($arbitres, new SendArbitreAccessCodesNotif($codeAccess));
+        }
 
         return response()->json([
             'success' => true,
@@ -189,7 +195,7 @@ class SeanceController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Code d\'accès incorrect',
-            ], 400);
+            ], 422);
         }
 
         // 2. Vérifier sa présence dans la rotation de CETTE config

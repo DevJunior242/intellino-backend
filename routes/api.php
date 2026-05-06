@@ -88,6 +88,9 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::get('/user', function (Request $request) {
         return $request->user();
     });
+    //roles  leagues 
+    Route::get('leagues/getRoles', [LeagueMemberController::class, 'getRoles']);
+
     //countries
     Route::apiResource('/countries', CountryController::class);
 
@@ -139,12 +142,6 @@ Route::middleware(['auth:sanctum'])->group(function () {
     });
 
 
-    //ajout membre league
-    Route::prefix('membres')->group(function () {
-        Route::get('leagues/getRoles', [LeagueMemberController::class, 'getRoles']);
-
-        Route::apiResource('league', LeagueMemberController::class);
-    });
 
 
 
@@ -173,9 +170,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
     //config notation
     Route::get('evenements/{evenementId}/plateaux', [ConfigNotationController::class, 'getPlateauxByEvenement']);
 
-    Route::prefix('config-notation')->group(function () {
-        Route::apiResource('/config-notation', ConfigNotationController::class);
-    });
+
     Route::prefix('seances')->group(function () {
 
         Route::post('configs/{config}/valider',          [SeanceController::class, 'valider']);
@@ -243,12 +238,17 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::prefix('leagues')->group(function () {
         Route::apiResource('/leagues', LeagueController::class);
     });
-    Route::middleware('permission:instructeur,secretaire,admin_club,parent,karateka,super_admin,admin_league')->group(function () {
+    Route::middleware('permission:instructeur,secretaire,admin_club,parent,karateka,super_admin,admin_league,arbitre_league')->group(function () {
         Route::apiResource('/saisons', SaisonController::class);
         //setup
         Route::prefix('setup')->group(function () {
             Route::apiResource('/setup', LeagueSetupController::class);
         });
+        //ajout membre league
+        Route::prefix('membres')->group(function () {
+            Route::apiResource('league', LeagueMemberController::class);
+        });
+
         //ligues
         Route::get('leagues/myClubs', [LeagueController::class, 'myClubs']);
 
@@ -301,6 +301,10 @@ Route::middleware(['auth:sanctum'])->group(function () {
             Route::post('/cloturer/{competition}', [CompetitionController::class, 'cloturer']);
             Route::post('/arbitrer/{competition}', [CompetitionController::class, 'arbitrer']);
             Route::apiResource('/competitions', CompetitionController::class);
+        });
+
+        Route::prefix('config-notation')->group(function () {
+            Route::apiResource('/config-notation', ConfigNotationController::class);
         });
         //plan controller
         Route::post('/plan/store', [PlanController::class, 'storePlan']);

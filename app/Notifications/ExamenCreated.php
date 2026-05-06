@@ -59,8 +59,6 @@ class ExamenCreated extends Notification implements ShouldQueue
             return;
         }
 
-        $clubId = optional($this->examen)->organisateur_id;
-        // /dashboard/examen/019dfbb1-956c-70bf-8ac8-f1e7f14b0dc1/show
         $url = config('app.frontend_url') . "/dashboard/examen/{$this->examen->id}/show";
 
         $html = "
@@ -95,7 +93,6 @@ class ExamenCreated extends Notification implements ShouldQueue
      */
     public function toArray(object $notifiable): array
     {
-        $clubId = optional($this->examen)->club_id;
         return [
             'title' => 'Nouvel examen',
             'message' => 'vous avez un nouvel examen du ' . $this->examen->start_date . '.',

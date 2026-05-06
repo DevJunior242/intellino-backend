@@ -16,17 +16,16 @@ use App\Http\Requests\StoreMemberRequest;
 class LeagueMemberController extends Controller
 {
 
-    public function index()
+    public function index(Request $request)
     {
         $user = auth()->user();
 
         // On détermine l'ID et le type dynamiquement
-        $activeId = $user->current_league_id ?? $user->current_federation_id;
-        $relation = $user->current_league_id ? 'leagues' : 'federations';
+        $activeId = $request->attributes->get('organisateur_id');
+        $activeType = $request->attributes->get('organisateur_type');
+        $relation = $activeType === 'Ligue' ? 'leagues' : 'federations';
 
-        if (!$activeId) {
-            return response()->json(['message' => 'Aucune organisation active'], 400);
-        }
+
         $allRoles =  Role::all()->keyBy('id');
         $members = User::whereHas($relation, function ($q) use ($activeId) {
             $q->where('id', $activeId);
@@ -77,8 +76,8 @@ class LeagueMemberController extends Controller
     public function store(StoreMemberRequest $request)
     {
         $validated = $request->validated();
-        $user = auth()->user();
-        $leagueId = $user->current_league_id;
+        $activeId = $request->attributes->get('organisateur_id');
+        $activeType = $request->attributes->get('organisateur_type');
 
 
         $targetUser = User::where('email', $validated['email'])
@@ -87,7 +86,7 @@ class LeagueMemberController extends Controller
         if ($targetUser) {
             $isAlreadyMember = DB::table('league_users')
                 ->where('user_id', $targetUser->id)
-                ->where('league_id', $leagueId)
+                ->where('league_id', $activeId)
                 ->exists();
 
             if ($isAlreadyMember) {
@@ -109,17 +108,17 @@ class LeagueMemberController extends Controller
         }
         $exists = DB::table('league_users')
             ->where('user_id', $targetUser->id)
-            ->where('league_id', $leagueId)
+            ->where('league_id', $activeId)
             ->where('role_id', $validated['role_id'])
             ->exists();
 
         if (!$exists) {
             $targetUser->leagues()->sync([
-                $leagueId => ['role_id' => $validated['role_id']]
+                $activeId => ['role_id' => $validated['role_id']]
             ], false);
         }
 
-        $targetUser->current_league_id = $leagueId;
+        $targetUser->current_league_id = $activeId;
         $targetUser->save();
         $targetUser->notify(new WelcomeToLeague($targetUser));
 
