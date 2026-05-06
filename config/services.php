@@ -21,7 +21,9 @@ return [
     'resend' => [
         'key' => env('RESEND_API_KEY'),
     ],
-
+    'brevo' => [
+        'key' => env('BREVO_API_KEY'),
+    ],
     'ses' => [
         'key' => env('AWS_ACCESS_KEY_ID'),
         'secret' => env('AWS_SECRET_ACCESS_KEY'),
@@ -34,8 +36,8 @@ return [
             'channel' => env('SLACK_BOT_USER_DEFAULT_CHANNEL'),
         ],
     ],
-     'turnstile' => [
+    'turnstile' => [
         'secret' => env('TURNSTILE_SECRET_KEY'),
-        'site_key' => env('TURNSTILE_SITE_KEY'),  
+        'site_key' => env('TURNSTILE_SITE_KEY'),
     ],
 ];

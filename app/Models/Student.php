@@ -10,17 +10,16 @@ use App\Models\ParentModel;
 use App\Models\ExamenLeague;
 use App\Models\ExamenResult;
 use App\Models\StudentGrade;
-use App\Models\StudentParent;
 use App\Models\ExamenCandidat;
 use App\Models\StudentPayment;
-use App\Models\ExamenStudentLeague;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Notifications\Notifiable;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 
 class Student extends Model
 {
-    use HasUuids, SoftDeletes;
+    use HasUuids, SoftDeletes, Notifiable;
     protected $table = 'students';
 
     protected $fillable = [
@@ -82,7 +81,10 @@ class Student extends Model
     {
         return $this->belongsTo(User::class);
     }
-
+    // public function routeNotificationForMail()
+    // {
+    //     return $this->user?->email;
+    // }
     public function getAgeAttribute()
     {
         return Carbon::parse($this->birthdate)->age;

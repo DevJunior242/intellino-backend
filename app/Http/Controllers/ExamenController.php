@@ -11,6 +11,7 @@ use App\Models\Student;
 use Illuminate\Support\Str;
 use Illuminate\Http\Request;
 use App\Models\ExamenCandidat;
+use App\Services\BrevoService;
 use Illuminate\Support\Facades\DB;
 use App\Services\ExamenStatService;
 use Illuminate\Support\Facades\Log;
@@ -175,11 +176,15 @@ class ExamenController extends Controller
                 return $examen;
             });
             $examenData->load('candidates');
-            // $candidats = $examenData->candidates;
 
-            // if ($candidats->isNotEmpty()) {
-            //     Notification::send($candidats, new ExamenCreated($examenData));
-            // }
+            $candidats = $examenData->candidates;
+            $students = $examenData->candidates()
+                ->with('student')
+                ->get()
+                ->pluck('student');
+            Log::info('examen created', ['students' => $students]);
+
+            Notification::send($students, new ExamenCreated($examenData));
             $message = ($activeType === 'Ligue')
                 ? 'Examen de Ligue créé. Les clubs peuvent maintenant inscrire leurs candidats.'
                 : 'Examen de Club créé avec inscriptions automatiques.';
