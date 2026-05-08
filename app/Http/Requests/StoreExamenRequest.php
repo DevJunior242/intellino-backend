@@ -50,7 +50,7 @@ class StoreExamenRequest extends FormRequest
             'end_date' => [
                 'required',
                 'date',
-                'after:start_date',
+                'after_or_equal:start_date',
             ],
 
             'start_time' => ['required', 'date_format:H:i'],

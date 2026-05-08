@@ -19,7 +19,7 @@ return new class extends Migration
                 ->nullable();
             // Est-il connecté sur sa tablette ?
             $table->boolean('connecte')->default(false);
-
+            $table->index('code_acces');
             $table->timestamps();
             $table->unique(['user_id', 'evenement_id']);
         });

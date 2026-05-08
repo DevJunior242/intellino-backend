@@ -14,6 +14,7 @@ use Illuminate\Validation\Rule;
 use App\Services\BracketService;
 use App\Models\ArbitreCompetition;
 use App\Http\Controllers\Controller;
+use Illuminate\Support\Facades\Cache;
 use App\Services\RotationArbitreService;
 use Illuminate\Support\Facades\Notification;
 use App\Notifications\SendArbitreAccessCodesNotif;
@@ -238,21 +239,19 @@ class SeanceController extends Controller
 
     public function enCours(ConfigNotation $config)
     {
-        $enCours = OrdrePassage::where('config_notation_id', $config->id)
-            ->where('statut', 'en_cours')
-            ->with([
-                'inscription.athlete',
-                'inscription.competition.category'
+        return Cache::remember("en_cours_{$config->id}", 1, function () use ($config) {
 
-            ])
-            ->first();
-
-        return response()->json([
-            'success' => true,
-            'enCours' => $enCours,
-        ]);
+            return OrdrePassage::query()
+                ->where('config_notation_id', $config->id)
+                ->where('statut', 'en_cours')
+                ->with([
+                    'inscription.athlete:id,fullname',
+                    'inscription.competition',
+                    'inscription.competition.category:id,nom,sexe',
+                ])
+                ->first();
+        });
     }
-
 
     // Retourner les arbitres de la rotation pour ce tatami
     public function arbitresRotation(ConfigNotation $config)

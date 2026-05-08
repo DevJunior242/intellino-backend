@@ -58,10 +58,17 @@ class CheckClubRole
             ->withPivot('role_id')
             ->where('leagues.id', $activeId)
             ->first();
-        if (!$club & !$league) {
-            return response()->json(['message' => 'Accès refusé'], 403);
-        }
+        if ($activeType === 'Club') {
 
+            $activeOrg = $user->clubs()
+                ->where('clubs.id', $activeId)
+                ->first();
+        } elseif ($activeType === 'Ligue') {
+
+            $activeOrg = $user->leagues()
+                ->where('leagues.id', $activeId)
+                ->first();
+        }
         // 1. Identifier l'organisation active 
         $activeOrg = $club ?: $league;
 

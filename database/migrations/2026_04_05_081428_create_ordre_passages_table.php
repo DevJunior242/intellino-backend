@@ -19,7 +19,7 @@ return new class extends Migration
             $table->string('statut')->default('en_attente'); // en_attente, en_cours, termine, blesse
             $table->float('score_final')->nullable();
             $table->timestamps();
-
+            $table->index(['config_notation_id', 'statut']);
             $table->unique(['config_notation_id', 'inscription_id']);
             $table->unique(['config_notation_id', 'ordre']);
         });

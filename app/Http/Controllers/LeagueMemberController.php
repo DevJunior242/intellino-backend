@@ -18,41 +18,35 @@ class LeagueMemberController extends Controller
 
     public function index(Request $request)
     {
-        $user = auth()->user();
 
         // On détermine l'ID et le type dynamiquement
         $activeId = $request->attributes->get('organisateur_id');
         $activeType = $request->attributes->get('organisateur_type');
         $relation = $activeType === 'Ligue' ? 'leagues' : 'federations';
+        $roleinclus = ["admin_league", "secretaire_league", "directeur_technique"];
 
+        $roleIds = Role::whereIn('name', $roleinclus)->pluck('id');
 
-        $allRoles =  Role::all()->keyBy('id');
-        $members = User::whereHas($relation, function ($q) use ($activeId) {
-            $q->where('id', $activeId);
+        $allRoles = Role::whereIn('name', $roleinclus)->get();
+
+        $members = User::whereHas($relation, function ($q) use ($activeId, $roleIds) {
+
+            $q->where('leagues.id', $activeId)
+                ->whereIn('league_users.role_id', $roleIds);
         })
             ->with([$relation => function ($q) use ($activeId) {
-                // On récupère le rôle via le pivot et on charge la relation 'role' si elle existe
-                $q->where('id', $activeId)->withPivot('role_id');
+
+                $q->where('id', $activeId)
+                    ->withPivot('role_id');
             }])
             ->get()
             ->map(function ($member) use ($relation, $allRoles) {
-                // On simplifie l'objet pour le Frontend
+
                 $orgData = $member->$relation->first();
+
                 $roleId = $orgData?->pivot?->role_id;
 
-                $roleObj = $allRoles->get($roleId);
-                // 2. Vérifier si l'organisation et le pivot existent avant d'accéder aux données
-                if (!$orgData || !$orgData->pivot) {
-                    return [
-                        'id' => $member->id,
-                        'fullname' => $member->fullname,
-                        'role_name' => 'Non défini',
-                        'role_id' => null
-                    ];
-                }
-
-                // 3. Accès sécurisé au pivot
-                $roleId = $orgData?->pivot->role_id;
+                $roleObj = $allRoles->firstWhere('id', $roleId);
                 return [
                     'id'         => $member->id,
                     'name'       => $member->fullname,
@@ -68,7 +62,7 @@ class LeagueMemberController extends Controller
 
         return response()->json([
             'success' => true,
-            'organization_type' => $user->current_league_id ? 'Ligue' : 'Fédération',
+            'organization_type' => $activeType,
             'members' => $members
         ]);
     }
@@ -141,8 +135,8 @@ class LeagueMemberController extends Controller
     private function getBadgeColor($roleName)
     {
         return match ($roleName) {
-            'Admin'   => 'error',   // Rouge
-            'Arbitre' => 'info',    // Bleu
+            'Admin_league'   => 'error',   // Rouge
+            'Arbitre_league' => 'info',    // Bleu
             'Coach'   => 'warning', // Orange
             default   => 'success', // Vert
         };
@@ -152,5 +146,53 @@ class LeagueMemberController extends Controller
         $hash = md5($name);
         $color = str_replace('#', '', str_replace('ff', '', $hash));
         return "#{$color}";
+    }
+
+
+
+    public function arbitres(Request $request)
+    {
+        $activeId = $request->attributes->get('organisateur_id');
+        $activeType = $request->attributes->get('organisateur_type');
+        $relation = $activeType === 'Ligue' ? 'leagues' : 'federations';
+        $roleinclus = ["arbitre_league"];
+
+        $roleIds = Role::whereIn('name', $roleinclus)->pluck('id');
+
+        $allRoles = Role::whereIn('name', $roleinclus)->get();
+
+        $members = User::whereHas($relation, function ($q) use ($activeId, $roleIds) {
+
+            $q->where('leagues.id', $activeId)
+                ->whereIn('league_users.role_id', $roleIds);
+        })
+            ->with([$relation => function ($q) use ($activeId) {
+
+                $q->where('id', $activeId)
+                    ->withPivot('role_id');
+            }])
+            ->get()
+            ->map(function ($member) use ($relation, $allRoles) {
+
+                $orgData = $member->$relation->first();
+
+                $roleId = $orgData?->pivot?->role_id;
+
+                $roleObj = $allRoles->firstWhere('id', $roleId);
+                return [
+                    'id'         => $member->id,
+                    'name'       => $member->fullname,
+                    'email'      => $member->email,
+                    'phone'      => $member->phone,
+                    'initials'   => strtoupper(substr($member->fullname, 0, 2)),
+
+                ];
+            });
+
+        return response()->json([
+            'success' => true,
+            'organization_type' => $activeType,
+            'members' => $members
+        ]);
     }
 }

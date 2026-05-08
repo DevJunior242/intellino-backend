@@ -25,7 +25,7 @@ class Inscription extends Model
     protected $fillable = [
         'competition_id',
         'athlete_id',
-        'kata_id',
+        'kata',
         'poids_declare',
         'poids_officiel',
         'statut_pesee',

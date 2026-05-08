@@ -19,6 +19,7 @@ class RolesTableSeeder extends Seeder
             'secretaire',
             'parent',
             'karateka',
+            'arbitre_league',
         ];
 
         foreach ($roles as $name) {

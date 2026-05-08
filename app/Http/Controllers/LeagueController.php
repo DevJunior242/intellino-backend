@@ -8,6 +8,7 @@ use App\Models\League;
 use App\Models\Student;
 use App\Models\StudentGrade;
 use Illuminate\Http\Request;
+use App\Models\ClubNonInscrit;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use App\Http\Controllers\Controller;
@@ -103,7 +104,29 @@ class LeagueController extends Controller
 
         return response()->json(['success' => true, 'message' => 'Le club a bien été ajouté à la ligue']);
     }
+    public function addClubManuel(Request $request)
+    {
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'description' => 'nullable|string',
+        ]);
 
+        $activeId = $request->attributes->get('organisateur_id');
+        $activeType = $request->attributes->get('organisateur_type');
+
+        $club = ClubNonInscrit::create([
+            'name' => $request->name,
+            'description' => $request->description,
+            'organisateur_id' => $activeId,
+            'organisateur_type' => $activeType,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Club ajouté avec succès',
+            'data' => $club
+        ], 201);
+    }
     public function myClubs(Request $request)
     {
         $activeId = $request->attributes->get('organisateur_id');

@@ -247,12 +247,15 @@ Route::middleware(['auth:sanctum'])->group(function () {
         //ajout membre league
         Route::prefix('membres')->group(function () {
             Route::apiResource('league', LeagueMemberController::class);
+            //arbitres
+            Route::get('arbitres', [LeagueMemberController::class, 'arbitres']);
         });
 
         //ligues
         Route::get('leagues/myClubs', [LeagueController::class, 'myClubs']);
 
         Route::post('leagues/addClub/{clubId}', [LeagueController::class, 'addClub']);
+        Route::post('leagues/addClubManuel', [LeagueController::class, 'addClubManuel']);
         //licences
         Route::prefix('licences')->group(function () {
             Route::apiResource('/licences', LicenceController::class);
