@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Models\User;
 use App\Models\Competition;
+use App\Models\ConfigNotation;
 use App\Models\ArbitreCompetition;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -55,5 +56,9 @@ class RotationArbitre extends Model
     public function estAuBanc(): bool
     {
         return !$this->actif;
+    }
+    public function configNotation()
+    {
+        return $this->belongsTo(ConfigNotation::class);
     }
 }

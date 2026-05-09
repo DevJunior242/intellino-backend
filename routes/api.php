@@ -49,6 +49,7 @@ use App\Http\Controllers\InscriptionController;
 use App\Http\Controllers\LeagueSetupController;
 use App\Http\Controllers\PricingPlanController;
 use App\Http\Controllers\AffiliationControllerr;
+use App\Http\Controllers\ArbitreStatsController;
 use App\Http\Controllers\Auth\SettingController;
 use App\Http\Controllers\EnchainementController;
 use App\Http\Controllers\ExamenLeagueController;
@@ -143,7 +144,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
 
 
 
-
+    Route::get('/arbitre/stats', [ArbitreStatsController::class, 'statsCarriere']);
 
     //league students 
     Route::prefix('league/students')->group(function () {

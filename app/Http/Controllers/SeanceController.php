@@ -115,14 +115,14 @@ class SeanceController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => "Séance lancée pour {$monAthle}",
-                'enCours' => $existAthlete ? $existAthlete->load('athlete') : null,
+                'enCours' => $existAthlete ? $existAthlete->load('inscription.athlete') : null,
             ], 201);
         }
 
         return response()->json([
             'success' => true,
             'message' => 'La séance a déjà été lancée pour cet athlète',
-            'enCours' => $existAthlete->load('athlete'),
+            'enCours' => $existAthlete->load('inscription.athlete'),
         ], 200);
     }
     // Appelé quand athlète suivant passe
@@ -314,11 +314,11 @@ class SeanceController extends Controller
         $enCours = OrdrePassage::where('config_notation_id', $config->id)
             ->where('statut', 'en_cours')
             ->with([
-                'inscription.athlete',
-                'inscription.club',
-                'inscription.competition.category',
-                'inscription.competition.evenement',
-                'inscription.kata'
+                'inscription.athlete:id,fullname',
+                'inscription.club:id,name',
+                'inscription.competition.category:id,nom,sexe',
+                'inscription.competition.evenement:id,nom,lieu',
+                'inscription'
             ])
             ->first();
 
@@ -351,17 +351,22 @@ class SeanceController extends Controller
         // Classement provisoire
         $classement = OrdrePassage::where('config_notation_id', $config->id)
             ->where('statut', 'termine')
-            ->with(['inscription.athlete', 'inscription.club'])
+            ->with([
+                'inscription.athlete:id,fullname',
+                'inscription.club:id,name',
+                'notes'
+            ])
             ->get()
             ->map(function ($passage) use ($config) {
-                $valeurs = Note::where('ordre_passage_id', $passage->id)
+                $valeurs = $passage->notes
                     ->pluck('valeur')
                     ->map(fn($v) => (float) $v)
                     ->toArray();
+
                 return [
                     'athlete' => $passage->inscription?->athlete?->fullname ?? '—',
                     'club'    => $passage->inscription?->club?->name ?? '—',
-                    'score'   => $this->calculerScore($valeurs, $config->getNbJuges()) ?? null,
+                    'score'   => $this->calculerScore($valeurs, $config->getNbJuges()),
                 ];
             })
             ->filter(fn($item) => $item['score'] !== null)
