@@ -13,6 +13,7 @@ use App\Models\RotationArbitre;
 use Illuminate\Validation\Rule;
 use App\Services\BracketService;
 use App\Models\ArbitreCompetition;
+use Illuminate\Support\Facades\Log;
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Cache;
 use App\Services\RotationArbitreService;
@@ -240,6 +241,7 @@ class SeanceController extends Controller
     public function enCours(ConfigNotation $config)
     {
         return Cache::remember("en_cours_{$config->id}", 1, function () use ($config) {
+            $start = microtime(true);
 
             return OrdrePassage::query()
                 ->where('config_notation_id', $config->id)
@@ -251,11 +253,14 @@ class SeanceController extends Controller
                 ])
                 ->first();
         });
+        Log::info('Temps execution enCours', ['ms' => round((microtime(true) - $start) * 1000, 2)]);
     }
 
     // Retourner les arbitres de la rotation pour ce tatami
     public function arbitresRotation(ConfigNotation $config)
     {
+        $start = microtime(true);
+
         $arbitres = RotationArbitre::where('config_notation_id', $config->id)
             ->with('arbitreCompetition.user:id,fullname')
             ->orderBy('ordre')
@@ -271,7 +276,7 @@ class SeanceController extends Controller
             ]);
 
         $superviseur = $arbitres->firstWhere('est_superviseur', true);
-
+        Log::infos('Temps execution arbitresRotation', ['ms' => round((microtime(true) - $start) * 1000, 2)]);
         return response()->json([
             'success'     => true,
             'arbitres'    => $arbitres,
@@ -311,6 +316,7 @@ class SeanceController extends Controller
     // Controller
     public function vuePublique(ConfigNotation $config)
     {
+        $start = microtime(true);
         $enCours = OrdrePassage::where('config_notation_id', $config->id)
             ->where('statut', 'en_cours')
             ->with([
@@ -372,6 +378,8 @@ class SeanceController extends Controller
             ->filter(fn($item) => $item['score'] !== null)
             ->sortByDesc('score')
             ->values();
+        Log::info('Temps execution publicvue', ['ms' => round((microtime(true) - $start) * 1000, 2)]);
+
         return response()->json([
             'success'    => true,
             'config'     => [

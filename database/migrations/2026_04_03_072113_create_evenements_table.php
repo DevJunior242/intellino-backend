@@ -24,6 +24,7 @@ return new class extends Migration
             $table->tinyInteger('status')->default(0); // 0 = En attente, 1 = En cours, 2 = Terminé
             $table->index(['status', 'date_debut', 'date_fin']);
             $table->timestamps();
+            $table->index(['organisateur_id', 'organisateur_type', 'saison_id']);
         });
     }
 

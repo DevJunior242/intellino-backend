@@ -12,10 +12,9 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('club_non_inscrits', function (Blueprint $table) {
-            $table->uuid('id');
-            //name , description,organisateur_id,organisateur_type
+            $table->uuid('id')->primary();
             $table->string('name');
-            $table->string('description')->nullable();
+            $table->text('description')->nullable();
             $table->uuidMorphs('organisateur');
             $table->timestamps();
         });
