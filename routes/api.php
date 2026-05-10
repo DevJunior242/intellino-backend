@@ -83,6 +83,7 @@ Route::get('/reset-password/{token}', [ResetPasswordController::class, 'sentToke
     ->name('password.reset');
 
 Route::post('/reset-password', [ResetPasswordController::class, 'resetPassword']);
+Route::get('configs/{config}/vue-publique', [SeanceController::class, 'vuePublique']);
 
 
 Route::middleware(['auth:sanctum'])->group(function () {
@@ -182,8 +183,6 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::get('competition/{config}/en-cours', [SeanceController::class, 'enCours']);
         Route::post('configs/{config}/connecter-tablette', [SeanceController::class, 'connecterTablette']);
         Route::get('configs/{config}/arbitres-rotation',    [SeanceController::class, 'arbitresRotation']);
-        // Route
-        Route::get('configs/{config}/vue-publique', [SeanceController::class, 'vuePublique']);
     });
 
 
