@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Note;
+use App\Events\NoteAjoutee;
 use App\Models\OrdrePassage;
 use Illuminate\Http\Request;
 
@@ -58,7 +59,10 @@ class NoteController extends Controller
                 'note_a' => now(),
             ]
         );
-
+        broadcast(new NoteAjoutee(
+            configId: $passage->config_notation_id,
+            ordrePassageId: $passage->id,
+        ));
         return response()->json(['success' => true, 'note' => $note]);
     }
 

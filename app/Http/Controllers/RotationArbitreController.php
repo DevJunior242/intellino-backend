@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Support\Str;
 use Illuminate\Http\Request;
+use App\Events\TatamiUpdated;
 use App\Models\ConfigNotation;
 use App\Models\RotationArbitre;
 use Illuminate\Support\Facades\DB;
@@ -38,7 +39,7 @@ class RotationArbitreController extends Controller
                 'actif'                  => false,
                 'poste'                  => null,
             ]);
-
+            broadcast(new TatamiUpdated($rotation->config_notation_id))->toOthers();
             return response()->json(['success' => true, 'data' => $rotation->load('arbitreCompetition.user')], 201);
         } catch (\Exception $e) {
             return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
@@ -67,7 +68,7 @@ class RotationArbitreController extends Controller
                     'poste' => null, // Un superviseur n'occupe pas de poste de juge (1-5)
                     'actif' => true
                 ]);
-
+            broadcast(new TatamiUpdated($configId))->toOthers();
             return response()->json(['success' => true, 'message' => 'Superviseur désigné avec succès']);
         });
     }
@@ -96,7 +97,7 @@ class RotationArbitreController extends Controller
             'poste' => $request->poste,
             'actif' => !is_null($request->poste)
         ]);
-
+        broadcast(new TatamiUpdated($rotation->config_notation_id))->toOthers();
         return response()->json(['success' => true]);
     }
 }

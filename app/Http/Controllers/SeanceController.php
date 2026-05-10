@@ -7,6 +7,7 @@ use App\Models\Competition;
 use App\Models\Inscription;
 use App\Models\OrdrePassage;
 use Illuminate\Http\Request;
+use App\Events\TatamiUpdated;
 use App\Models\ConfigNotation;
 use App\Models\JugeCompetition;
 use App\Models\RotationArbitre;
@@ -68,7 +69,7 @@ class SeanceController extends Controller
                 ->get();
             Notification::send($arbitres, new SendArbitreAccessCodesNotif($codeAccess));
         }
-
+        broadcast(new TatamiUpdated($config->id));
         return response()->json([
             'success' => true,
             'message' => 'Séance ouverte',
@@ -113,13 +114,14 @@ class SeanceController extends Controller
             //passer de config a inscription pourr recuperer athlete
             $premier->load(['inscription.athlete']);
             $monAthle = $premier->inscription->athlete->fullname ?? "Aucun athlète";
+            broadcast(new TatamiUpdated($config->id));
             return response()->json([
                 'success' => true,
                 'message' => "Séance lancée pour {$monAthle}",
                 'enCours' => $existAthlete ? $existAthlete->load('inscription.athlete') : null,
             ], 201);
         }
-
+        broadcast(new TatamiUpdated($config->id));
         return response()->json([
             'success' => true,
             'message' => 'La séance a déjà été lancée pour cet athlète',
@@ -153,6 +155,7 @@ class SeanceController extends Controller
         if ($suivant) {
             $suivant->update(['statut' => 'en_cours']);
         }
+        broadcast(new TatamiUpdated($config->id));
 
         return response()->json([
             'success' => true,

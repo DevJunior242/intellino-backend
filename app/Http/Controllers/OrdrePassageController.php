@@ -65,7 +65,12 @@ class OrdrePassageController extends Controller
     public function retirer($inscriptionId)
     {
         $order = OrdrePassage::where('inscription_id', $inscriptionId)->first();
+
+        if (!$order) {
+            return response()->json(['message' => 'Ordre de passage introuvable'], 422);
+        }
+
         $order->delete();
-        return response()->json($order);
+        return response()->json(['message' => 'Retiré avec succès']);
     }
 }

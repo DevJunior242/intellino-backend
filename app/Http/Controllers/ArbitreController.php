@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Competition;
 use Illuminate\Http\Request;
+use App\Events\TatamiUpdated;
 use App\Models\ConfigNotation;
 use App\Models\RotationArbitre;
 use App\Models\ArbitreCompetition;
@@ -41,6 +42,7 @@ class ArbitreController extends Controller
             ],
 
         );
+        broadcast(new TatamiUpdated($config->id))->toOthers();
 
         return response()->json([
             'success' => true,
