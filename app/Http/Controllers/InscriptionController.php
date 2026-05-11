@@ -25,7 +25,7 @@ class InscriptionController extends Controller
         $inscriptions = Inscription::where('competition_id', $request->competition_id)
             ->with([
                 'athlete:id,fullname,sex',
-                'club:id,name',
+                'organisateu',
                 'competition.category:id,nom,sexe',
                 'competition.discipline:id,nom'
             ])
