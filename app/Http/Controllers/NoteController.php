@@ -37,7 +37,7 @@ class NoteController extends Controller
         }
         //verifier si ordre est en_cours 
         $ordre = OrdrePassage::find($validated['ordre_passage_id']);
-        if ($ordre->statut !== 'en_cours') {
+        if ($ordre->status !== OrdrePassage::STATUS_STARTED) {
             return response()->json(['message' => 'Cet ordre n\'est pas en cours'], 422);
         }
         // Vérifier que l'arbitre n'a pas déjà noté
