@@ -252,6 +252,7 @@ class SeanceController extends Controller
                     'inscription.athlete:id,fullname',
                     'inscription.competition',
                     'inscription.competition.category:id,nom,sexe',
+                    'inscription.organisateur:id,name',
                 ])
                 ->first();
         });
@@ -266,6 +267,7 @@ class SeanceController extends Controller
                 'inscription.athlete:id,fullname',
                 'inscription.competition',
                 'inscription.competition.category:id,nom,sexe',
+                'inscription.organisateur:id,name',
             ])
             ->first();
         return response()->json([
