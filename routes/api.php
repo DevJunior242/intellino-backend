@@ -84,6 +84,7 @@ Route::get('/reset-password/{token}', [ResetPasswordController::class, 'sentToke
 
 Route::post('/reset-password', [ResetPasswordController::class, 'resetPassword']);
 Route::get('configs/{config}/vue-publique', [SeanceController::class, 'vuePublique']);
+Route::get('configs/{config}/next-athlete', [SeanceController::class, 'nextAthlete']);
 
 
 Route::middleware(['auth:sanctum'])->group(function () {

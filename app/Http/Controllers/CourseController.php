@@ -8,7 +8,6 @@ use App\Models\SessionModel;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 use App\Http\Requests\CourseRequest;
 
 class CourseController extends Controller
@@ -16,14 +15,27 @@ class CourseController extends Controller
     public function index(Request $request)
     {
 
+        $activeId = $request->attributes->get('organisateur_id');
+        $activeType = $request->attributes->get('organisateur_type');
+
+        $saisonActive =  Saison::where('active', true)->first();
+
+        if (!$saisonActive) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Vous devez définir une saison pour créer un cours',
+            ], 422);
+        }
         $saisonActive =  Saison::where('active', true)->first();
 
         $activeId = $request->attributes->get('organisateur_id');
-        $sessions = SessionModel::with(['course.club', 'course.grade'])
-            ->whereHas('course', function ($query) use ($activeId, $saisonActive) {
-                $query->where('club_id', $activeId);
-                $query->where('saison_id', $saisonActive->id);
+        $sessions = SessionModel::with(['course.organisateur', 'course.grade'])
+            ->whereHas('course', function ($query) use ($activeId, $saisonActive, $activeType) {
+                $query->where('organisateur_id', $activeId)
+                    ->where('organisateur_type', $activeType)
+                    ->where('saison_id', $saisonActive->id);
             })
+
             ->latest()
             ->paginate(6);
         return response()->json([
@@ -36,12 +48,8 @@ class CourseController extends Controller
     {
         $saisonActive =  Saison::where('active', true)->first();
         $activeId = $request->attributes->get('organisateur_id');
-        $role = $request->attributes->get('role');
+        $activeType = $request->attributes->get('organisateur_type');
 
-        $hasAcess = ['admin_club', 'instructeur'];
-        if (!in_array($role, $hasAcess)) {
-            return response()->json(['message' => 'Vous n\'avez pas les droits pour accéder à cette page'], 403);
-        }
         if (!$saisonActive) {
             return response()->json([
                 'success' => false,
@@ -50,10 +58,11 @@ class CourseController extends Controller
         }
 
         $validated = $request->validated();
-        return DB::transaction(function () use ($validated, $request, $activeId, $saisonActive) {
+        return DB::transaction(function () use ($validated, $request, $activeId, $activeType, $saisonActive) {
             $course = Course::create([
                 ...$validated['course'],
-                'club_id' => $activeId,
+                'organisateur_id' => $activeId,
+                'organisateur_type' => $activeType,
                 'instructor_id' => $request->user()->id,
                 'saison_id' => $saisonActive->id,
             ]);
@@ -76,7 +85,7 @@ class CourseController extends Controller
     {
 
         $session->load([
-            'course.club',
+            'course.organisateur',
             'course.grade',
             'course.instructor',
         ]);

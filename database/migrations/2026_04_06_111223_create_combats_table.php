@@ -32,7 +32,7 @@ return new class extends Migration
             $table->string('type_victoire')->nullable(); // Hantei, Kiken, Hansoku, Points
 
             $table->string('etape'); // Finale, Demie, Poule_Match_1, etc.
-            $table->tinyInteger('statut')->default(0); // 0 = En attente, 1 = En cours, 2 = Terminé
+            $table->tinyInteger('status')->default(0); // 0 = En attente, 1 = En cours, 2 = Terminé
             $table->uuid('source_aka_combat_id')->nullable();
 
             // Next combat (format éliminatoire seulement)

@@ -2,11 +2,11 @@
 
 namespace App\Models;
 
+use App\Models\Note;
 use App\Models\Inscription;
 use App\Models\ConfigNotation;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
-use App\Models\Note;
 
 class OrdrePassage extends Model
 {
@@ -14,12 +14,16 @@ class OrdrePassage extends Model
     protected $fillable = [
         'config_notation_id',
         'ordre',
-        'statut',
+        'status',
         'score_final',
         'inscription_id',
     ];
     protected $keyType = 'string';
     public $incrementing = false;
+
+    const STATUS_NOT_STARTED = 0;
+    const STATUS_STARTED = 1;
+    const STATUS_FINISHED = 2;
 
     public function inscription()
     {
@@ -32,5 +36,15 @@ class OrdrePassage extends Model
     public function notes()
     {
         return $this->hasMany(Note::class);
+    }
+
+    public function getStatusLabelAttribute()
+    {
+        return match ($this->status) {
+            self::STATUS_NOT_STARTED => 'En attente',
+            self::STATUS_STARTED => 'En cours',
+            self::STATUS_FINISHED => 'Terminé',
+            default => 'Inconnu',
+        };
     }
 }

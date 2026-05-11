@@ -63,18 +63,20 @@ class ExamenPolicy
      */
     public function delete(User $user, Examen $examen): bool
     {
+        $activeType = $examen->organisateur_type;
 
         if ($user->isSuperAdmin()) {
             return true;
         }
-        $clubId = $examen->club_id;
-        if (!$clubId) {
+        $activeId = $examen->organisateur_id;
+        if (!$activeId) {
             return false;
         }
 
-        return $user->clubs()
-            ->where('clubs.id', $clubId)
-            ->whereIn('club_users.role_id', Role::clubAdminRoles())
+        $relation = $activeType === 'Club' ? 'clubs' : 'leagues';
+        return $user->$relation()
+            ->where($relation . '.id', $activeId)
+            ->whereIn($relation . '_users.role_id', Role::AccessRoles())
             ->exists();
     }
 
@@ -99,6 +101,6 @@ class ExamenPolicy
             return true;
         }
 
-        return $user->hasClubRole(['instructeur', 'admin_club', 'admin_league']);
+        return $user->hasAccessTo(['instructeur', 'admin_club', 'admin_league']);
     }
 }

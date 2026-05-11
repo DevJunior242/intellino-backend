@@ -9,6 +9,7 @@ use App\Models\Competition;
 use App\Models\Inscription;
 use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\StoreInscriptionReq;
 
 class InscriptionController extends Controller
 {
@@ -28,7 +29,7 @@ class InscriptionController extends Controller
                 'competition.category:id,nom,sexe',
                 'competition.discipline:id,nom'
             ])
-            ->orderBy('club_id')
+            ->orderBy('organisateur_id')
             ->get();
 
         return response()->json($inscriptions);
@@ -68,9 +69,12 @@ class InscriptionController extends Controller
     // Récupérer les inscriptions d'une épreuve pour un club
     public function parEpreuve(Competition $competition, Request $request)
     {
+        $activeId = $request->attributes->get('organisateur_id');
+        $activeType = $request->attributes->get('organisateur_type');
         $inscriptions = Inscription::where('competition_id', $competition->id)
-            ->where('club_id', $request->club_id)
-            ->with(['athlete', 'kata'])
+            ->where('organisateur_id', $activeId)
+            ->where('organisateur_type', $activeType)
+            ->with(['athlete'])
             ->get();
 
         return response()->json([
@@ -81,14 +85,9 @@ class InscriptionController extends Controller
     }
 
     // Inscrire un athlète à une épreuve
-    public function store(Request $request)
+    public function store(StoreInscriptionReq $request)
     {
-        $validated = $request->validate([
-            'competition_id'      => 'required|exists:competitions,id',
-            'athlete_id'          => 'required|exists:students,id',
-            'poids_declare'       => 'nullable|numeric|min:0',
-            'kata'                => 'nullable|string|max:255',
-        ]);
+        $validated = $request->validated();
 
         // Vérifier doublon
         $existe = Inscription::where('competition_id', $validated['competition_id'])
@@ -108,20 +107,14 @@ class InscriptionController extends Controller
             ->max('ordre_passage') ?? 0;
 
         $inscription = Inscription::create([
-            'competition_id'  => $validated['competition_id'],
-            'athlete_id'      => $validated['athlete_id'],
-            'club_id'         => $request->club_id,
-            'poids_declare'   => $validated['poids_declare'],
-            'kata'            => $validated['kata'] ?? null,
+            ...$validated,
             'ordre_passage'   => $dernierOrdre + 1,
-            'statut_pesee'    => 0,
-            'statut_passage'  => 'en_attente',
         ]);
 
         return response()->json([
             'success'     => true,
             'message'     => 'Athlète inscrit avec succès',
-            'inscription' => $inscription->load(['athlete', 'kata']),
+            'inscription' => $inscription->load(['athlete']),
         ], 201);
     }
 

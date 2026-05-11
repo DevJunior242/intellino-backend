@@ -28,10 +28,11 @@ class Inscription extends Model
         'kata',
         'poids_declare',
         'poids_officiel',
-        'statut_pesee',
+        'status',
         'ordre_passage',
         'statut_passage',
-        'club_id',
+        'organisateur_type',
+        'organisateur_id',
     ];
 
     protected $keyType = 'string';
@@ -63,7 +64,7 @@ class Inscription extends Model
     // Une fonction magique (Accessor) pour l'affichage
     public function getStatutTexteAttribute()
     {
-        return match ($this->statut_pesee) {
+        return match ($this->status) {
             self::STATUS_ATTENTE => 'En attente',
             self::STATUS_VALIDE  => 'Validé',
             self::STATUS_ECHOUE  => 'Échoué',
@@ -75,13 +76,14 @@ class Inscription extends Model
     {
         return $this->hasMany(Note::class, 'inscription_id');
     }
-    public function kata()
-    {
-        return $this->belongsTo(Kata::class, 'kata_id');
-    }
 
     public function configNotation()
     {
         return $this->belongsTo(ConfigNotation::class, 'config_notation_id');
+    }
+
+    public function organisateur()
+    {
+        return $this->morphTo();
     }
 }

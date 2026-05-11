@@ -20,7 +20,7 @@ return new class extends Migration
             // On garde 'etape' pour savoir si c'est un tour de qualif ou une phase finale
             $table->string('etape')->default('qualification');
             // 0 = Création, 1 = Matchs lancés, 2 = Résultats validés (Fermée)
-            $table->tinyInteger('statut')->default(0);
+            $table->tinyInteger('status')->default(0);
             $table->integer('ordre')->default(1);
             $table->timestamps();
         });

@@ -94,13 +94,13 @@ class SeanceController extends Controller
 
         //exist en cours athlete
         $existAthlete = OrdrePassage::where('config_notation_id', $config->id)
-            ->where('statut', 'en_cours')
+            ->where('status', OrdrePassage::STATUS_STARTED)
             ->first();
 
         // Premier athlète en cours
         if (!$existAthlete) {
             $premier = OrdrePassage::where('config_notation_id', $config->id)
-                ->where('statut', 'en_attente')
+                ->where('status', OrdrePassage::STATUS_NOT_STARTED)
                 ->orderBy('ordre')
                 ->first();
 
@@ -110,7 +110,7 @@ class SeanceController extends Controller
                     'problemes' => ['Aucun athlète en attente'],
                 ], 422);
             }
-            $premier->update(['statut' => 'en_cours']);
+            $premier->update(['status' => OrdrePassage::STATUS_STARTED]);
             //passer de config a inscription pourr recuperer athlete
             $premier->load(['inscription.athlete']);
             $monAthle = $premier->inscription->athlete->fullname ?? "Aucun athlète";
@@ -133,7 +133,7 @@ class SeanceController extends Controller
     {
         // Marquer l'athlète en cours comme terminé
         $passageActuel = OrdrePassage::where('config_notation_id', $config->id)
-            ->where('statut', 'en_cours')
+            ->where('status', OrdrePassage::STATUS_STARTED)
             ->with('notes')
             ->first();
 
@@ -141,19 +141,19 @@ class SeanceController extends Controller
             $valeursNotes = $passageActuel->notes->pluck('valeur')->map(fn($v) => (float)$v)->toArray();
 
             $scoreFinal = $this->calculerScore($valeursNotes, $config->getNbJuges());
-            $passageActuel->update(['statut' => 'termine', 'score_final' => $scoreFinal]);
+            $passageActuel->update(['status' => OrdrePassage::STATUS_FINISHED, 'score_final' => $scoreFinal]);
         }
         // Faire tourner les arbitres
         //$this->rotationService->tourner($config);
 
         // Passer l'athlète suivant en cours
         $suivant = OrdrePassage::where('config_notation_id', $config->id)
-            ->where('statut', 'en_attente')
+            ->where('status', OrdrePassage::STATUS_NOT_STARTED)
             ->orderBy('ordre')
             ->first();
 
         if ($suivant) {
-            $suivant->update(['statut' => 'en_cours']);
+            $suivant->update(['status' => OrdrePassage::STATUS_STARTED]);
         }
         broadcast(new TatamiUpdated($config->id));
 
@@ -172,7 +172,7 @@ class SeanceController extends Controller
             'success' => true,
             'etat'    => $this->rotationService->etat($config),
             'enCours' => Inscription::where('competition_id', $config->competition_id)
-                ->where('statut', 'en_cours')
+                ->where('status', 'en_cours')
                 ->with('athlete')
                 ->first(),
         ]);
@@ -219,7 +219,7 @@ class SeanceController extends Controller
                 return response()->json(['success' => false, 'message' => 'En attente d\'affectation à un poste...'], 422);
             }
         }
-        // 3. Update du statut de connexion
+        // 3. Update du status de connexion
         $arbitre->update(['connecte' => true]);
 
         return response()->json([
@@ -247,7 +247,7 @@ class SeanceController extends Controller
 
             return OrdrePassage::query()
                 ->where('config_notation_id', $config->id)
-                ->where('statut', 'en_cours')
+                ->where('status', OrdrePassage::STATUS_STARTED)
                 ->with([
                     'inscription.athlete:id,fullname',
                     'inscription.competition',
@@ -255,6 +255,23 @@ class SeanceController extends Controller
                 ])
                 ->first();
         });
+    }
+    //recuperer le prochain athlète
+    public function nextAthlete(ConfigNotation $config)
+    {
+        $prochain = OrdrePassage::where('config_notation_id', $config->id)
+            ->where('status', OrdrePassage::STATUS_NOT_STARTED)
+            ->orderBy('ordre')
+            ->with([
+                'inscription.athlete:id,fullname',
+                'inscription.competition',
+                'inscription.competition.category:id,nom,sexe',
+            ])
+            ->first();
+        return response()->json([
+            'success' => true,
+            'prochain' => $prochain,
+        ]);
     }
 
     // Retourner les arbitres de la rotation pour ce tatami
@@ -317,7 +334,7 @@ class SeanceController extends Controller
     {
         $start = microtime(true);
         $enCours = OrdrePassage::where('config_notation_id', $config->id)
-            ->where('statut', 'en_cours')
+            ->where('status', OrdrePassage::STATUS_STARTED)
             ->with([
                 'inscription.athlete:id,fullname',
                 'inscription.club:id,name',
@@ -355,7 +372,7 @@ class SeanceController extends Controller
 
         // Classement provisoire
         $classement = OrdrePassage::where('config_notation_id', $config->id)
-            ->where('statut', 'termine')
+            ->where('status', OrdrePassage::STATUS_FINISHED)
             ->with([
                 'inscription.athlete:id,fullname',
                 'inscription.club:id,name',

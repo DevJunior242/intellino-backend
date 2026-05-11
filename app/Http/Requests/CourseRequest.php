@@ -22,6 +22,8 @@ class CourseRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'organisateur_id' => 'required|uuid',
+            'organisateur_type' => 'required|string|in:Ligue,Club',
             'course.current_grade_id' => ['bail', 'required', 'exists:grades,id'],
             'course.name' => ['bail', 'required', 'regex:/^[\pL\s\d\-,.\']+$/u', 'max:50'],
             'sessions' => ['bail', 'required', 'array', 'min:1'],

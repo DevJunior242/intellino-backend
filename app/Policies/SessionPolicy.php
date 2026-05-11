@@ -61,7 +61,7 @@ class SessionPolicy
 
         return $user->clubs()
             ->where('clubs.id', $clubId)
-            ->whereIn('club_users.role_id', Role::clubAdminRoles())
+            ->whereIn('club_users.role_id', Role::AccessRoles())
             ->exists();
     }
 
@@ -82,7 +82,7 @@ class SessionPolicy
 
         return $user->clubs()
             ->where('clubs.id', $clubId)
-            ->whereIn('club_users.role_id', Role::clubAdminRoles())
+            ->whereIn('club_users.role_id', Role::AccessRoles())
             ->exists();
     }
 

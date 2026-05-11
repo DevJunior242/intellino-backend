@@ -14,10 +14,9 @@ class OrdrePassageController extends Controller
 
         $orders = OrdrePassage::with(
             [
-                'inscription.athlete',
-                'inscription.club',
-                'inscription.kata',
-                'inscription.competition.category'
+                'inscription.athlete:id,fullname',
+                'inscription.club:id,name',
+                'inscription.competition.category:id,nom,sexe',
             ]
         )
             ->withCount('inscription')
@@ -35,7 +34,7 @@ class OrdrePassageController extends Controller
         $dejaAssigneesIds = OrdrePassage::pluck('inscription_id');
 
         // On retourne les inscriptions de cette compétition qui NE SONT PAS dans cette liste
-        $inscriptions = Inscription::with(['athlete', 'club', 'kata'])
+        $inscriptions = Inscription::with(['athlete:id,fullname', 'club:id,name'])
             ->where('competition_id', $competitionId)
             ->whereNotIn('id', $dejaAssigneesIds)
             ->get();
@@ -56,7 +55,7 @@ class OrdrePassageController extends Controller
             [
                 'config_notation_id' => $configId,
                 'ordre' => $dernierOrdre + 1,
-                'statut' => 'en_attente'
+                'status' => OrdrePassage::STATUS_NOT_STARTED,
             ]
         );
     }

@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('inscriptions', function (Blueprint $table) {
             $table->uuid('id')->primary();
-            $table->foreignUuid('club_id')->constrained('clubs')->cascadeOnDelete();
+            $table->uuidMorphs('organisateur');
             $table->foreignUuid('competition_id')->constrained('competitions')->cascadeOnDelete();
             $table->foreignUuid('athlete_id')->constrained('students')->cascadeOnDelete();
 
@@ -24,7 +24,7 @@ return new class extends Migration
             $table->decimal('poids_declare', 5, 2)->nullable(); // Saisi par le club
             $table->decimal('poids_officiel', 5, 2)->nullable(); // Saisi par la Ligue le jour J
 
-            $table->tinyInteger('statut_pesee')->default(0)->index(); // 0 = En attente, 1 = Validé, 2 = Échoué
+            $table->tinyInteger('status')->default(0)->index(); // 0 = En attente, 1 = Validé, 2 = Échoué
 
             // Ordre de passage dans la compétition
             $table->integer('ordre_passage')->nullable();

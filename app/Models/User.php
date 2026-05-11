@@ -135,11 +135,9 @@ class User extends Authenticatable implements MustVerifyEmail
     }
 
 
-    public function hasClubRole(array $roles): bool
+    public function hasAccessTo(array $roles): bool
     {
-        if ($this->isSuperAdmin()) {
-            return true;
-        }
+
         return in_array(request()->attributes->get('role'), $roles, true);
     }
     public function hasLeagueRole(array $roles): bool

@@ -14,7 +14,8 @@ class Course extends Model
     use HasUuids;
     protected $table = 'courses';
     protected $fillable = [
-        'club_id',
+        'organisateur_id',
+        'organisateur_type',
         'saison_id',
         'name',
         'level',
