@@ -337,7 +337,7 @@ class SeanceController extends Controller
             ->where('status', OrdrePassage::STATUS_STARTED)
             ->with([
                 'inscription.athlete:id,fullname',
-                'inscription.club:id,name',
+                'inscription.organisateur:id,name',
                 'inscription.competition.category:id,nom,sexe',
                 'inscription.competition.evenement:id,nom,lieu',
                 'inscription'
@@ -375,7 +375,7 @@ class SeanceController extends Controller
             ->where('status', OrdrePassage::STATUS_FINISHED)
             ->with([
                 'inscription.athlete:id,fullname',
-                'inscription.club:id,name',
+                'inscription.organisateur:id,name',
                 'notes'
             ])
             ->get()
@@ -387,7 +387,7 @@ class SeanceController extends Controller
 
                 return [
                     'athlete' => $passage->inscription?->athlete?->fullname ?? '—',
-                    'club'    => $passage->inscription?->club?->name ?? '—',
+                    'organisateur'    => $passage->inscription?->organisateur?->name ?? '—',
                     'score'   => $this->calculerScore($valeurs, $config->getNbJuges()),
                 ];
             })
