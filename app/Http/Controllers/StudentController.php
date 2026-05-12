@@ -191,10 +191,10 @@ class StudentController extends Controller
                         }
 
                         // Si l'élève est son propre responsable, il devient son propre "ParentModel"
-                        if ($validated['is_own_responsible']) {
-                            $pProfile = ParentModel::firstOrCreate(['user_id' => $studentUserId]);
-                            $currentStudentParentId = null;
-                        }
+                        // if ($validated['is_own_responsible']) {
+                        //     $pProfile = ParentModel::firstOrCreate(['user_id' => $studentUserId]);
+                        //     $currentStudentParentId = null;
+                        // }
                         // $token = Password::createToken($studentUser);
                         // $studentUser->notify(new WelcomeNewMember($token));
                     }
