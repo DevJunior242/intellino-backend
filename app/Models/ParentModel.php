@@ -24,11 +24,7 @@ class ParentModel extends Model
     public $incrementing = false;
     protected $keyType = 'string';
 
-    // Relationship with StudentModel through ParentStudent pivot table
-    // public function students()
-    // {
-    //     return $this->belongsToMany(Student::class, 'parent_students')->withTimestamps();
-    // }
+
     public function students()
     {
         return $this->belongsToMany(Student::class, 'parent_students', 'parent_model_id', 'student_id')->withTimestamps();

@@ -57,7 +57,7 @@ class SessionController extends Controller
         if ($session->status === 'cancelled') {
             return response()->json([
                 'message' => 'Session déjà annulée'
-            ], 400);
+            ], 422);
         }
 
         $session->update([

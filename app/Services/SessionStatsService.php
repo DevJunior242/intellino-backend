@@ -10,7 +10,7 @@ class SessionStatsService
     private function clubSessionQuery($activeId)
     {
         return SessionModel::whereHas('course', function ($query) use ($activeId) {
-            $query->where('club_id', $activeId);
+            $query->where('organisateur_id', $activeId);
         });
     }
     public function getStats($activeId)

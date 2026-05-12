@@ -12,13 +12,18 @@ class SessionObserver
      */
     public function created(SessionModel $sessionModel): void
     {
+        $course = $sessionModel->course;
+
+        if (!$course) {
+            return;
+        }
         Activity::create([
-            'user_id'        => auth()->id(),
-            'organisateur_id' => $sessionModel?->course->club_id,
-            'organisateur_type' => 'Club',
+            'organisateur_id'   => $course->organisateur_id,
+            'organisateur_type' => $course->organisateur_type,
             'type'           => 'session',
             'action'         => 'created',
             'description'    => "A créé la session " . $sessionModel->title,
+            'user_id' => auth()->id() ?? $sessionModel->created_by,
         ]);
     }
 
@@ -37,7 +42,7 @@ class SessionObserver
     {
         Activity::create([
             'user_id'        => auth()->id(),
-            'organisateur_id' => $sessionModel->course->club_id,
+            'organisateur_id' => $sessionModel->course->organisateur_id,
             'organisateur_type' => 'Club',
             'type'           => 'session',
             'action'         => 'deleted',

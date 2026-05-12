@@ -24,7 +24,7 @@ class ProgrammeController extends Controller
         }
 
         $sessions = SessionModel::whereHas('course', function ($q) use ($orgId) {
-            $q->where('club_id', $orgId);
+            $q->where('organisateur_id', $orgId);
         })
             ->whereBetween('session_date', [$start, $end])
             ->where('status', '!=', SessionModel::STATUS_CANCELLED)

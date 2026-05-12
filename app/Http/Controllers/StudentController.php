@@ -53,7 +53,43 @@ class StudentController extends Controller
             'students' => $formattedStudents,
         ]);
     }
+    public function studentsWithoutGrade(Request $request)
+    {
+        $activeId = $request->attributes->get('organisateur_id');
+        $role = $request->attributes->get('role');
+        $isSuperAdmin = ($role === 'super_admin');
 
+        $query = Student::query()
+            ->whereDoesntHave('grades');
+
+        if (!$isSuperAdmin) {
+            $query->where('club_id', $activeId);
+        }
+
+        $students = $query
+            ->with('club:id,name')
+            ->get();
+
+        $formattedStudents = $students->map(function ($student) use ($isSuperAdmin) {
+            return [
+                'id' => $student->id,
+                'fullname' => $student->fullname,
+                'birthdate' => $student->birthdate,
+                'sex' => $student->sex,
+                'status' => $student->status,
+                'club' => $isSuperAdmin ? $student->club : null,
+                'photo' => $student->photo
+                    ? url('storage/' . $student->photo)
+                    : null,
+            ];
+        });
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Students without grade',
+            'students' => $formattedStudents,
+        ]);
+    }
 
     public function getParent(Request $request)
     {
@@ -157,7 +193,7 @@ class StudentController extends Controller
                         // Si l'élève est son propre responsable, il devient son propre "ParentModel"
                         if ($validated['is_own_responsible']) {
                             $pProfile = ParentModel::firstOrCreate(['user_id' => $studentUserId]);
-                            $currentStudentParentId = $pProfile->id;
+                            $currentStudentParentId = null;
                         }
                         // $token = Password::createToken($studentUser);
                         // $studentUser->notify(new WelcomeNewMember($token));

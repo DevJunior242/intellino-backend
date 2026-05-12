@@ -35,9 +35,6 @@ class SessionPolicy
      */
     public function create(User $user): bool
     {
-        if ($user->isSuperAdmin()) {
-            return true;
-        }
 
         return $user->clubs()
             ->wherePivotIn('role', ['admind_club', 'instructeur'])
@@ -49,18 +46,16 @@ class SessionPolicy
      */
     public function update(User $user, SessionModel $session): bool
     {
-        if ($user->isSuperAdmin()) {
-            return true;
-        }
-        $session->load('course');
-        $clubId = $session->course?->club_id;
 
-        if (!$clubId) {
+        $session->load('course');
+        $activeId = $session->course?->organisateur_id;
+
+        if (!$activeId) {
             return false;
         }
 
         return $user->clubs()
-            ->where('clubs.id', $clubId)
+            ->where('clubs.id', $activeId)
             ->whereIn('club_users.role_id', Role::AccessRoles())
             ->exists();
     }
@@ -70,18 +65,15 @@ class SessionPolicy
      */
     public function delete(User $user, SessionModel $session): bool
     {
-        if ($user->isSuperAdmin()) {
-            return true;
-        }
 
-        $clubId = $session->course?->club_id;
+        $activeId = $session->course?->organisateur_id;
 
-        if (!$clubId) {
+        if (!$activeId) {
             return false;
         }
 
         return $user->clubs()
-            ->where('clubs.id', $clubId)
+            ->where('clubs.id', $activeId)
             ->whereIn('club_users.role_id', Role::AccessRoles())
             ->exists();
     }

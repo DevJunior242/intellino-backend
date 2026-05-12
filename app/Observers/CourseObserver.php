@@ -17,8 +17,8 @@ class CourseObserver
         $user = auth()->user();
         Activity::create([
             'user_id'        => $user->id,
-            'organisateur_id' => $course->club_id,
-            'organisateur_type' => 'Club',
+            'organisateur_id' => $course->organisateur_id,
+            'organisateur_type' =>  $course->organisateur_type,
             'type'           => 'course',
             'action'         => 'created',
             'description'    => "A créé le cours " . $course->name,

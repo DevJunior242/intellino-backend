@@ -26,11 +26,10 @@ class Course extends Model
     public $incrementing = false;
     protected $keyType = 'string';
 
-    public function club()
+    public function organisateur()
     {
-        return $this->belongsTo(Club::class, 'club_id');
+        return $this->morphTo();
     }
-
     public function instructor()
     {
         return $this->belongsTo(Instructor::class);

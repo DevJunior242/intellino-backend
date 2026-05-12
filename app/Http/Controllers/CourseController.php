@@ -28,7 +28,6 @@ class CourseController extends Controller
         }
         $saisonActive =  Saison::where('active', true)->first();
 
-        $activeId = $request->attributes->get('organisateur_id');
         $sessions = SessionModel::with(['course.organisateur', 'course.grade'])
             ->whereHas('course', function ($query) use ($activeId, $saisonActive, $activeType) {
                 $query->where('organisateur_id', $activeId)
@@ -61,8 +60,6 @@ class CourseController extends Controller
         return DB::transaction(function () use ($validated, $request, $activeId, $activeType, $saisonActive) {
             $course = Course::create([
                 ...$validated['course'],
-                'organisateur_id' => $activeId,
-                'organisateur_type' => $activeType,
                 'instructor_id' => $request->user()->id,
                 'saison_id' => $saisonActive->id,
             ]);

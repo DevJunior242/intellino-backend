@@ -100,7 +100,7 @@ class AttendanceController extends Controller
         $activeId = $request->attributes->get('organisateur_id');
         $validatedData = $request->validated();
         $attendances = $validatedData['attendances'];
-        $saisonActive =  Saison::where('active', true)->firsts();
+        $saisonActive =  Saison::where('active', true)->first();
         if (!$saisonActive) {
             return response()->json([
                 'success' => false,

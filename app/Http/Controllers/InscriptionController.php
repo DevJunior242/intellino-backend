@@ -117,6 +117,26 @@ class InscriptionController extends Controller
             'inscription' => $inscription->load(['athlete']),
         ], 201);
     }
+    //valider une inscription
+    public function valider(Inscription $inscription)
+    {
+        $inscription->update(['status' => Inscription::STATUS_VALIDE]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Inscription validée',
+        ]);
+    }
+    //annuler une inscription
+    public function annuler(Inscription $inscription)
+    {
+        $inscription->update(['status' => Inscription::STATUS_ECHOUE]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Inscription annulée',
+        ]);
+    }
 
     // Désinscrire un athlète
     public function destroy(Inscription $inscription)

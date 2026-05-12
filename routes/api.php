@@ -273,8 +273,6 @@ Route::middleware(['auth:sanctum'])->group(function () {
             Route::apiResource('/affiliations', AffiliationController::class);
         });
 
-        Route::get('evenements/ouverts',                          [InscriptionController::class, 'getEvenementsOuverts']);
-        Route::get('inscriptions/epreuve/{competition}',          [InscriptionController::class, 'parEpreuve']);
         //inscription 
 
         Route::post('inscriptions',                               [InscriptionController::class, 'store']);
@@ -284,8 +282,12 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::prefix('inscriptions')->group(function () {
             Route::apiResource('/inscriptions', InscriptionController::class);
         });
+        Route::post('inscriptions/annuler/{inscription}',         [InscriptionController::class, 'annuler']);
+        Route::post('inscriptions/valider/{inscription}',         [InscriptionController::class, 'valider']);
 
         Route::get('/inscriptions/competition/{competitionId}', [InscriptionController::class, 'getByCompetition']);
+        Route::get('evenements/ouverts',                          [InscriptionController::class, 'getEvenementsOuverts']);
+        Route::get('inscriptions/epreuve/{competition}',          [InscriptionController::class, 'parEpreuve']);
         //evenements
         Route::prefix('evenements')->group(function () {
             //ouvrir et cloturer evenement
@@ -354,6 +356,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
         //student 
 
         Route::get('/students', [StudentController::class, 'index']);
+        Route::get('/students/without-grade', [StudentController::class, 'studentsWithoutGrade']);
         Route::get('/students/latest', [StudentController::class, 'latestStudent']);
         Route::get('/parents-users', [StudentController::class, 'getParent']);
         Route::post('/parent-eleven/store-multiple ', [StudentController::class, 'store']);
