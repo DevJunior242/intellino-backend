@@ -2,8 +2,8 @@
 
 namespace Database\Seeders;
 
+use App\Models\Grade;
 use Illuminate\Database\Seeder;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 
 class GradeSeeder extends Seeder
 {
@@ -12,13 +12,6 @@ class GradeSeeder extends Seeder
      */
     public function run(): void
     {
-        //         Ceinture blanche (débutant)
-        // Ceinture jaune
-        // Ceinture orange
-        // Ceinture verte
-        // Ceinture bleue
-        // Ceinture marron
-        // Ceinture noire
         $grades = [
             'centure blanche',
             'centure jaune',
@@ -29,7 +22,7 @@ class GradeSeeder extends Seeder
             'centure noire',
         ];
         foreach ($grades as $grade) {
-            \App\Models\Grade::firstOrCreate(
+            Grade::firstOrCreate(
                 ['name' => $grade]
             );
         }

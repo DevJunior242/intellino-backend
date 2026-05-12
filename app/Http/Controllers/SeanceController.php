@@ -396,8 +396,7 @@ class SeanceController extends Controller
             ->filter(fn($item) => $item['score'] !== null)
             ->sortByDesc('score')
             ->values();
-        //channel
-        Broadcast(new TatamiUpdated($config->id));
+
 
         return response()->json([
             'success'    => true,
