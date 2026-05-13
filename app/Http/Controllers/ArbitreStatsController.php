@@ -61,7 +61,7 @@ class ArbitreStatsController extends Controller
             RotationArbitre::whereIn('arbitre_competition_id', $arbitreCompIds)
                 ->pluck('config_notation_id')
         )
-            ->whereIn('statut', ['en_cours', 'termine'])
+            ->whereIn('status', [OrdrePassage::STATUS_STARTED, OrdrePassage::STATUS_FINISHED])
             ->count();
 
         $tauxCompletion = $passagesAttendus > 0
