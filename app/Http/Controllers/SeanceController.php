@@ -243,36 +243,33 @@ class SeanceController extends Controller
 
     public function enCours(ConfigNotation $config)
     {
-        return Cache::remember("en_cours_{$config->id}", 1, function () use ($config) {
 
-            return OrdrePassage::query()
-                ->where('config_notation_id', $config->id)
-                ->where('status', OrdrePassage::STATUS_STARTED)
-                ->with([
-                    'inscription.athlete:id,fullname',
-                    'inscription.competition',
-                    'inscription.competition.category:id,nom,sexe',
-                    'inscription.organisateur:id,name',
-                ])
-                ->first();
-        });
+        return OrdrePassage::query()
+            ->where('config_notation_id', $config->id)
+            ->where('status', OrdrePassage::STATUS_STARTED)
+            ->with([
+                'inscription.athlete:id,fullname',
+                'inscription.competition',
+                'inscription.competition.category:id,nom,sexe',
+                'inscription.organisateur:id,name',
+                'notes'
+            ])
+            ->first();
     }
     //recuperer le prochain athlète
     public function nextAthlete(ConfigNotation $config)
     {
-        return Cache::remember("next_athlete_{$config->id}", 1, function () use ($config) {
-            return OrdrePassage::query()
-                ->where('config_notation_id', $config->id)
-                ->where('status', OrdrePassage::STATUS_NOT_STARTED)
-                ->orderBy('ordre')
-                ->with([
-                    'inscription.athlete:id,fullname',
-                    'inscription.competition',
-                    'inscription.competition.category:id,nom,sexe',
-                    'inscription.organisateur:id,name',
-                ])
-                ->first();
-        });;
+        return OrdrePassage::query()
+            ->where('config_notation_id', $config->id)
+            ->where('status', OrdrePassage::STATUS_NOT_STARTED)
+            ->orderBy('ordre')
+            ->with([
+                'inscription.athlete:id,fullname',
+                'inscription.competition',
+                'inscription.competition.category:id,nom,sexe',
+                'inscription.organisateur:id,name',
+            ])
+            ->first();
     }
 
     // Retourner les arbitres de la rotation pour ce tatami
@@ -341,7 +338,8 @@ class SeanceController extends Controller
                 'inscription.organisateur:id,name',
                 'inscription.competition.category:id,nom,sexe',
                 'inscription.competition.evenement:id,nom,lieu',
-                'inscription'
+                'inscription',
+                'notes'
             ])
             ->first();
 
