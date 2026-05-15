@@ -216,7 +216,7 @@ class SeanceController extends Controller
             }
 
             $arbitre->timestamps = false;
-            $arbitre->update(['connecte' => true]);
+            $arbitre->quietlyUpdate(['connecte' => true]);
 
             return response()->json([
                 'success' => true,
