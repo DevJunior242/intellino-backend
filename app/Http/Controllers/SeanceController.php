@@ -216,8 +216,7 @@ class SeanceController extends Controller
             }
 
             $arbitre->timestamps = false;
-            $arbitre->quietlyUpdate(['connecte' => true]);
-
+            $arbitre->updateQuietly(['connecte' => true]);
             return response()->json([
                 'success' => true,
                 'message' => "Connecté au poste {$rotation->poste}",
