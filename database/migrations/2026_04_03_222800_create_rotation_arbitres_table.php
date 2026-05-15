@@ -25,9 +25,9 @@ return new class extends Migration
             $table->boolean('actif')->default(false);  // sur un poste ou au banc
             $table->integer('poste')->nullable();      // 1..7 si actif, null si banc
             $table->integer('nb_passages')->default(0); // nb athlètes jugés
-            $table->unique(['config_notation_id', 'arbitre_competition_id'], 'unique_arbitre_per_config');
+            $table->index(['config_notation_id', 'arbitre_competition_id', 'actif'], 'idx_rotation_recherche');
+            $table->unique(['config_notation_id', 'arbitre_competition_id', 'poste'], 'unique_arbitre_per_config');
 
-            $table->unique(['config_notation_id', 'poste']);
             $table->timestamps();
         });
     }

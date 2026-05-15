@@ -32,8 +32,8 @@ class ArbitreCompetition extends Model
         return $this->belongsTo(Competition::class);
     }
 
-    public function rotation()
+    public function rotations()
     {
-        return $this->hasOne(RotationArbitre::class);
+        return $this->hasMany(RotationArbitre::class, 'arbitre_competition_id');
     }
 }
