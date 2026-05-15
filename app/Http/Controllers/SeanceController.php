@@ -252,7 +252,7 @@ class SeanceController extends Controller
             })
             ->with('user:id,fullname')
             ->first();
-        $queryDuration = (microtime(true)) - ($startQuery) * 1000;
+        $queryDuration = (microtime(true) - ($startQuery)) * 1000;
 
         if (!$arbitre) {
             return response()->json([
@@ -278,7 +278,7 @@ class SeanceController extends Controller
         $arbitre->timestamps = false;
         $arbitre->update(['connecte' => true]);
 
-        $globalDuration = (microtime(true)) - ($startGlobal) * 1000;
+        $globalDuration = (microtime(true) - ($startGlobal)) * 1000;
 
         return response()->json([
             'success' => true,
