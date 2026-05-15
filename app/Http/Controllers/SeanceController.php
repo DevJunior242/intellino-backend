@@ -221,9 +221,7 @@ class SeanceController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => "Connecté au poste {$rotation->poste}",
-                'poste'   => $rotation->poste,
-                'nom'     => $arbitre->user->fullname,
-                'superviseur' => $rotation->est_superviseur,
+
             ]);
         });
 
