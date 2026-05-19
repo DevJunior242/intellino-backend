@@ -59,6 +59,7 @@ use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\OrdrePassageController;
 use App\Http\Controllers\StudentGradeController;
 use App\Http\Controllers\SubscriptionController;
+use App\Http\Controllers\ActivationKeyController;
 use App\Http\Controllers\Auth\RegisterController;
 use App\Http\Controllers\ResetPasswordController;
 use App\Http\Controllers\ConfigNotationController;
@@ -70,9 +71,7 @@ use App\Http\Controllers\DisciplineConfigController;
 use App\Http\Controllers\Auth\AdminRegisterController;
 use App\Http\Controllers\NiveauxCompetitionController;
 
-// Route::get('/user', function (Request $request) {
-//     return $request->user();
-// })->middleware('auth:sanctum');
+
 
 Route::post('/register', [RegisterController::class, 'register']);
 Route::post('/login', [LoginController::class, 'login']);
@@ -93,6 +92,8 @@ Route::middleware(['auth:sanctum'])->group(function () {
     });
     //roles  leagues 
     Route::get('leagues/getRoles', [LeagueMemberController::class, 'getRoles']);
+    //keys
+    Route::apiResource('/activation-keys', ActivationKeyController::class);
 
     //countries
     Route::apiResource('/countries', CountryController::class);

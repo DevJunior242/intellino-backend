@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use App\Models\ConfigNotation;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Auth;
 
@@ -15,10 +16,9 @@ class ConfigNotationController extends Controller
 {
     public function index(Request $request)
     {
-        $user = auth()->user();
 
+        $start = microtime(true);
         $activeId = $request->attributes->get('organisateur_id');
-        $activeRole = $request->attributes->get('role');
 
         $activeType = $request->attributes->get('organisateur_type');
 
@@ -32,14 +32,14 @@ class ConfigNotationController extends Controller
                 ->where('organisateur_type', $activeType);
         })
             ->with([
-                'competition.discipline',
-                'competition.category',
-                'competition.evenement',
-                'competition.niveau',
-                'modeSaisie',
+                'competition.discipline:id,nom',
+                'competition.category:id,nom,sexe',
+                'competition.evenement:id,nom,date_debut,date_fin',
+                'competition.niveau:id,nom',
+                'modeSaisie:id,libelle',
                 'nbJugesOption',
-                'plateau',
-                'kumiteFormat',
+                'plateau:id,nom',
+                'kumiteFormat:id,code',
             ])
             ->get();
 
@@ -77,7 +77,15 @@ class ConfigNotationController extends Controller
                 'raw_plateau'     => $config->plateau,
             ];
         });
-
+        $globalTime = round(microtime(true) - $start, 2);
+        Log::info('Temps chargement configs', [
+            'time' => $globalTime . 's',
+            'url' => request()->path(),
+            'user' => auth()->id(),
+        ]);
+        Log::info('Configs endpoint hit', [
+            'time' => now()->format('H:i:s'),
+        ]);
         return response()->json($mappedConfigs);
     }
     public function store(Request $request)

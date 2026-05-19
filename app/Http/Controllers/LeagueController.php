@@ -8,6 +8,7 @@ use App\Models\League;
 use App\Models\Student;
 use App\Models\StudentGrade;
 use Illuminate\Http\Request;
+use App\Models\ActivationKey;
 use App\Models\ClubNonInscrit;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -30,12 +31,25 @@ class LeagueController extends Controller
         return response()->json($leagues);
     }
 
-
     public function store(StoreLeagueReq $request)
     {
         $user = auth()->user();
         try {
             return DB::transaction(function () use ($request, $user) {
+
+                // 1. AJOUT : VÉRIFICATION ET VERROUILLAGE DE LA CLÉ LIGUE
+                $key = ActivationKey::where('key_code', $request->activation_key)
+                    ->where('is_used', false)
+                    ->where('type', 'league')
+                    ->lockForUpdate()
+                    ->first();
+
+                if (!$key) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'La clé d\'activation est invalide ou a déjà été utilisée.',
+                    ], 422);
+                }
 
                 $adminRoleName = Role::where('name', 'admin_league')->first();
                 //verifier si role existe
@@ -56,6 +70,13 @@ class LeagueController extends Controller
                     ...$request->validated(),
                     'logo' => isset($path) ? $path : null,
                 ]);
+
+                // 2. AJOUT : CONSOMMATION DE LA CLÉ APRÈS LA CRÉATION RÉUSSIE
+                $key->update([
+                    'is_used' => true,
+                    'used_at' => now()
+                ]);
+
                 $user->current_league_id = $league->id;
                 $user->save();
 
@@ -84,7 +105,6 @@ class LeagueController extends Controller
                 ], 201);
             });
         } catch (\Throwable $th) {
-            //throw $th;
             return response()->json([
                 'success' => false,
                 'message' => 'Une erreur est survenue lors de la création du league',

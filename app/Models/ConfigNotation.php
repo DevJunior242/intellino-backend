@@ -145,7 +145,7 @@ class ConfigNotation extends Model
 
         if ($this->estModeTablettes()) {
             $nonConnectes = ArbitreCompetition::where('evenement_id', $this->evenement_id)
-                ->whereHas('rotation', fn($q) => $q->where('actif', true))
+                ->whereHas('rotations', fn($q) => $q->where('actif', true))
                 ->where('connecte', false)
                 ->count();
             if ($nonConnectes > 0) {

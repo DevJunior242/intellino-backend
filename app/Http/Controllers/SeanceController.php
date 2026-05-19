@@ -32,6 +32,7 @@ class SeanceController extends Controller
     // Lance la rotation initiale
     public function valider(ConfigNotation $config)
     {
+        $start = microtime(true);
         $problemes = $config->estPrete();
         if (!empty($problemes)) {
             return response()->json([
@@ -40,7 +41,7 @@ class SeanceController extends Controller
             ], 422);
         }
 
-        $config->update([
+        $config->updateQuietly([
             'configuration_validee' => true,
             'validee_a'             => now(),
         ]);
@@ -54,26 +55,38 @@ class SeanceController extends Controller
 
         // Générer PIN arbitres
         // load competition
-        $config->load('competition');
+        if (!$config->relationLoaded('competition')) {
+            $config->load('competition');
+        }
         $evenementId = $config?->competition?->evenement_id;
-        $codeAccess = ArbitreCompetition::where('evenement_id', $evenementId)
+
+        $arbitresSansCode = ArbitreCompetition::where('evenement_id', $evenementId)
             ->whereNull('code_acces')
-            ->each(fn($a) => $a->update([
+            ->get();
+
+        foreach ($arbitresSansCode as $arbitre) {
+            $arbitre->updateQuietly([
                 'code_acces' => str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT)
-            ]));
+            ]);
+        }
 
         if ($config->estModeTablettes()) {
-            $evenementId = $config?->competition?->evenement_id;
-            $arbitres = ArbitreCompetition::where('evenement_id', $evenementId)
-                ->whereNotNull('code_acces')
-                ->with('user')
-                ->get();
-            Notification::send($arbitres, new SendArbitreAccessCodesNotif($codeAccess));
+
+            $arbitresSansCode->load('user');
+
+            Notification::send(
+                $arbitresSansCode,
+                new SendArbitreAccessCodesNotif()
+            );
         }
+
         broadcast(new TatamiUpdated($config->id));
         return response()->json([
             'success' => true,
             'message' => 'Séance ouverte',
+            'debug' => [
+                'temps_execution_ms' => round((microtime(true) - $start) * 1000, 2),
+            ],
             //'etat'    => $this->rotationService->etat($config),
         ]);
     }
@@ -180,122 +193,61 @@ class SeanceController extends Controller
     }
 
 
-
     public function connecterTablette(Request $request, ConfigNotation $config)
     {
-        // Benchmark::value exécute le code, le chronomètre, et retourne un tableau [résultat, temps_ms]
-        [$response, $tempsTotalMs] = Benchmark::value(function () use ($request, $config) {
+        $validated = $request->validate([
+            'code_acces' => 'required|digits:6',
+        ]);
 
-            $validated = $request->validate([
-                'code_acces' => 'required|string|size:6',
-            ]);
+        // Chargement de la compétition en amont si non fait par le Router Model Binding
+        if (!$config->relationLoaded('competition')) {
+            $config->load('competition');
+        }
+        // Récupère l'arbitre avec sa SEULE rotation active sur ce plateau
+        $arbitre = ArbitreCompetition::where('evenement_id', $config->competition->evenement_id)
+            ->where('user_id', auth()->id())
+            ->where('code_acces', $validated['code_acces'])
+            ->withWhereHas('rotations', function ($query) use ($config) {
+                $query->where('config_notation_id', $config->id)
+                    ->where('actif', true); // Filtre pour avoir la rotation en cours
+            })
+            ->with('user:id,fullname')
+            ->first();
 
-            if (!$config->relationLoaded('competition')) {
-                $config->load('competition');
-            }
-
-            // Requête SQL optimisée
-            $arbitre = ArbitreCompetition::where('evenement_id', $config->competition->evenement_id)
-                ->where('user_id', auth()->id())
-                ->where('code_acces', $validated['code_acces'])
-                ->withWhereHas('rotations', function ($query) use ($config) {
-                    $query->where('config_notation_id', $config->id)
-                        ->where('actif', true);
-                })
-                ->with('user:id,fullname')
-                ->first();
-
-            if (!$arbitre) {
-                return response()->json(['success' => false, 'message' => 'Accès refusé.'], 422);
-            }
-
-            $rotation = $arbitre->rotations->first();
-
-            if (is_null($rotation->poste) && !$rotation->est_superviseur) {
-                return response()->json(['success' => false, 'message' => 'En attente d\'affectation...'], 422);
-            }
-
-            $arbitre->timestamps = false;
-            $arbitre->updateQuietly(['connecte' => true]);
+        if (!$arbitre) {
             return response()->json([
-                'success' => true,
-                'message' => "Connecté au poste {$rotation->poste}",
+                'success' => false,
+                'message' => 'Accès refusé. Vérifiez votre code ou votre affectation active.',
+            ], 422);
+        }
 
-            ]);
-        });
+        // Extraction de la rotation active filtrée par le withWhereHas
+        $rotation = $arbitre->rotations->first();
 
-        // On récupère les données JSON générées ci-dessus
-        $data = $response->getData(true);
+        // Sécurité si le poste est nul malgré le statut actif
+        if (is_null($rotation->poste)) {
+            if (!$rotation->est_superviseur) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'En attente d\'affectation à un poste actif...'
+                ], 422);
+            }
+        }
 
-        // On y ajoute proprement le temps total calculé par le Benchmark
-        $data['debug']['temps_total_ms'] = round($tempsTotalMs, 2);
+        // Mise à jour rapide de l'état de connexion
+        $arbitre->timestamps = false;
+        $arbitre->updateQuietly(['connecte' => true]);
 
-        // On renvoie la réponse finale à la tablette
-        return response()->json($data, $response->getStatusCode());
+
+        return response()->json([
+            'success' => true,
+            'message' => "Connecté au poste {$rotation->poste}",
+            'poste'   => $rotation->poste,
+            'nom'     => $arbitre->user->fullname,
+            'superviseur' => $rotation->est_superviseur,
+
+        ]);
     }
-
-    // public function connecterTablette(Request $request, ConfigNotation $config)
-    // {
-    //     $startGlobal = microtime(true);
-    //     $validated = $request->validate([
-    //         'code_acces' => 'required|string|size:6',
-    //     ]);
-
-    //     // Chargement de la compétition en amont si non fait par le Router Model Binding
-    //     if (!$config->relationLoaded('competition')) {
-    //         $config->load('competition');
-    //     }
-    //     $startQuery = microtime(true);
-    //     // Récupère l'arbitre avec sa SEULE rotation active sur ce plateau
-    //     $arbitre = ArbitreCompetition::where('evenement_id', $config->competition->evenement_id)
-    //         ->where('user_id', auth()->id())
-    //         ->where('code_acces', $validated['code_acces'])
-    //         ->withWhereHas('rotations', function ($query) use ($config) {
-    //             $query->where('config_notation_id', $config->id)
-    //                 ->where('actif', true); // Filtre pour avoir la rotation en cours
-    //         })
-    //         ->with('user:id,fullname')
-    //         ->first();
-    //     $queryDuration = (microtime(true) - ($startQuery)) * 1000;
-
-    //     if (!$arbitre) {
-    //         return response()->json([
-    //             'success' => false,
-    //             'message' => 'Accès refusé. Vérifiez votre code ou votre affectation active.',
-    //         ], 422);
-    //     }
-
-    //     // Extraction de la rotation active filtrée par le withWhereHas
-    //     $rotation = $arbitre->rotations->first();
-
-    //     // Sécurité si le poste est nul malgré le statut actif
-    //     if (is_null($rotation->poste)) {
-    //         if (!$rotation->est_superviseur) {
-    //             return response()->json([
-    //                 'success' => false,
-    //                 'message' => 'En attente d\'affectation à un poste actif...'
-    //             ], 422);
-    //         }
-    //     }
-
-    //     // Mise à jour rapide de l'état de connexion
-    //     $arbitre->timestamps = false;
-    //     $arbitre->update(['connecte' => true]);
-
-    //     $globalDuration = (microtime(true) - ($startGlobal)) * 1000;
-
-    //     return response()->json([
-    //         'success' => true,
-    //         'message' => "Connecté au poste {$rotation->poste}",
-    //         'poste'   => $rotation->poste,
-    //         'nom'     => $arbitre->user->fullname,
-    //         'superviseur' => $rotation->est_superviseur,
-    //         'debug' => [
-    //             'query_duration_ms' => $queryDuration,
-    //             'global_duration_ms' => $globalDuration,
-    //         ],
-    //     ]);
-    // }
 
 
     public function estPret(ConfigNotation $config)

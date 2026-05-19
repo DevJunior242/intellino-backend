@@ -7,13 +7,14 @@ use App\Models\OrdrePassage;
 use Illuminate\Http\Request;
 use App\Models\RotationArbitre;
 use App\Models\ArbitreCompetition;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
 
 class ArbitreStatsController extends Controller
 {
     public function statsCarriere(Request $request)
     {
+        $start = microtime(true);
         $user = Auth::user();
 
         // Tous les arbitre_competition_id de cet arbitre
@@ -130,7 +131,7 @@ class ArbitreStatsController extends Controller
         $depuisAnnee = $premiereComp
             ? $premiereComp->created_at->format('Y')
             : now()->format('Y');
-
+        Log::info('Temps execution', ['ms' => round((microtime(true) - $start) * 1000, 2)]);
         // ── Réponse ────────────────────────────────────────────────────────
 
         return response()->json([
@@ -157,6 +158,7 @@ class ArbitreStatsController extends Controller
                 'par_annee'         => $parAnnee,
                 'derniere_comp'     => $derniereComp,
             ],
+
         ]);
     }
 }

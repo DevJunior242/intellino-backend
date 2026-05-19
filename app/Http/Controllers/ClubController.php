@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Club;
 use App\Models\Role;
+use App\Models\ActivationKey;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use App\Http\Controllers\Controller;
@@ -15,7 +16,15 @@ class ClubController extends Controller
    public function index()
    {
       //listes des clubs
-      $clubs = Club::select('id', 'name', 'logo', 'city', 'address')
+      $clubs = Club::select(
+         'id',
+         'name',
+         'logo',
+         'city',
+         'address',
+         'discipline_id',
+         'country_id'
+      )
          ->with(['discipline:id,name', 'country:id,name'])
          ->withCount('users')
          ->latest()
@@ -60,8 +69,22 @@ class ClubController extends Controller
       try {
          return DB::transaction(function () use ($request, $user) {
 
+            // 1. VERIFICATION ET VERROUILLAGE DE LA CLÉ D'ACTIVATION
+            $key = ActivationKey::where('key_code', $request->activation_key)
+               ->where('is_used', false)
+               ->where('type', 'club')
+               ->lockForUpdate()
+               ->first();
+
+            if (!$key) {
+               return response()->json([
+                  'success' => false,
+                  'message' => 'La clé d\'activation est invalide ou a déjà été utilisée.',
+               ], 422);
+            }
+
+            // 2. VERIFICATION DU ROLE
             $adminRoleName = Role::where('name', 'admin_club')->first();
-            //verifier si role existe
             if (!$adminRoleName) {
                return response()->json([
                   'success' => false,
@@ -69,17 +92,28 @@ class ClubController extends Controller
                ], 422);
             }
 
+            // 3. GESTION DU LOGO
             $file = $request->logo;
             if ($file) {
                $ext = $file->getClientOriginalExtension();
                $fileName = uniqid() . '.' . $ext;
                $path = $file->storeAs('logos', $fileName, 'public');
             }
+
+            // 4. CREATION DU CLUB
             $club = Club::create([
                ...$request->validated(),
                'logo' => isset($path) ? $path : null,
             ]);
-            $user->update([
+
+            // 5. MARQUER LA CLÉ COMME CONSOMMÉE
+            $key->update([
+               'is_used' => true,
+               'used_at' => now()
+            ]);
+
+            // 6. LOGIQUE UTILISATEUR & ROLES (Ton code d'origine)
+            $user->updateQuietly([
                'current_club_id' => $club->id,
             ]);
 
@@ -92,35 +126,30 @@ class ClubController extends Controller
                   'id'   => $c->id,
                   'name' => $c->name,
                   'role' => $role?->name,
-
                ];
             });
 
-
             return response()->json([
-               'success'     => true,
-               'message'     => 'Le club a été créé avec succès',
-               'user'        => $user,
-               'clubs' => $clubs,
-               'new_club'    => [
+               'success'  => true,
+               'message'  => 'Le club a été créé avec succès',
+               'user'     => $user,
+               'clubs'    => $clubs,
+               'new_club' => [
                   'id'   => $club->id,
                   'type' => 'Club',
                   'role' => 'admin_club'
-
                ]
             ], 201);
          });
       } catch (\Throwable $th) {
-         //throw $th;
-         Log::error('erreur', ['erreur' => $th->getMessage()]);
+         Log::error('Erreur lors de la création du club', ['erreur' => $th->getMessage()]);
          return response()->json([
             'success' => false,
-            'error' => $th->getMessage(),
+            'error'   => $th->getMessage(),
             'message' => 'Une erreur est survenue lors de la création du club',
-         ], 400);
+         ], 422);
       }
    }
-
    public function count()
    {
       $clubs = Club::count();

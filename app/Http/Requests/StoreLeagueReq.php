@@ -27,6 +27,7 @@ class StoreLeagueReq extends FormRequest
             'region' => ['bail', 'regex:/^[\pL\s\d\-\.,\#\/\(\)\']+$/u', 'max:50'],
             'address' => ['bail', 'nullable', 'regex:/^[\pL\s\d\-\.,\#\/\(\)\']+$/u', 'max:50'],
             'logo' => 'nullable|image|mimes:jpeg,png,jpg,svg|max:1024',
+            'activation_key' => 'required|string',
         ];
     }
 
@@ -45,6 +46,7 @@ class StoreLeagueReq extends FormRequest
 
             'logo.mimes' => 'Le logo doit être un fichier image',
             'logo.max' => 'Le logo doit être inférieur à 1Mo',
+            'activation_key.required' => 'La clé d\'activation est requise',
         ];
     }
 }

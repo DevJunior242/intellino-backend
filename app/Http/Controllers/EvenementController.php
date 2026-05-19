@@ -20,7 +20,6 @@ class EvenementController extends Controller
     use AuthorizesRequests;
     public function index(Request $request)
     {
-        $start = microtime(true);
         $activeId = $request->attributes->get('organisateur_id');
         $activeType = $request->attributes->get('organisateur_type');
         $saisonActive =  Saison::where('active', true)->first();
@@ -38,7 +37,7 @@ class EvenementController extends Controller
             ->where('saison_id', $saisonActive->id)
             ->with([
                 'competitions' => function ($query) {
-                    $query->with(['niveau', 'category', 'discipline'])
+                    $query->with(['niveau:id,nom', 'category:id,nom,sexe', 'discipline:id,nom'])
                         ->withCount('inscriptions')
                         ->orderBy('heure_debut_prevu', 'asc');
                 }
@@ -46,14 +45,12 @@ class EvenementController extends Controller
             ->withCount('competitions')
             ->orderBy('date_debut', 'desc')
             ->get();
-        Log::info('Temps execution', ['ms' => round((microtime(true) - $start) * 1000, 2)]);
         return response()->json($evenements);
     }
 
     public function getEventActive(Request $request)
     {
 
-        $start = microtime(true);
         $activeId = $request->attributes->get('organisateur_id');
         $activeType = $request->attributes->get('organisateur_type');
         $saisonActive =  Saison::where('active', true)->first();
@@ -71,7 +68,7 @@ class EvenementController extends Controller
             ->where('organisateur_type', $activeType)
             ->where('saison_id', $saisonActive->id)
             ->with(['competitions' => function ($query) {
-                $query->with(['niveau', 'category', 'discipline'])
+                $query->with(['niveau:id,nom', 'category:id,nom,sexe', 'discipline:id,nom'])
                     ->withCount('inscriptions')
                     ->orderBy('heure_debut_prevu', 'asc');
             }])
@@ -85,7 +82,6 @@ class EvenementController extends Controller
                 'data'    => null
             ], 422);
         }
-        Log::info('Temps execution getevent', ['ms' => round((microtime(true) - $start) * 1000, 2)]);
         return response()->json($evenement);
     }
     public function store(StoreEvenementRequest $request)

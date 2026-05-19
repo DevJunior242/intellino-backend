@@ -7,6 +7,7 @@ use App\Models\Role;
 use App\Models\User;
 use App\Models\Grade;
 use App\Models\League;
+use App\Models\Country;
 use App\Models\Licence;
 use App\Models\Student;
 use App\Models\ClubUser;
@@ -15,7 +16,6 @@ use App\Models\Affiliation;
 use App\Models\Subscription;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
-use App\Models\Country;
 
 class Club extends Model
 {
