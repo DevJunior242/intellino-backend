@@ -23,7 +23,7 @@ class LeagueMemberController extends Controller
         $activeId = $request->attributes->get('organisateur_id');
         $activeType = $request->attributes->get('organisateur_type');
         $relation = $activeType === 'Ligue' ? 'leagues' : 'federations';
-        $roleinclus = ["admin_league", "secretaire_league", "directeur_technique"];
+        $roleinclus = ["admin_league", "secretaire_league", "directeur_technique", "responsable_technique", "vice_president_league"];
 
         $roleIds = Role::whereIn('name', $roleinclus)->pluck('id');
 
