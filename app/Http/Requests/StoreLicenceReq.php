@@ -31,7 +31,7 @@ class StoreLicenceReq extends FormRequest
                 // Unicité combinée : l'élève ne peut avoir qu'une licence par saison
                 Rule::unique('licences')->where(function ($query) {
                     return $query->where('student_id', $this->student_id)
-                        ->where('saison', $this->saison);
+                        ->where('saison_id', $this->saison_id);
                 }),
             ],
             // 'saison' => 'required|string|regex:/^\d{4,10}-\d{4,10}$/',
