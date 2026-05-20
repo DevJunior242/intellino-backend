@@ -6,6 +6,7 @@ use App\Models\Poule;
 use App\Models\Combat;
 use App\Models\Inscription;
 use Illuminate\Support\Str;
+use App\Models\OrdrePassage;
 use App\Models\ConfigNotation;
 use Illuminate\Support\Facades\DB;
 
@@ -34,9 +35,9 @@ class BracketService
     // ─────────────────────────────────────────────────────────────────────────
     public function genererEliminatoire(ConfigNotation $config): void
     {
-        $inscriptions = Inscription::where('config_notation_id', $config->id)->get()->shuffle();
+        $ordres = OrdrePassage::where('config_notation_id', $config->id)->get()->shuffle();
 
-        $nb = $inscriptions->count();
+        $nb = $ordres->count();
 
         if ($nb < 2) {
             throw new \Exception("Pas assez de combattants — minimum 2");
@@ -48,7 +49,7 @@ class BracketService
 
         // Construire le bracket de l'intérieur vers l'extérieur
         // On crée d'abord la finale, puis les demi-finales, etc.
-        $combats = $this->construireBracket($config, $taille, $inscriptions->toArray(), $byes);
+        $combats = $this->construireBracket($config, $taille, $ordres->toArray(), $byes);
     }
 
     /**
@@ -58,7 +59,7 @@ class BracketService
     private function construireBracket(
         ConfigNotation $config,
         int $taille,
-        array $inscriptions,
+        array $ordres,
         int $byes
     ): array {
         $combatsParRound = [];
@@ -75,10 +76,12 @@ class BracketService
             $roundCombats = [];
 
             for ($i = 0; $i < $nbCombats; $i++) {
+
                 $combat = Combat::create([
                     'id'                  => Str::uuid(),
-                    'competition_id'      => $config->competition_id,
                     'config_notation_id'  => $config->id,
+                    'inscription_aka_id'  => $aka->id,
+                    'inscription_ao_id'   => $ao->id,
                     'etape'               => $etape,
                     'ordre'               => $ordre++,
                     'statut'              => 0,
@@ -124,7 +127,7 @@ class BracketService
 
         // Assigner les combattants au 1er round
         $combatsPremierRound = $combatsParRound[1];
-        $this->assignerCombattants($combatsPremierRound, $inscriptions, $byes);
+        $this->assignerCombattants($combatsPremierRound, $ordres, $byes);
 
         return $combatsParRound;
     }
@@ -135,13 +138,13 @@ class BracketService
      */
     private function assignerCombattants(
         array $combats,
-        array $inscriptions,
+        array $ordres,
         int $byes
     ): void {
         $index = 0;
         foreach ($combats as $combat) {
-            $aka = $inscriptions[$index] ?? null;
-            $ao  = $inscriptions[$index + 1] ?? null;
+            $aka = $ordres[$index] ?? null;
+            $ao  = $ordres[$index + 1] ?? null;
             $index += 2;
 
             if ($aka && $ao) {
@@ -171,14 +174,14 @@ class BracketService
     // ─────────────────────────────────────────────────────────────────────────
     public function genererPoules(ConfigNotation $config): void
     {
-        $inscriptions = Inscription::where('config_notation_id', $config->id)->get();
-        $nb = $inscriptions->count();
+        $ordres = Inscription::where('config_notation_id', $config->id)->get();
+        $nb = $ordres->count();
 
         if ($nb < 3) throw new \Exception("Minimum 3 combattants pour des poules");
 
         // Division équilibrée (ex: 8 athlètes -> 2 poules de 4)
         $nbPoules = $nb <= 5 ? 1 : max(2, intdiv($nb, 4));
-        $groupes  = $inscriptions->shuffle()->chunk(ceil($nb / $nbPoules));
+        $groupes  = $ordres->shuffle()->chunk(ceil($nb / $nbPoules));
         $ordre    = 1;
 
         foreach ($groupes as $groupIndex => $groupe) {
@@ -192,7 +195,7 @@ class BracketService
 
             // Utilisation de la table Pivot avec initialisation des compteurs
             foreach ($groupe as $ins) {
-                $poule->inscriptions()->attach($ins->id, [
+                $poule->ordres()->attach($ins->id, [
                     'id'                     => Str::uuid(),
                     'points_victoire'        => 0,
                     'total_points_marques'   => 0,
@@ -238,7 +241,7 @@ class BracketService
      */
     public function lancerPhaseEliminatoire(ConfigNotation $config): void
     {
-        $poules = Poule::where('config_notation_id', $config->id)->with('inscriptions')->get();
+        $poules = Poule::where('config_notation_id', $config->id)->with('ordres')->get();
 
         // Prendre les 2 premiers de chaque poule
         $qualifies = [];
@@ -283,7 +286,7 @@ class BracketService
     public function classementPoule(Poule $poule): array
     {
         $stats = [];
-        foreach ($poule->inscriptions as $ins) {
+        foreach ($poule->ordres as $ins) {
             $stats[$ins->id] = [
                 'id'         => $ins->id,
                 'victoires'  => 0,
