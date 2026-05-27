@@ -80,11 +80,10 @@ class BracketService
                 $combat = Combat::create([
                     'id'                  => Str::uuid(),
                     'config_notation_id'  => $config->id,
-                    'inscription_aka_id'  => $aka->id,
-                    'inscription_ao_id'   => $ao->id,
+
                     'etape'               => $etape,
                     'ordre'               => $ordre++,
-                    'statut'              => 0,
+                    'status'              => 0,
                     'score_final_aka'     => 0,
                     'score_final_ao'      => 0,
                 ]);
@@ -150,21 +149,21 @@ class BracketService
             if ($aka && $ao) {
                 // Combat normal
                 $combat->update([
-                    'inscription_aka_id' => $aka['id'],
-                    'inscription_ao_id'  => $ao['id'],
-                    'statut'             => 0, // en attente
+                    'inscription_aka_id' => $aka['inscription_id'],
+                    'inscription_ao_id'  => $ao['inscription_id'],
+                    'status'             => 0, // en attente
                 ]);
             } elseif ($aka && !$ao) {
                 // Bye — aka passe directement au round suivant
                 $combat->update([
-                    'inscription_aka_id' => $aka['id'],
-                    'vainqueur_id'       => $aka['id'],
-                    'statut'             => 2, // terminé automatiquement
+                    'inscription_aka_id' => $aka['inscription_id'],
+                    'inscription_ao_id'  => $ao['inscription_id'],
+                    'status'             => 2, // terminé automatiquement
                     'type_victoire'      => 'kiken',
                 ]);
 
                 // Placer directement dans le combat suivant
-                $this->propaguerVainqueur($combat, $aka['id']);
+                $this->propaguerVainqueur($combat, $aka['inscription_id']);
             }
         }
     }
@@ -189,7 +188,7 @@ class BracketService
                 'id'                 => Str::uuid(),
                 'config_notation_id' => $config->id,
                 'nom'                => 'Groupe ' . chr(65 + $groupIndex),
-                'statut'             => 0, // En attente
+                'status'             => 0, // En attente
                 'etape'              => 'qualification'
             ]);
 
@@ -216,7 +215,7 @@ class BracketService
                         'inscription_ao_id'  => $membres[$j]->id,
                         'etape'              => 'poule',
                         'ordre'              => $ordre++,
-                        'statut'             => 0,
+                        'status'             => 0,
                     ]);
                 }
             }
@@ -276,7 +275,7 @@ class BracketService
 
         // Si les deux adversaires sont connus → combat prêt
         if ($combatSuivant->inscription_aka_id && $combatSuivant->inscription_ao_id) {
-            $combatSuivant->update(['statut' => 0]); // en attente
+            $combatSuivant->update(['status' => 0]); // en attente
         }
     }
 
@@ -295,7 +294,7 @@ class BracketService
             ];
         }
 
-        $combats = Combat::where('poule_id', $poule->id)->where('statut', 2)->get();
+        $combats = Combat::where('poule_id', $poule->id)->where('status', 2)->get();
 
         foreach ($combats as $c) {
             if (!$c->vainqueur_id) continue;

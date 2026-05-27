@@ -4,17 +4,22 @@ namespace App\Models;
 
 use App\Models\Combat;
 use App\Models\Inscription;
+use App\Models\RotationArbitre;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
 
 class CombatAction extends Model
 {
+    use HasUuids;
     protected $table = 'combat_actions';
     protected $fillable = [
         'combat_id',
-        'inscription_id',
+        'rotation_arbitre_id',
         'type',
         'valeur',
-        'temps_match',
+        'combattant',
+        'signale_a',
+        'validee',
     ];
     protected $keyType = 'string';
     public $incrementing = false;
@@ -30,6 +35,11 @@ class CombatAction extends Model
     public function inscription()
     {
         return $this->belongsTo(Inscription::class);
+    }
+
+    public function rotationArbitre()
+    {
+        return $this->belongsTo(RotationArbitre::class);
     }
     // Accesseur pour récupérer le nom du type facilement
     public function getTypeLabelAttribute()

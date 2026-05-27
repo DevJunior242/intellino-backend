@@ -30,7 +30,7 @@ return new class extends Migration
                 ->nullable()
                 ->default(1)
             ;
-            $table->integer('duration')->nullable()->default(180);
+            $table->integer('duration')->nullable()->default(3);
             $table->boolean('configuration_validee')->default(false);
             $table->foreignUuid('configure_par')->constrained('users');
             $table->timestamp('validee_a')->nullable();

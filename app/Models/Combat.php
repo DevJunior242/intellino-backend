@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Models\Poule;
 use App\Models\Competition;
 use App\Models\Inscription;
+use App\Models\CombatAction;
 use App\Models\ConfigNotation;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -20,9 +21,20 @@ class Combat extends Model
         'inscription_ao_id',
         'etape',
         'ordre',
-        'statut',
+        'status',
         'score_final_aka',
         'score_final_ao',
+        'temps_ecoule',
+        'hajime_at',
+        'yame_at',
+        'source_aka_combat_id',
+        'source_ao_combat_id',
+        'next_combat_id',
+        'senshu_id',
+        'vainqueur_id',
+        'type_victoire',
+        'type',
+        'valeur',
     ];
 
 
@@ -42,5 +54,10 @@ class Combat extends Model
     public function inscriptionAo()
     {
         return $this->belongsTo(Inscription::class, 'inscription_ao_id');
+    }
+
+    public function actions()
+    {
+        return $this->hasMany(CombatAction::class);
     }
 }

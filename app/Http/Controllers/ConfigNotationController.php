@@ -78,11 +78,7 @@ class ConfigNotationController extends Controller
             ];
         });
         $globalTime = round(microtime(true) - $start, 2);
-        Log::info('Temps chargement configs', [
-            'time' => $globalTime . 's',
-            'url' => request()->path(),
-            'user' => auth()->id(),
-        ]);
+
         Log::info('Configs endpoint hit', [
             'time' => now()->format('H:i:s'),
         ]);
@@ -157,7 +153,7 @@ class ConfigNotationController extends Controller
                         'mode_saisie_id'     => $request->mode_saisie_id,
                         'kumite_format_id'   => $request->kumite_format_id,
                         'nb_juges_option_id' => $request->nb_juges_option_id,
-                        'duration'           => $request->duration ?? 180,
+                        'duration'           => $request->duration ?? 3,
                         'configure_par'      => Auth::id(),
                     ]
                 );

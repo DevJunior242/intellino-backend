@@ -51,8 +51,10 @@ use App\Http\Controllers\PricingPlanController;
 use App\Http\Controllers\AffiliationControllerr;
 use App\Http\Controllers\ArbitreStatsController;
 use App\Http\Controllers\Auth\SettingController;
+use App\Http\Controllers\CombatActionController;
 use App\Http\Controllers\EnchainementController;
 use App\Http\Controllers\ExamenLeagueController;
+use App\Http\Controllers\JudgeSessionController;
 use App\Http\Controllers\KumiteFormatController;
 use App\Http\Controllers\LeagueMemberController;
 use App\Http\Controllers\NotificationController;
@@ -183,10 +185,26 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::get('configs/{config}/etat',              [SeanceController::class, 'etat']);
         Route::get('configs/{config}/pret', [SeanceController::class, 'estPret']);
         Route::get('competition/{config}/en-cours', [SeanceController::class, 'enCours']);
+
         Route::post('configs/{config}/connecter-tablette', [SeanceController::class, 'connecterTablette']);
         Route::get('configs/{config}/arbitres-rotation',    [SeanceController::class, 'arbitresRotation']);
     });
+    //combats
+    Route::post('/combats/{combat}/start-chrono', [CombatController::class, 'startChrono']);
+    Route::post('/combats/{combat}/stop-chrono', [CombatController::class, 'stopChrono']);
+    Route::post('/configs/{config}/lancer-kumite', [CombatController::class, 'lancerSeanceKumite']);
+    Route::get('/configs/{config}/combat-en-cours', [CombatController::class, 'combatEnCours']);
+    Route::get('/configs/{config}/next-combat', [CombatController::class, 'nextCombat']);
+    Route::post('/configs/{config}/combat-suivant', [CombatController::class, 'combatSuivant']);
+    Route::get('configs/{config}/bracket', [CombatController::class, 'bracket']);
+    // Actions
+    Route::post('combat-actions', [CombatActionController::class, 'store']);
+    Route::post('/combat-penalite', [CombatActionController::class, 'penalite']);
+    Route::post('/config/{config}/get-judge-number', [JudgeSessionController::class, 'getJudgeNumber']);
+    Route::get('/config/{config}/judges', [JudgeSessionController::class, 'getJudges']);
 
+    Route::delete('/reset-judge/{config}/{juge_numero}', [JudgeSessionController::class, 'resetSpecificJudge']);
+    Route::delete('/reset-all-judges/{config}', [JudgeSessionController::class, 'resetAllJudges']);
 
     //arbitre dispo
     Route::get('/arbitres/disponibles/{evenementId}/{configId}', [ArbitreController::class, 'getDisponibles']);
@@ -228,7 +246,6 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::prefix('kumite')->group(function () {
         Route::apiResource('/kumite-formats', KumiteFormatController::class);
     });
-    Route::get('configs/{config}/bracket', [CombatController::class, 'bracket']);
 
 
     //student grade 

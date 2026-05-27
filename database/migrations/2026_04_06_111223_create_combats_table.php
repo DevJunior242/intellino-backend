@@ -17,8 +17,8 @@ return new class extends Migration
             $table->foreignUuid('config_notation_id')->constrained('config_notations')->cascadeOnDelete();
 
             // Les deux adversaires (liés à la table inscriptions)
-            $table->foreignUuid('inscription_aka_id')->constrained('inscriptions')->cascadeOnDelete(); // Rouge
-            $table->foreignUuid('inscription_ao_id')->constrained('inscriptions')->cascadeOnDelete();  // Bleu
+            $table->foreignUuid('inscription_aka_id')->nullable()->constrained('inscriptions')->cascadeOnDelete();
+            $table->foreignUuid('inscription_ao_id')->nullable()->constrained('inscriptions')->cascadeOnDelete();
             // Nullable : car un combat de tableau final n'est pas forcément dans une poule
             $table->foreignUuid('poule_id')->nullable()->constrained('poules')->nullOnDelete();
             // Scores finaux (mis à jour à la fin du chrono)
@@ -38,8 +38,9 @@ return new class extends Migration
             // Next combat (format éliminatoire seulement)
             $table->uuid('next_combat_id')->nullable();
             // Pas de FK directe car auto-référence
-
-            // Ordre d'exécution
+            $table->timestamp('yame_at')->nullable();      // moment du stop
+            $table->timestamp('hajime_at')->nullable();    // moment du start/resume
+            $table->integer('temps_ecoule')->default(0);            // Ordre d'exécution
             $table->integer('ordre')->default(0);
             $table->uuid('source_ao_combat_id')->nullable();
             $table->timestamps();

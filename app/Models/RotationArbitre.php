@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\User;
+use App\Models\CombatAction;
 use App\Models\Competition;
 use App\Models\ConfigNotation;
 use App\Models\ArbitreCompetition;
@@ -60,5 +61,10 @@ class RotationArbitre extends Model
     public function configNotation()
     {
         return $this->belongsTo(ConfigNotation::class);
+    }
+
+    public function combatActions()
+    {
+        return $this->hasMany(CombatAction::class);
     }
 }
