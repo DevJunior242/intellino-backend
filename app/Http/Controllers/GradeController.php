@@ -27,7 +27,7 @@ class GradeController extends Controller
         try {
 
             $validated = $request->validated();
-            $clubId = $request->validated_club_id;
+            $clubId = $request->attributes->get('club_id');
 
             $grade = \App\Models\Grade::create([
                 ...$validated,

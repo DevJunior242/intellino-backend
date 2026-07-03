@@ -27,11 +27,13 @@ class ConfigNotation extends Model
         'validee_a',
         'kumite_format_id',
         'duration',
+        'match_nul_autorise',
     ];
 
     protected $casts = [
         'configuration_validee' => 'boolean',
         'validee_a'             => 'datetime',
+        'match_nul_autorise'    => 'boolean',
     ];
 
     public function organisateur()

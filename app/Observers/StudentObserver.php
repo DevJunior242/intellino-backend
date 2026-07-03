@@ -12,10 +12,11 @@ class StudentObserver
      */
     public function created(Student $student): void
     {
+        $activeId = request()->attributes->get('organisateur_id');
         Activity::create([
             'user_id'        => auth()->id(),
-            'organisateur_id' => $student->club_id,
-            'organisateur_type' => get_class($student->club),
+            'organisateur_id' => $activeId,
+            'organisateur_type' => 'Club',
             'type'           => 'student',
             'action'         => 'created',
             'description'    => "A créé le étudiant " . $student->fullname,
@@ -29,7 +30,7 @@ class StudentObserver
     {
         Activity::create([
             'user_id'        => auth()->id(),
-            'organisateur_id' => $student->club_id,
+            'organisateur_id' => request()->attributes->get('organisateur_id'),
             'organisateur_type' => 'Club',
             'type'           => 'student',
             'action'         => 'updated',
@@ -44,7 +45,7 @@ class StudentObserver
     {
         Activity::create([
             'user_id'        => auth()->id(),
-            'organisateur_id' => $student->club_id,
+            'organisateur_id' => request()->attributes->get('organisateur_id'),
             'organisateur_type' => 'Club',
             'type'           => 'student',
             'action'         => 'deleted',

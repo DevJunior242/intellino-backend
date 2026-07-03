@@ -68,13 +68,16 @@ class StudentPolicy
         if ($user->isSuperAdmin()) {
             return true;
         }
-        $clubId = $student->club_id;
 
-        if (!$clubId) {
+        // Student n'a pas de colonne club_id (relation many-to-many via club_students).
+        $clubIds = $student->clubs()->wherePivot('is_active', true)->pluck('clubs.id');
+
+        if ($clubIds->isEmpty()) {
             return false;
         }
+
         return $user->clubs()
-            ->where('clubs.id', $clubId)
+            ->whereIn('clubs.id', $clubIds)
             ->whereIn('club_users.role_id', Role::clubAdminRoles())
             ->exists();
     }
@@ -87,13 +90,15 @@ class StudentPolicy
         if ($user->isSuperAdmin()) {
             return true;
         }
-        $clubId = $student->club_id;
 
-        if (!$clubId) {
+        $clubIds = $student->clubs()->wherePivot('is_active', true)->pluck('clubs.id');
+
+        if ($clubIds->isEmpty()) {
             return false;
         }
+
         return $user->clubs()
-            ->where('clubs.id', $clubId)
+            ->whereIn('clubs.id', $clubIds)
             ->whereIn('club_users.role_id', Role::clubAdminRoles())
             ->exists();
     }

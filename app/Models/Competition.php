@@ -6,6 +6,7 @@ use App\Models\League;
 use App\Models\Category;
 use App\Models\Evenement;
 use App\Models\Inscription;
+use App\Models\SubDiscipline;
 use App\Models\Disciplineleague;
 use App\Models\NiveauxCompetition;
 use Illuminate\Database\Eloquent\Model;
@@ -15,7 +16,7 @@ class Competition extends Model
 {
     use HasUuids;
     protected $table = 'competitions';
-    protected $fillable = ['category_id', 'disciplineleague_id', 'niveau_id', 'evenement_id', 'status', 'heure_debut_prevu', 'heure_fin_prevue', 'id'];
+    protected $fillable = ['category_id', 'sub_discipline_id', 'niveau_id', 'evenement_id', 'status', 'heure_debut_prevu', 'heure_fin_prevue', 'id'];
 
     protected $keyType = 'string';
     public $incrementing = false;
@@ -49,7 +50,7 @@ class Competition extends Model
 
     public function discipline()
     {
-        return $this->belongsTo(Disciplineleague::class, 'disciplineleague_id');
+        return $this->belongsTo(SubDiscipline::class, 'sub_discipline_id');
     }
 
     public function evenement()

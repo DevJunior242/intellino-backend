@@ -2,31 +2,50 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Club;
+
 use App\Models\Role;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
 class RoleController extends Controller
 {
-    public function roles(Request $request)
+
+
+    public function getRoles(Request $request)
     {
+        // 1. On récupère le type d'organisation active validé par ton middleware
+        $organisateurType = $request->attributes->get('organisateur_type')
+            ?? $request->input('organisateur_type');
 
+        // 2. On définit dynamiquement les rôles autorisés selon le contexte
+        $roleInclus = match (strtolower($organisateurType)) {
+            'club' => [
+                'instructeur',
+                'secretaire',
+            ],
 
-        $isSuperAdmin = ($request->validated_role_name === 'super_admin');
-        $clubId = $request->validated_club_id;
-        if ($isSuperAdmin) {
-            $club = Club::find($clubId);
-            if (!$club) {
-                return response()->json(['message' => 'Club sélectionné invalide'], 422);
-            }
+            'ligue' => [
+                'secretaire',
+                'arbitre',
+                'dtn',
+                'instructeur',
+            ],
+            'federation' => [
+                'directeur_technique',
+                'arbitre'
+            ],
+            default => [],
+        };
+        if (empty($roleInclus)) {
+            return response()->json(['success' => true, 'roles' => []]);
         }
+        // 3. Récupération des rôles filtrés
+        $roles = Role::whereIn('name', $roleInclus)->get();
 
-        Log::info('club_id', ['clubId' => $clubId]);
 
-        $roleOut = ['super_admin', 'admin_club', 'admin_league', 'arbitre_league', 'secretaire_league', 'instructeur_league', 'karateka'];
-
-        $roles = Role::whereNotIn('name', $roleOut)->get();
-        return response()->json(['success' => true, 'roles' => $roles]);
+        return response()->json([
+            'success' => true,
+            'roles' => $roles
+        ]);
     }
 }

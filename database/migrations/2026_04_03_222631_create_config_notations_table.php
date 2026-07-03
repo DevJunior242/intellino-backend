@@ -18,7 +18,6 @@ return new class extends Migration
                 ->constrained('competitions')->cascadeOnDelete();
             $table->foreignUuid('plateau_id')
                 ->constrained('plateaux')->cascadeOnDelete();
-            //kumiteformat_id 
             $table->foreignUuid('kumite_format_id')
                 ->nullable()
                 ->constrained('kumite_formats')->nullOnDelete();
@@ -32,6 +31,7 @@ return new class extends Migration
             ;
             $table->integer('duration')->nullable()->default(3);
             $table->boolean('configuration_validee')->default(false);
+            $table->boolean('match_nul_autorise')->default(false);
             $table->foreignUuid('configure_par')->constrained('users');
             $table->timestamp('validee_a')->nullable();
             $table->timestamps();

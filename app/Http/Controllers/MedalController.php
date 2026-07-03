@@ -30,7 +30,7 @@ class MedalController extends Controller
         $validated = $request->validated();
         $user = auth()->user();
         $clubId = $request->input('club_id');
-        $authorizedRoles = ['admin_club', 'secretaire', 'instructeur'];
+        $authorizedRoles = ['admin', 'secretaire', 'instructeur'];
         $hasPermission = $user->clubs()
             ->where('club_id', $clubId)
             ->whereHas('roles', function ($q) use ($authorizedRoles) {

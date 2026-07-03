@@ -14,9 +14,9 @@ return new class extends Migration
         Schema::create('tatami_judges', function (Blueprint $table) {
             $table->id();
             $table->foreignUuid('config_notation_id')->constrained('config_notations')->cascadeOnDelete();
-            $table->string('ip_address'); // L'IP unique de la tablette
-            $table->string('judge_token'); // Un token unique pour chaque tablette
-            $table->tinyInteger('juge_numero'); // 1, 2, 3 ou 4
+            $table->string('ip_address');  
+            $table->string('judge_token');  
+            $table->tinyInteger('juge_numero'); 
             $table->timestamp('last_seen_at');
             $table->timestamps();
 

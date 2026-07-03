@@ -22,7 +22,6 @@ class RegisterRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'club_id' => ['nullable', 'exists:clubs,id'],
             'fullname' => ['bail', 'required', 'regex:/^[\pL\s\d\-]+$/u', 'max:50'],
             'phone' => [
                 'bail',
@@ -38,8 +37,6 @@ class RegisterRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'club_id.exists' => 'Le club existe pas',
-            'club_id.required' => 'Le club est requis',
             'fullname.required' => 'Le nom complet est requis',
             'fullname.max' => 'Le nom complet est trop long',
             'phone.required' => 'Le numéro de téléphone est requis',

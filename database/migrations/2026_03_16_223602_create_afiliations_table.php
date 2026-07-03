@@ -17,12 +17,7 @@ return new class extends Migration
             $table->foreignUuid('club_id')->constrained('clubs')->cascadeOnDelete();
             $table->tinyInteger('status')->default(1);
             $table->decimal('cotisation', 10, 2)->nullable();
-
-
-            $table->date('date_debut');
-            $table->date('date_fin');
             $table->timestamps();
-            $table->unique(['club_id']);    // 1 affiliation par saison
         });
     }
 

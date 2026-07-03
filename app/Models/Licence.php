@@ -3,40 +3,43 @@
 namespace App\Models;
 
 use App\Models\Club;
+use App\Models\Saison;
 use App\Models\Student;
-use App\Models\Category;
-use Illuminate\Support\Facades\Cache;
+use App\Models\Federation;
+use App\Models\LicenceType;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 
 class Licence extends Model
 {
-    use HasUuids;
-    protected $table = 'licences';
+    use HasUuids, SoftDeletes;
+
+    // Statuts (cohérents avec la colonne tinyInteger 'status')
+    public const STATUS_EN_ATTENTE = 0;
+    public const STATUS_PAYE = 1;
+    public const STATUS_VALIDE = 2;
 
     protected $fillable = [
-        'id',
-        'league_id',
+        'saison_id',
         'club_id',
         'student_id',
-        'saison_id',
-        'numero',
-        'type',
+        'federation_id',
+        'licence_type_id',
         'grade_au_moment',
-        'montant',
-        'date_emission',
-        'date_expiration',
+        'montant_paye',
+        'numero',
         'status',
     ];
-    const STATUS_ACTIVE = 0;
-    const STATUS_EXPIRED = 1;
-    protected $keyType = 'string';
-    public $incrementing = false;
 
+    protected $casts = [
+        'montant_paye' => 'decimal:2',
+        'status' => 'integer',
+    ];
 
-    public function student()
+    public function saison()
     {
-        return $this->belongsTo(Student::class);
+        return $this->belongsTo(Saison::class);
     }
 
     public function club()
@@ -44,38 +47,27 @@ class Licence extends Model
         return $this->belongsTo(Club::class);
     }
 
-    protected static function booted()
+    public function student()
     {
-        static::saved(function ($licence) {
-            static::clearStatsCache($licence->league_id);
-        });
-
-        // Se déclenche après une suppression
-        static::deleted(function ($licence) {
-            static::clearStatsCache($licence->league_id);
-        });
+        return $this->belongsTo(Student::class);
     }
 
-    /**
-     * Nettoie toutes les clés de cache de catégories pour une ligue précise
-     */
-    protected static function clearStatsCache($leagueId)
+    public function federation()
     {
-        // On récupère les IDs de toutes les catégories existantes
-        $categoryIds = Category::pluck('id');
-
-        foreach ($categoryIds as $id) {
-            $key = "licencies_count_cat_{$id}_league_{$leagueId}";
-            Cache::forget($key);
-        }
+        return $this->belongsTo(Federation::class);
     }
 
-    public function getStatusLabelAttribute()
+    public function licenceType()
     {
-        return match ($this->status) {
-            self::STATUS_ACTIVE => 'Actif',
-            self::STATUS_EXPIRED => 'Expiré',
-            default => 'Inconnu',
+        return $this->belongsTo(LicenceType::class);
+    }
+
+    public function getStatusLabelAttribute(): string
+    {
+        return match ((int) $this->status) {
+            self::STATUS_PAYE => 'Payé',
+            self::STATUS_VALIDE => 'Validé',
+            default => 'En attente',
         };
     }
 }

@@ -12,15 +12,17 @@ use App\Models\Student;
 use App\Models\Activity;
 use App\Models\Candidat;
 use App\Models\ClubUser;
+use App\Models\Federation;
 use App\Models\ParentModel;
 use Laravel\Sanctum\HasApiTokens;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
-use Illuminate\Auth\Passwords\CanResetPassword;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class User extends Authenticatable implements MustVerifyEmail
 {
@@ -38,6 +40,8 @@ class User extends Authenticatable implements MustVerifyEmail
         'email',
         'password',
         'current_club_id',
+        'current_league_id',
+        'current_federation_id',
         'global_role_id',
 
     ];
@@ -81,7 +85,51 @@ class User extends Authenticatable implements MustVerifyEmail
             ->withTimestamps();
     }
 
+    public function federations(): BelongsToMany
+    {
+        return $this->belongsToMany(Federation::class, 'federation_users')
+            ->withPivot('role_id', 'mandate_start_at', 'mandate_end_at', 'mandate_status')
+            ->withTimestamps();
+    }
 
+    public function activeLeagues()
+    {
+        $adminLeagueRoleId = Role::where('name', 'admin')->value('id');
+
+        return $this->belongsToMany(League::class, 'league_users')
+            ->withPivot('role_id', 'mandate_status', 'mandate_end_at')
+            ->where(function ($query) use ($adminLeagueRoleId) {
+                // On prend tout, SAUF les lignes qui sont à la fois 'admin' ET avec un mandat expiré (0)
+                $query->whereNot(function ($q) use ($adminLeagueRoleId) {
+                    $q->where('league_users.role_id', $adminLeagueRoleId)
+                        ->where('league_users.mandate_status', 0);
+                });
+            })
+            ->withTimestamps();
+    }
+
+    public function activeFederations()
+    {
+        $adminFedRoleId = Role::where('name', 'admin')->value('id');
+
+        return $this->belongsToMany(Federation::class, 'federation_users')
+            ->withPivot('role_id', 'mandate_status', 'mandate_end_at')
+            ->where(function ($query) use ($adminFedRoleId) {
+                $query->whereNot(function ($q) use ($adminFedRoleId) {
+                    $q->where('federation_users.role_id', $adminFedRoleId)
+                        ->where('federation_users.mandate_status', 0);
+                });
+            })
+            ->withTimestamps();
+    }
+
+    /**
+     * Relation Session Active : La fédération sur laquelle l'utilisateur travaille actuellement
+     */
+    public function currentFederation(): BelongsTo
+    {
+        return $this->belongsTo(Federation::class, 'current_federation_id');
+    }
     public function children()
     {
         return $this->belongsToMany(

@@ -12,12 +12,12 @@ class ArbitreVerificationService
         'Ligue' => [
             'table' => 'league_users',
             'fk'    => 'league_id',
-            'role'  => 'arbitre_league',
+            'role'  => 'arbitre',
         ],
         // 'Federation' => [
-        //     'table' => 'federation_user',
+        //     'table' => 'federation_users',
         //     'fk'    => 'federation_id',
-        //     'role'  => 'arbitre_federation',
+        //     'role'  => 'arbitre',
         // ],
     ];
     public function estArbitre(Evenement $evenement, int|string $userId): bool
@@ -29,7 +29,7 @@ class ArbitreVerificationService
         }
 
         $cfg         = $this->config[$type];
-        $roleArbitre = Role::where('name', 'arbitre_league')->first();
+        $roleArbitre = Role::where('name', $cfg['role'])->first();
 
         if (!$roleArbitre) return false;
 

@@ -13,8 +13,7 @@ class RegisterController extends Controller
     public function register(RegisterRequest $request)
     {
         $user = User::create([
-            "club_id" => $request->club_id,
-            'fullname' => $request->fullname,
+             'fullname' => $request->fullname,
             'email' => $request->email,
             'phone' => $request->phone,
             'password' => bcrypt($request->password),
@@ -27,6 +26,6 @@ class RegisterController extends Controller
             'user' => $user,
             // 'token' => $token,
 
-        ], 200);
+        ], 201);
     }
 }

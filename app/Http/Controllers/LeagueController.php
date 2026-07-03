@@ -6,6 +6,7 @@ use App\Models\Club;
 use App\Models\Role;
 use App\Models\League;
 use App\Models\Student;
+use App\Models\LeagueUser;
 use App\Models\StudentGrade;
 use Illuminate\Http\Request;
 use App\Models\ActivationKey;
@@ -31,13 +32,29 @@ class LeagueController extends Controller
         return response()->json($leagues);
     }
 
+    public function getLeaguesForAdmin()
+    {
+        // Récupère uniquement l'id et le nom pour que la requête soit ultra légère
+        $leagues = League::select('id', 'name')->orderBy('name')->get();
+
+        return response()->json([
+            'success' => true,
+            'leagues' => $leagues
+        ]);
+    }
+    public function getLeaguePublicInfo($leagueId)
+    {
+        $league = League::findOrFail($leagueId);
+        $league->logo = $league->logo ? url('storage/' . $league->logo) : null;
+        return response()->json($league);
+    }
     public function store(StoreLeagueReq $request)
     {
         $user = auth()->user();
         try {
             return DB::transaction(function () use ($request, $user) {
 
-                // 1. AJOUT : VÉRIFICATION ET VERROUILLAGE DE LA CLÉ LIGUE
+                // 1. VÉRIFICATION ET VERROUILLAGE DE LA CLÉ LIGUE
                 $key = ActivationKey::where('key_code', $request->activation_key)
                     ->where('is_used', false)
                     ->where('type', 'league')
@@ -51,14 +68,17 @@ class LeagueController extends Controller
                     ], 422);
                 }
 
-                $adminRoleName = Role::where('name', 'admin_league')->first();
-                //verifier si role existe
+                $adminRoleName = Role::where('name', 'admin')->first();
                 if (!$adminRoleName) {
                     return response()->json([
                         'success' => false,
-                        'message' => 'Le role  n\'existe pas',
+                        'message' => 'Le role n\'existe pas',
                     ], 422);
                 }
+
+                // 2. SÉCURISATION DES DONNÉES DE LA LIGUE
+                // On récupère uniquement les données validées de la ligue en ignorant la clé d'activation
+                $leagueData = collect($request->validated())->except(['activation_key'])->toArray();
 
                 $file = $request->logo;
                 if ($file) {
@@ -66,21 +86,32 @@ class LeagueController extends Controller
                     $fileName = uniqid() . '.' . $ext;
                     $path = $file->storeAs('logos', $fileName, 'public');
                 }
+
+                // Utilisation des données nettoyées
                 $league = League::create([
-                    ...$request->validated(),
+                    ...$leagueData,
                     'logo' => isset($path) ? $path : null,
                 ]);
 
-                // 2. AJOUT : CONSOMMATION DE LA CLÉ APRÈS LA CRÉATION RÉUSSIE
+                // 3. CONSOMMATION DE LA CLÉ
                 $key->update([
                     'is_used' => true,
-                    'used_at' => now()
+                    'used_at' => now(),
+                    'used_by_user_id' => $user->id,
                 ]);
 
                 $user->current_league_id = $league->id;
                 $user->save();
 
-                $user->leagues()->attach($league->id, ['role_id' => $adminRoleName->id]);
+
+                LeagueUser::create([
+                    'league_id' => $league->id,
+                    'user_id' => $user->id,
+                    'role_id' => $adminRoleName->id,
+                    'mandate_start_at' => $request->mandate_start_at,
+                    'mandate_end_at' => $request->mandate_end_at,
+                ]);
+
                 $user->load('leagues.roles');
 
                 $leagues = $user->leagues->map(function ($c) {
@@ -89,29 +120,33 @@ class LeagueController extends Controller
                         'id'   => $c->id,
                         'name' => $c->name,
                         'role' => $role?->name,
+                        'mandate_status' => $c->pivot->mandate_status,
                     ];
                 });
-
 
                 return response()->json([
                     'success'     => true,
                     'user'        => $user,
-                    'leagues' => $leagues,
-                    'new_league'    => [
+                    'leagues'     => $leagues,
+                    'new_league'  => [
                         'id'   => $league->id,
                         'type' => 'Ligue',
-                        'role' => 'admin_league'
+                        'role' => 'admin'
                     ]
                 ], 201);
             });
         } catch (\Throwable $th) {
+            // 4. NETTOYAGE DU LOGO EN CAS D'ÉCHEC DE LA TRANSACTION
+            if (isset($path) && \Illuminate\Support\Facades\Storage::disk('public')->exists($path)) {
+                \Illuminate\Support\Facades\Storage::disk('public')->delete($path);
+            }
+
             return response()->json([
                 'success' => false,
                 'message' => 'Une erreur est survenue lors de la création du league',
             ], 422);
         }
     }
-
 
     public function addClub($clubId, Request $request)
     {
@@ -124,29 +159,7 @@ class LeagueController extends Controller
 
         return response()->json(['success' => true, 'message' => 'Le club a bien été ajouté à la ligue']);
     }
-    public function addClubManuel(Request $request)
-    {
-        $request->validate([
-            'name' => 'required|string|max:255',
-            'description' => 'nullable|string',
-        ]);
 
-        $activeId = $request->attributes->get('organisateur_id');
-        $activeType = $request->attributes->get('organisateur_type');
-
-        $club = ClubNonInscrit::create([
-            'name' => $request->name,
-            'description' => $request->description,
-            'organisateur_id' => $activeId,
-            'organisateur_type' => $activeType,
-        ]);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Club ajouté avec succès',
-            'data' => $club
-        ], 201);
-    }
     public function myClubs(Request $request)
     {
         $activeId = $request->attributes->get('organisateur_id');
@@ -182,7 +195,6 @@ class LeagueController extends Controller
 
     public function getLeagueStudents(Request $request)
     {
-        $user = auth()->user();
 
         $clubId = $request->query('club_id');
         $students = StudentGrade::with('student:id,fullname', 'currentGrade:id,name,description')

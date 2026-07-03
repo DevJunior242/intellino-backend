@@ -6,7 +6,6 @@ use Carbon\Carbon;
 use App\Models\User;
 use App\Models\Grade;
 use App\Models\Examen;
-use App\Models\Saison;
 use App\Models\Student;
 use Illuminate\Support\Str;
 use Illuminate\Http\Request;
@@ -22,16 +21,19 @@ use App\Notifications\ExamenCanceled;
 use Illuminate\Database\QueryException;
 use App\Http\Requests\StoreExamenRequest;
 use Illuminate\Support\Facades\Notification;
+use App\Http\Controllers\Concerns\ResolvesFederationSaison;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
 class ExamenController extends Controller
 {
     use AuthorizesRequests;
+    use ResolvesFederationSaison;
+
     public function index(Request $request)
     {
         $user = auth()->user();
-        $activeId = $request->validated_organisateur_id ?? $request->attributes->get('organisateur_id');
-        $activeType = $request->validated_organisateur_type ?? $request->attributes->get('organisateur_type');
+        $activeId = $request->attributes->get('organisateur_id');
+        $activeType = $request->attributes->get('organisateur_type');
 
         $query = Examen::with(['organisateur', 'nextGrade:id,name'])
             ->select('id', 'organisateur_id', 'organisateur_type', 'next_grade_id', 'start_date', 'status')
@@ -41,13 +43,19 @@ class ExamenController extends Controller
         if ($user?->isSuperAdmin()) {
             $examens = $query->paginate(8);
         }
-        // 2. Si Ligue : voit ses propres examens
+        // 2. Si Fédération : voit ses propres examens
+        else if ($activeType == 'Federation') {
+            $examens = $query->where('organisateur_id', $activeId)
+                ->where('organisateur_type', 'Federation')
+                ->paginate(8);
+        }
+        // 3. Si Ligue : voit ses propres examens
         else if ($activeType == 'Ligue') {
             $examens = $query->where('organisateur_id', $activeId)
                 ->where('organisateur_type', 'Ligue')
                 ->paginate(8);
         }
-        // 3. Si Club : voit SES examens + les examens OUVERTS de la Ligue
+        // 4. Si Club : voit SES examens + les examens OUVERTS de la Ligue
         else {
             $currentClub = \App\Models\Club::select('id', 'league_id')->find($activeId);
             $parentLeagueId = $currentClub?->league_id;
@@ -103,7 +111,7 @@ class ExamenController extends Controller
             $curentGrade = Grade::findOrFail($request->current_grade_id);
             $nextGrade = Grade::findOrFail($request->next_grade_id);
             $isNoire = str_contains(strtolower($nextGrade->name), 'noire');
-            $saisonActive =  Saison::where('active', true)->first();
+            $saisonActive = $this->saisonActivePour($activeId, $activeType);
             if (!$saisonActive) {
                 return response()->json([
                     'success' => false,
@@ -144,16 +152,21 @@ class ExamenController extends Controller
             $examenData = DB::transaction(function () use ($validated, $user, $activeId, $activeType, $saisonActive, $request) {
 
 
-                // Créer l'examen
+                // Créer l'examen — organisateur_id/type viennent du contexte
+                // authentifié (middleware), jamais du payload client.
                 $examen = Examen::create([
                     ...$validated,
+                    'organisateur_id' => $activeId,
+                    'organisateur_type' => $activeType,
                     'created_by' => $user->id,
                     'saison_id' => $saisonActive->id,
                 ]);
 
                 // 3. Inscription AUTOMATIQUE uniquement si c'est un CLUB
                 if ($activeType === 'Club') {
-                    $students = Student::where('club_id', $activeId)
+                    $students = Student::whereHas('clubs', function ($q) use ($activeId) {
+                        $q->where('club_id', $activeId);
+                    })
                         ->whereHas('currentGrade', function ($q) use ($request) {
                             $q->where('current_grade_id', $request->current_grade_id)
                                 ->whereDate('awarded_at', '<=', $request->start_date);
@@ -183,9 +196,11 @@ class ExamenController extends Controller
                 ->pluck('student');
 
             Notification::send($students, new ExamenCreated($examenData));
-            $message = ($activeType === 'Ligue')
-                ? 'Examen de Ligue créé. Les clubs peuvent maintenant inscrire leurs candidats.'
-                : 'Examen de Club créé avec inscriptions automatiques.';
+            $message = match ($activeType) {
+                'Federation' => 'Examen de Fédération créé. Les ligues et clubs peuvent maintenant inscrire leurs candidats.',
+                'Ligue' => 'Examen de Ligue créé. Les clubs peuvent maintenant inscrire leurs candidats.',
+                default => 'Examen de Club créé avec inscriptions automatiques.',
+            };
 
             return response()->json([
                 'success' => true,
@@ -216,6 +231,64 @@ class ExamenController extends Controller
             'success' => true,
             'message' => 'liste d\'examen ',
             'examen' => $examen,
+        ]);
+    }
+
+    public function update(Request $request, Examen $examen)
+    {
+        $this->authorize('update', $examen);
+
+        $validated = $request->validate([
+            'current_grade_id' => ['required', 'uuid', 'exists:grades,id'],
+            'next_grade_id'    => ['required', 'uuid', 'exists:grades,id'],
+            'start_date'       => ['required', 'date'],
+            'end_date'         => ['required', 'date', 'after_or_equal:start_date'],
+            'start_time'       => ['required', 'date_format:H:i'],
+            'end_time'         => ['required', 'date_format:H:i', 'after:start_time'],
+        ]);
+
+        if ($validated['current_grade_id'] === $validated['next_grade_id']) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Le grade actuel ne peut pas être identique au grade visé.',
+            ], 400);
+        }
+
+        $nextGrade = Grade::findOrFail($validated['next_grade_id']);
+        $isNoire = str_contains(strtolower($nextGrade->name), 'noire');
+
+        if ($isNoire && $examen->organisateur_type !== 'Ligue') {
+            return response()->json([
+                'success' => false,
+                'message' => 'L\'examen pour la ceinture noire est réservé aux Ligues.'
+            ], 422);
+        }
+
+        $examen->update($validated);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Examen mis à jour avec succès',
+            'data'    => $examen->fresh(['currentGrade', 'nextGrade']),
+        ]);
+    }
+
+    public function destroy(Examen $examen)
+    {
+        $this->authorize('delete', $examen);
+
+        if ($examen->candidates()->exists()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Cet examen a déjà des candidats inscrits — annulez-le plutôt que de le supprimer.',
+            ], 422);
+        }
+
+        $examen->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Examen supprimé avec succès',
         ]);
     }
 

@@ -14,10 +14,10 @@ class SubscriptionController extends Controller
     public function index(Request $request)
     {
         $user = auth()->user();
-        $clubId = $request->validated_club_id;
+        $clubId = $request->attributes->get('club_id');
 
 
-        $role = $request->validated_role_name;
+        $role = $request->attributes->get('role');
 
 
         if ($role === 'super_admin') {
@@ -48,10 +48,7 @@ class SubscriptionController extends Controller
 
     public function store(SubscribedRequest $request)
     {
-        $clubId = $request->validated()['club_id']
-            ?? $request->validated_club_id
-            ?? $request->club_id;
-        // $clubId = $request->validated_club_id;
+        $clubId = $request->validated()['club_id'] ?? null;
         if (!$clubId) {
             return response()->json(['message' => 'Club ID manquant dans la requête'], 422);
         }
@@ -94,9 +91,9 @@ class SubscriptionController extends Controller
     public function show(Request $request)
     {
         $user = auth()->user();
-        $clubId = $request->validated_club_id;
+        $clubId = $request->attributes->get('club_id');
         Log::info('club_id', ['clubId' => $clubId]);
-        $role = $request->validated_role_name;
+        $role = $request->attributes->get('role');
         //afficher les abonnements actif pour le club
         if ($role === 'super_admin') {
             $subscriptions = Subscription::with(['club', 'plan'])

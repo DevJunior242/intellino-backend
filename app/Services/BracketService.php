@@ -2,13 +2,16 @@
 
 namespace App\Services;
 
+use DB;
+use Exception;
 use App\Models\Poule;
 use App\Models\Combat;
+
 use App\Models\Inscription;
 use Illuminate\Support\Str;
 use App\Models\OrdrePassage;
+use App\Events\TatamiUpdated;
 use App\Models\ConfigNotation;
-use Illuminate\Support\Facades\DB;
 
 class BracketService
 {
@@ -25,7 +28,7 @@ class BracketService
                 'eliminatoire'        => $this->genererEliminatoire($config),
                 'poules'              => $this->genererPoules($config),
                 'poules_eliminatoire' => $this->genererPoulesEliminatoire($config),
-                default               => throw new \Exception("Format non reconnu"),
+                default               => throw new Exception("Format non reconnu"),
             };
         });
     }
@@ -35,21 +38,126 @@ class BracketService
     // ─────────────────────────────────────────────────────────────────────────
     public function genererEliminatoire(ConfigNotation $config): void
     {
-        $ordres = OrdrePassage::where('config_notation_id', $config->id)->get()->shuffle();
-
-        $nb = $ordres->count();
+        $combattants = $this->chargerCombattants($config);
+        $nb = count($combattants);
 
         if ($nb < 2) {
-            throw new \Exception("Pas assez de combattants — minimum 2");
+            throw new Exception("Pas assez de combattants — minimum 2");
         }
 
         // Compléter à la puissance de 2 supérieure (2, 4, 8, 16...)
         $taille = $this->prochainesPuissanceDeDeux($nb);
         $byes   = $taille - $nb; // combattants exemptés au 1er tour
 
+        // Place les têtes de série (bye en priorité) puis limite les
+        // rencontres intra-club/ligue au 1er tour quand c'est possible
+        $slots = $this->placerCombattants($combattants, $taille);
+
         // Construire le bracket de l'intérieur vers l'extérieur
         // On crée d'abord la finale, puis les demi-finales, etc.
-        $combats = $this->construireBracket($config, $taille, $ordres->toArray(), $byes);
+        $combats = $this->construireBracket($config, $taille, $slots, $byes);
+    }
+
+    /**
+     * Charge les combattants d'une config avec leur tête de série
+     * éventuelle et l'identité de leur club/ligue (pour l'anti-collision)
+     */
+    private function chargerCombattants(ConfigNotation $config): array
+    {
+        return OrdrePassage::where('config_notation_id', $config->id)
+            ->with('inscription:id,seed,organisateur_type,organisateur_id')
+            ->get()
+            ->map(fn($o) => [
+                'inscription_id' => $o->inscription_id,
+                'seed'           => $o->inscription->seed,
+                'club_key'       => $o->inscription->organisateur_type . ':' . $o->inscription->organisateur_id,
+            ])
+            ->all();
+    }
+
+    /**
+     * Génère l'ordre des rangs dans un tableau de $n places (algorithme
+     * standard de seeding : seed 1 et 2 ne peuvent se croiser qu'en finale)
+     */
+    private function genererOrdreSeed(int $n): array
+    {
+        if ($n === 1) return [1];
+
+        $precedent = $this->genererOrdreSeed($n / 2);
+        $ordre = [];
+        foreach ($precedent as $rang) {
+            $ordre[] = $rang;
+            $ordre[] = $n + 1 - $rang;
+        }
+
+        return $ordre;
+    }
+
+    /**
+     * Place les combattants dans les positions du tableau selon leur
+     * tête de série (les non-seedés se partagent les places restantes au
+     * hasard), puis tente de limiter les rencontres intra-club au 1er tour.
+     */
+    private function placerCombattants(array $combattants, int $taille): array
+    {
+        $seeds  = collect($combattants)->filter(fn($c) => !is_null($c['seed']))->sortBy('seed')->values();
+        $autres = collect($combattants)->filter(fn($c) => is_null($c['seed']))->shuffle()->values();
+        $classes = $seeds->concat($autres)->values(); // rang 1..nb
+
+        $ordreSeed = $this->genererOrdreSeed($taille);
+        $slots = array_fill(0, $taille, null);
+
+        foreach ($ordreSeed as $position => $rang) {
+            if ($rang > $classes->count()) continue; // place vide -> bye
+
+            $c = $classes[$rang - 1];
+            $slots[$position] = [
+                'inscription_id' => $c['inscription_id'],
+                'club_key'       => $c['club_key'],
+                'verrouille'     => !is_null($c['seed']),
+            ];
+        }
+
+        return $this->resoudreCollisionsClub($slots);
+    }
+
+    /**
+     * Parcourt les paires du 1er tour (0-1, 2-3, ...) et tente d'échanger
+     * un combattant non verrouillé (non-seedé / non-premier de poule) pour
+     * éviter deux combattants du même club/ligue. Best effort : si aucun
+     * échange ne résout la collision (ex: le club a plusieurs têtes de
+     * série), on la laisse telle quelle.
+     */
+    private function resoudreCollisionsClub(array $slots): array
+    {
+        $n = count($slots);
+
+        for ($i = 0; $i < $n; $i += 2) {
+            $a = $slots[$i] ?? null;
+            $b = $slots[$i + 1] ?? null;
+
+            if (!$a || !$b || $a['club_key'] !== $b['club_key']) continue;
+            if ($b['verrouille']) continue; // impossible de déplacer ce côté
+
+            for ($j = 0; $j < $n; $j++) {
+                if ($j === $i || $j === $i + 1) continue;
+
+                $candidat = $slots[$j] ?? null;
+                if (!$candidat || $candidat['verrouille']) continue;
+
+                $partenaireCandidat = $slots[$j % 2 === 0 ? $j + 1 : $j - 1] ?? null;
+
+                $okIci   = !$partenaireCandidat || $partenaireCandidat['club_key'] !== $b['club_key'];
+                $okLaBas = $candidat['club_key'] !== $a['club_key'];
+
+                if ($okIci && $okLaBas) {
+                    [$slots[$i + 1], $slots[$j]] = [$candidat, $b];
+                    break;
+                }
+            }
+        }
+
+        return $slots;
     }
 
     /**
@@ -66,7 +174,7 @@ class BracketService
         $ordre           = 1;
 
         // Générer tous les rounds
-        // taille=8 → rounds: [4 combats quart, 2 combats demi, 1 finale]
+        // taille=8 -> rounds: [4 combats quart, 2 combats demi, 1 finale]
         $rounds = log($taille, 2); // ex: log(8,2) = 3
 
         // Créer les combats vides par round (finale en dernier)
@@ -93,7 +201,7 @@ class BracketService
         }
 
         // Lier les combats entre rounds
-        // Combat du round N → next_combat = combat du round N+1
+        // Combat du round N -> next_combat = combat du round N+1
         for ($round = 1; $round < $rounds; $round++) {
             $combatsActuels  = $combatsParRound[$round];
             $combatsSuivants = $combatsParRound[$round + 1];
@@ -105,7 +213,7 @@ class BracketService
 
                 // Position dans le combat suivant (aka ou ao)
                 if ($index % 2 === 0) {
-                    // Pair → source_aka du combat suivant
+                    // Pair -> source_aka du combat suivant
                     $combat->update([
                         'next_combat_id'      => $combatSuivant->id,
                     ]);
@@ -113,7 +221,7 @@ class BracketService
                         'source_aka_combat_id' => $combat->id,
                     ]);
                 } else {
-                    // Impair → source_ao du combat suivant
+                    // Impair -> source_ao du combat suivant
                     $combat->update([
                         'next_combat_id'      => $combatSuivant->id,
                     ]);
@@ -157,9 +265,11 @@ class BracketService
                 // Bye — aka passe directement au round suivant
                 $combat->update([
                     'inscription_aka_id' => $aka['inscription_id'],
-                    'inscription_ao_id'  => $ao['inscription_id'],
-                    'status'             => 2, // terminé automatiquement
+                    'vainqueur_id'       => $aka['inscription_id'],
+                    'inscription_ao_id'  => null,
+                    'status'             => 1,
                     'type_victoire'      => 'kiken',
+                    'is_bye'       => true,
                 ]);
 
                 // Placer directement dans le combat suivant
@@ -171,30 +281,40 @@ class BracketService
     // ─────────────────────────────────────────────────────────────────────────
     // FORMAT POULES
     // ─────────────────────────────────────────────────────────────────────────
+
     public function genererPoules(ConfigNotation $config): void
     {
-        $ordres = Inscription::where('config_notation_id', $config->id)->get();
-        $nb = $ordres->count();
+        $combattants = $this->chargerCombattants($config);
+        $nb = count($combattants);
 
-        if ($nb < 3) throw new \Exception("Minimum 3 combattants pour des poules");
+        if ($nb < 3) throw new Exception("Minimum 3 combattants pour des poules");
 
-        // Division équilibrée (ex: 8 athlètes -> 2 poules de 4)
-        $nbPoules = $nb <= 5 ? 1 : max(2, intdiv($nb, 4));
-        $groupes  = $ordres->shuffle()->chunk(ceil($nb / $nbPoules));
-        $ordre    = 1;
+        // 1. Calcul intelligent du nombre de poules
+        $nbPoules = $this->calculerNbPoules($nb);
 
-        foreach ($groupes as $groupIndex => $groupe) {
+        // 2. Répartition en 4/3 sans poule de 1 ou 2
+        $taillesPoules = $this->repartirEnTroisQuatre($nb, $nbPoules);
+
+        // 3. Têtes de série en serpentin + non-seedés placés en limitant
+        // les collisions de club/ligue dans une même poule
+        $repartition = $this->repartirEnPoules($combattants, $taillesPoules);
+
+        $ordreGlobalCombat = 1;
+        $order = 1;
+
+        foreach ($repartition as $groupIndex => $membres) {
             $poule = Poule::create([
                 'id'                 => Str::uuid(),
                 'config_notation_id' => $config->id,
                 'nom'                => 'Groupe ' . chr(65 + $groupIndex),
-                'status'             => 0, // En attente
-                'etape'              => 'qualification'
+                'status'             => 0,
+                'etape'              => 'qualification',
+                'ordre'              => $order++,
             ]);
 
-            // Utilisation de la table Pivot avec initialisation des compteurs
-            foreach ($groupe as $ins) {
-                $poule->ordres()->attach($ins->id, [
+            // Attacher les membres à la poule
+            foreach ($membres as $m) {
+                $poule->combattants()->attach($m['inscription_id'], [
                     'id'                     => Str::uuid(),
                     'points_victoire'        => 0,
                     'total_points_marques'   => 0,
@@ -202,25 +322,137 @@ class BracketService
                 ]);
             }
 
-            // Génération des combats (Chacun contre chacun)
-            $membres = $groupe->values();
-            for ($i = 0; $i < $membres->count(); $i++) {
-                for ($j = $i + 1; $j < $membres->count(); $j++) {
-                    Combat::create([
-                        'id'                 => Str::uuid(),
-                        'competition_id'     => $config->competition_id,
-                        'config_notation_id' => $config->id,
-                        'poule_id'           => $poule->id,
-                        'inscription_aka_id' => $membres[$i]->id,
-                        'inscription_ao_id'  => $membres[$j]->id,
-                        'etape'              => 'poule',
-                        'ordre'              => $ordre++,
-                        'status'             => 0,
-                    ]);
+            // Génération des combats Berger
+            $list = array_map(fn($m) => $m['inscription_id'], $membres);
+            $count = count($list);
+
+            if ($count % 2 !== 0) {
+                $list[] = null;
+                $count++;
+            }
+
+            $totalRounds = $count - 1;
+            $matchesPerRound = $count / 2;
+
+            for ($round = 0; $round < $totalRounds; $round++) {
+                for ($i = 0; $i < $matchesPerRound; $i++) {
+                    $home = $list[$i];
+                    $away = $list[$count - 1 - $i];
+
+                    if ($home !== null && $away !== null) {
+                        Combat::create([
+                            'id'                 => Str::uuid(),
+                            'competition_id'     => $config->competition_id,
+                            'config_notation_id' => $config->id,
+                            'poule_id'           => $poule->id,
+                            'inscription_aka_id' => $home,
+                            'inscription_ao_id'  => $away,
+                            'etape'              => 'poule',
+                            'ordre'              => $ordreGlobalCombat++,
+                            'status'             => 0,
+                        ]);
+                    }
                 }
+
+                $lastElement = array_pop($list);
+                array_splice($list, 1, 0, [$lastElement]);
             }
         }
     }
+
+
+    /**
+     * Répartit les combattants dans les poules : les têtes de série d'abord,
+     * en serpentin (une par poule dans la mesure du possible), puis les
+     * non-seedés placés un par un dans la poule qui minimise les
+     * collisions de club/ligue (best effort, une poule pleine de membres
+     * du même club reste possible si les effectifs l'imposent).
+     */
+    private function repartirEnPoules(array $combattants, array $taillesPoules): array
+    {
+        $nbPoules = count($taillesPoules);
+        $poules = array_fill(0, $nbPoules, []);
+
+        $seeds  = collect($combattants)->filter(fn($c) => !is_null($c['seed']))->sortBy('seed')->values();
+        $autres = collect($combattants)->filter(fn($c) => is_null($c['seed']))->shuffle()->values();
+
+        $indexPoule = 0;
+        $sens = 1; // serpentin : 1 = avant, -1 = retour
+
+        $avancer = function () use (&$indexPoule, &$sens, $nbPoules) {
+            $indexPoule += $sens;
+            if ($indexPoule >= $nbPoules) {
+                $indexPoule = $nbPoules - 1;
+                $sens = -1;
+            } elseif ($indexPoule < 0) {
+                $indexPoule = 0;
+                $sens = 1;
+            }
+        };
+
+        foreach ($seeds as $c) {
+            $tentatives = 0;
+            while (count($poules[$indexPoule]) >= $taillesPoules[$indexPoule] && $tentatives < $nbPoules) {
+                $avancer();
+                $tentatives++;
+            }
+            $poules[$indexPoule][] = $c;
+            $avancer();
+        }
+
+        foreach ($autres as $c) {
+            $meilleurePoule = null;
+            $meilleurScore  = null;
+
+            for ($p = 0; $p < $nbPoules; $p++) {
+                if (count($poules[$p]) >= $taillesPoules[$p]) continue;
+
+                $conflits = collect($poules[$p])->where('club_key', $c['club_key'])->count();
+                $score = [$conflits, count($poules[$p])];
+
+                if ($meilleurScore === null || $score < $meilleurScore) {
+                    $meilleurScore = $score;
+                    $meilleurePoule = $p;
+                }
+            }
+
+            $poules[$meilleurePoule][] = $c;
+        }
+
+        return $poules;
+    }
+
+    private function calculerNbPoules(int $nb): int
+    {
+        // Cas < 6 : 1 poule max
+        if ($nb <= 5) return 1;
+
+        // Test des puissances de 2 : 8, 16, 32 qualifiés
+        $puissances2 = [32, 16, 8, 4];
+
+        foreach ($puissances2 as $qualifies) {
+            $nbPoules = $qualifies / 2; // 2 qualifiés/poule
+
+            // Peut-on répartir $nb athlètes en $nbPoules poules de 3 ou 4 ?
+            $min = $nbPoules * 3;
+            $max = $nbPoules * 4;
+
+            if ($nb >= $min && $nb <= $max) {
+                return $nbPoules; // Zéro bye possible 
+            }
+        }
+
+        // Si aucune puissance de 2 ne marche -> on prend le plus proche
+        // Et on minimise les bye entre 3 et 4 par poule
+        $poules4 = (int) ceil($nb / 4);
+        $poules3 = (int) ceil($nb / 3);
+
+        $bye4 = $this->calculerBye($poules4 * 2);
+        $bye3 = $this->calculerBye($poules3 * 2);
+
+        return $bye4 <= $bye3 ? $poules4 : $poules3;
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     // FORMAT POULES + ÉLIMINATOIRE
     // ─────────────────────────────────────────────────────────────────────────
@@ -228,10 +460,6 @@ class BracketService
     {
         // Phase 1 — générer les poules
         $this->genererPoules($config);
-
-        // Phase 2 — le bracket éliminatoire sera généré APRÈS les poules
-        // quand on connaît les qualifiés
-        // → déclenché par finPoules()
     }
 
     /**
@@ -240,22 +468,136 @@ class BracketService
      */
     public function lancerPhaseEliminatoire(ConfigNotation $config): void
     {
-        $poules = Poule::where('config_notation_id', $config->id)->with('ordres')->get();
+        $poules = Poule::where('config_notation_id', $config->id)->get();
 
-        // Prendre les 2 premiers de chaque poule
         $qualifies = [];
+        $thirdCandidates = [];
+
+        // Récupère 1er et 2ème de chaque poule, et garde les 3èmes en candidat
         foreach ($poules as $poule) {
-            $classement = $this->classementPoule($poule);
-            $qualifies   = array_merge($qualifies, array_slice($classement, 0, 2));
+            // Récupération ordonnée avec les critères de classement
+            $rows = \DB::table('poule_inscriptions')
+                ->where('poule_id', $poule->id)
+                ->orderByDesc('points_victoire')
+                ->orderByDesc('total_points_marques')
+                ->orderBy('total_points_encaisses')
+                ->get();
+
+            if (isset($rows[0])) $qualifies[] = ['inscription_id' => $rows[0]->inscription_id, 'role' => 'premier'];
+            if (isset($rows[1])) $qualifies[] = ['inscription_id' => $rows[1]->inscription_id, 'role' => 'second'];
+
+            // Garder le 3ème si présent pour sélection possible
+            if (isset($rows[2])) {
+                $thirdCandidates[] = [
+                    'inscription_id' => $rows[2]->inscription_id,
+                    'points_victoire' => $rows[2]->points_victoire,
+                    'total_points_marques' => $rows[2]->total_points_marques,
+                    'total_points_encaisses' => $rows[2]->total_points_encaisses,
+                ];
+            }
         }
 
-        // Générer le bracket avec les qualifiés
-        $taille = $this->prochainesPuissanceDeDeux(count($qualifies));
-        $byes   = $taille - count($qualifies);
+        // Déterminer la taille cible du bracket (puissance de 2)
+        $baseQualifies = count($qualifies);
+        $tailleCible = $this->prochainesPuissanceDeDeux($baseQualifies);
+        $additionalNeeded = $tailleCible - $baseQualifies;
 
-        $this->construireBracket($config, $taille, $qualifies, $byes);
+        // Si besoin, sélectionner les meilleurs 3èmes selon les critères
+        if ($additionalNeeded > 0 && count($thirdCandidates) > 0) {
+            usort($thirdCandidates, function ($a, $b) {
+                if ($a['points_victoire'] !== $b['points_victoire']) return $b['points_victoire'] <=> $a['points_victoire'];
+                if ($a['total_points_marques'] !== $b['total_points_marques']) return $b['total_points_marques'] <=> $a['total_points_marques'];
+                return $a['total_points_encaisses'] <=> $b['total_points_encaisses'];
+            });
+
+            $selectedThirds = array_slice($thirdCandidates, 0, $additionalNeeded);
+            foreach ($selectedThirds as $t) {
+                $qualifies[] = ['inscription_id' => $t['inscription_id'], 'role' => 'troisieme'];
+            }
+
+            // Recompute cible si on a toujours un nombre non puissance de deux
+            $baseQualifies = count($qualifies);
+            $tailleCible = $this->prochainesPuissanceDeDeux($baseQualifies);
+        }
+
+        $qualifiesTriés = $this->seederBracket($qualifies, $poules->count());
+        $taille = $this->prochainesPuissanceDeDeux(count($qualifies));
+        $byes   = $taille - count($qualifiesTriés);
+
+        $clubParInscription = Inscription::whereIn('id', collect($qualifiesTriés)->pluck('inscription_id'))
+            ->get(['id', 'organisateur_type', 'organisateur_id'])
+            ->keyBy('id');
+
+        $slots = $this->slotsDepuisQualifies($qualifiesTriés, $clubParInscription, $taille);
+
+        $this->construireBracket($config, $taille, $slots, $byes);
     }
 
+    /**
+     * Construit les positions du 1er tour à partir de l'ordre déjà seedé
+     * par seederBracket, puis tente de limiter les rencontres intra-club
+     * en n'échangeant que les "seconds" (les 1ers de poule restent fixes,
+     * comme les têtes de série en éliminatoire directe).
+     */
+    private function slotsDepuisQualifies(array $qualifies, $clubParInscription, int $taille): array
+    {
+        $slots = array_fill(0, $taille, null);
+
+        foreach ($qualifies as $i => $q) {
+            $ins = $clubParInscription[$q['inscription_id']] ?? null;
+            $slots[$i] = [
+                'inscription_id' => $q['inscription_id'],
+                'club_key'       => $ins ? "{$ins->organisateur_type}:{$ins->organisateur_id}" : null,
+                'verrouille'     => ($q['role'] ?? null) === 'premier',
+            ];
+        }
+
+        return $this->resoudreCollisionsClub($slots);
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private function seederBracket(array $qualifies, int $nbPoules): array
+    {
+        // Séparer 1ers et 2èmes de chaque poule
+        $premiers = [];
+        $seconds  = [];
+
+        for ($i = 0; $i < $nbPoules; $i++) {
+            if (isset($qualifies[$i * 2])) {
+                $premiers[] = $qualifies[$i * 2];     // 1er de chaque poule
+            }
+            if (isset($qualifies[$i * 2 + 1])) {
+                $seconds[] = $qualifies[$i * 2 + 1];  // 2ème de chaque poule
+            }
+        }
+
+        // Placement WKF : 1ers d'un côté, 2èmes de l'autre
+        // Pour éviter que 1er poule A affronte 1er poule B avant la finale
+        $seeded = [];
+        $nb = max(count($premiers), count($seconds));
+
+        for ($i = 0; $i < $nb; $i++) {
+            if (isset($premiers[$i])) $seeded[] = $premiers[$i];
+            if (isset($seconds[$nb - 1 - $i])) $seeded[] = $seconds[$nb - 1 - $i];
+        }
+
+        return $seeded;
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // CLASSEMENT POULE
+    // ─────────────────────────────────────────────────────────────────────────
+    public function classementPoule(Poule $poule): array
+    {
+        return DB::table('poule_inscriptions')
+            ->where('poule_id', $poule->id)
+            ->orderByDesc('points_victoire')
+            ->orderByDesc('total_points_marques')
+            ->orderBy('total_points_encaisses')
+            ->get()
+            ->map(fn($row) => ['inscription_id' => $row->inscription_id])
+            ->toArray();
+    }
     // ─────────────────────────────────────────────────────────────────────────
     // PROPAGATION DU VAINQUEUR
     // ─────────────────────────────────────────────────────────────────────────
@@ -273,81 +615,224 @@ class BracketService
             $combatSuivant->update(['inscription_ao_id' => $vainqueurId]);
         }
 
-        // Si les deux adversaires sont connus → combat prêt
+        // Si les deux adversaires sont connus -> combat prêt
         if ($combatSuivant->inscription_aka_id && $combatSuivant->inscription_ao_id) {
             $combatSuivant->update(['status' => 0]); // en attente
         }
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // CLASSEMENT POULE
-    // ─────────────────────────────────────────────────────────────────────────
-    public function classementPoule(Poule $poule): array
+    private function getPerduContreFinaliste(string $finalisteId, ConfigNotation $config): array
     {
-        $stats = [];
-        foreach ($poule->ordres as $ins) {
-            $stats[$ins->id] = [
-                'id'         => $ins->id,
-                'victoires'  => 0,
-                'points_for' => 0,
-                'points_ag'  => 0,
-            ];
+        $perdants = [];
+        $combattantActuel = $finalisteId;
+
+        // Remonter tous les combats gagnés par le finaliste
+        $combats = Combat::where('config_notation_id', $config->id)
+            ->where('vainqueur_id', $combattantActuel)
+            ->where('status', 2)
+            ->whereNull('poule_id') // phase éliminatoire seulement
+            ->get();
+
+        foreach ($combats as $combat) {
+            // Le perdant = celui qui n'est pas le vainqueur
+            $perdant = $combat->inscription_aka_id === $combattantActuel
+                ? $combat->inscription_ao_id
+                : $combat->inscription_aka_id;
+
+            $perdants[] = $perdant;
         }
 
-        $combats = Combat::where('poule_id', $poule->id)->where('status', 2)->get();
+        return $perdants;
+    }
+    public function lancerRepechage(ConfigNotation $config): void
+    {
+        // Trouver les deux finalistes
+        $finale = Combat::where('config_notation_id', $config->id)
+            ->where('etape', 'Finale')
+            ->first();
 
-        foreach ($combats as $c) {
-            if (!$c->vainqueur_id) continue;
+        $finalisteAka = $finale->inscription_aka_id;
+        $finalisteAo  = $finale->inscription_ao_id;
 
-            $stats[$c->inscription_aka_id]['points_for'] += $c->score_final_aka;
-            $stats[$c->inscription_aka_id]['points_ag']  += $c->score_final_ao;
-            $stats[$c->inscription_ao_id]['points_for']  += $c->score_final_ao;
-            $stats[$c->inscription_ao_id]['points_ag']   += $c->score_final_aka;
-            $stats[$c->vainqueur_id]['victoires']++;
-        }
+        // Perdants de chaque côté
+        $perdantsCoteAka = $this->getPerduContreFinaliste($finalisteAka, $config);
+        $perdantsCoteAo  = $this->getPerduContreFinaliste($finalisteAo, $config);
 
-        usort($stats, function ($a, $b) use ($poule) {
-            // 1. Nombre de victoires
-            if ($a['victoires'] !== $b['victoires']) return $b['victoires'] - $a['victoires'];
+        // Générer bracket repêchage côté AKA
+        $this->construireBracketRepechage($config, $perdantsCoteAka, 'bronze_aka');
 
-            // 2. Confrontation directe (Indispensable en Karaté)
-            $direct = Combat::where('poule_id', $poule->id)
-                ->where(function ($q) use ($a, $b) {
-                    $q->where('inscription_aka_id', $a['id'])->where('inscription_ao_id', $b['id']);
-                })->orWhere(function ($q) use ($a, $b) {
-                    $q->where('inscription_aka_id', $b['id'])->where('inscription_ao_id', $a['id']);
-                })->first();
-
-            if ($direct && $direct->vainqueur_id) {
-                return $direct->vainqueur_id === $a['id'] ? -1 : 1;
-            }
-
-            // 3. Différence de points techniques
-            return ($b['points_for'] - $b['points_ag']) - ($a['points_for'] - $a['points_ag']);
-        });
-
-        return $stats;
+        // Générer bracket repêchage côté AO
+        $this->construireBracketRepechage($config, $perdantsCoteAo, 'bronze_ao');
     }
 
+    private function construireBracketRepechage(
+        ConfigNotation $config,
+        array $perdants,
+        string $cote // 'bronze_aka' ou 'bronze_ao'
+    ): void {
+        $nb = count($perdants);
+
+        if ($nb === 0) return;
+
+        // Si un seul perdant -> bye direct -> bronze automatique
+        if ($nb === 1) {
+            Combat::create([
+                'id'                 => Str::uuid(),
+                'config_notation_id' => $config->id,
+                'inscription_aka_id' => null,
+                'inscription_ao_id'  => $perdants[0],
+                'vainqueur_id'       => $perdants[0],
+                'etape'              => "Bronze_{$cote}",
+                'type_victoire'      => 'kiken',
+                'status'             => 2,
+                'ordre'              => Combat::where('config_notation_id', $config->id)->max('ordre') + 1,
+                'score_final_aka'    => 0,
+                'score_final_ao'     => 0,
+            ]);
+            return;
+        }
+
+        // Compléter à la puissance de 2
+        $taille = $this->prochainesPuissanceDeDeux($nb);
+        $byes   = $taille - $nb;
+
+        // Construire le bracket de repêchage
+        $combatsParRound = [];
+        $ordre = Combat::where('config_notation_id', $config->id)
+            ->max('ordre') + 100;
+
+        $rounds = log($taille, 2);
+
+        for ($round = 1; $round <= $rounds; $round++) {
+            $nbCombats   = $taille / pow(2, $round);
+            $roundCombats = [];
+
+            for ($i = 0; $i < $nbCombats; $i++) {
+                $combat = Combat::create([
+                    'id'                 => Str::uuid(),
+                    'config_notation_id' => $config->id,
+                    'etape'              => $round === $rounds
+                        ? "Bronze_{$cote}"   // Finale repêchage -> bronze
+                        : "Repechage_{$cote}_R{$round}",
+                    'ordre'              => $ordre++,
+                    'status'             => 0,
+                    'score_final_aka'    => 0,
+                    'score_final_ao'     => 0,
+                ]);
+                $roundCombats[] = $combat;
+            }
+            $combatsParRound[$round] = $roundCombats;
+        }
+
+        // Lier les combats entre rounds
+        for ($round = 1; $round < $rounds; $round++) {
+            $combatsActuels  = $combatsParRound[$round];
+            $combatsSuivants = $combatsParRound[$round + 1];
+
+            foreach ($combatsActuels as $index => $combat) {
+                $indexSuivant  = intdiv($index, 2);
+                $combatSuivant = $combatsSuivants[$indexSuivant];
+
+                $combat->update(['next_combat_id' => $combatSuivant->id]);
+
+                if ($index % 2 === 0) {
+                    $combatSuivant->update(['source_aka_combat_id' => $combat->id]);
+                } else {
+                    $combatSuivant->update(['source_ao_combat_id' => $combat->id]);
+                }
+            }
+        }
+
+        // Assigner les combattants au 1er round
+        $this->assignerCombattants(
+            $combatsParRound[1],
+            array_map(fn($id) => ['inscription_id' => $id], $perdants),
+            $byes
+        );
+    }
+
+    public function verifierEtLancerRepechage(ConfigNotation $config): void
+    {
+        // Vérifier que les deux demi-finales sont terminées
+
+        DB::transaction(function () use ($config) {
+            $repechageExiste = Combat::where('config_notation_id', $config->id)
+                ->where('etape', 'LIKE', 'Bronze_%')
+                ->lockForUpdate()
+                ->exists();
+
+            if ($repechageExiste) return;
+
+            $demiesTerminees = Combat::where('config_notation_id', $config->id)
+                ->where('etape', 'Demi-finale')
+                ->where('status', 2)
+                ->count();
+
+            $totalDemies = Combat::where('config_notation_id', $config->id)
+                ->where('etape', 'Demi-finale')
+                ->count();
+
+            if ($demiesTerminees === $totalDemies && $totalDemies > 0) {
+                $this->lancerRepechage($config);
+                broadcast(new TatamiUpdated($config->id));
+            }
+        });
+    }
     // ─────────────────────────────────────────────────────────────────────────
     // HELPERS
     // ─────────────────────────────────────────────────────────────────────────
+    // private function prochainesPuissanceDeDeux(int $n): int
+    // {
+    //     $puissance = 1;
+    //     while ($puissance < $n) {
+    //         $puissance *= 2;
+    //     }
+    //     return $puissance;
+    // }
+
+
+    private function repartirEnTroisQuatre(int $nb, int $nbPoules): array
+    {
+        $base = intdiv($nb, $nbPoules);
+        $reste = $nb % $nbPoules;
+
+        $tailles = array_fill(0, $nbPoules, $base);
+
+        for ($i = 0; $i < $reste; $i++) {
+            $tailles[$i]++;
+        }
+
+        // Sécurité WKF : transforme 2+4 en 3+3
+        if (in_array(2, $tailles) && in_array(4, $tailles)) {
+            $k4 = array_search(4, $tailles);
+            $k2 = array_search(2, $tailles);
+            $tailles[$k4] = 3;
+            $tailles[$k2] = 3;
+        }
+
+        return $tailles; // Ex: 15 -> [4,4,4,3] | 14 -> [4,4,3,3]
+    }
+
+    private function calculerBye(int $qualifies): int
+    {
+        $puissance = $this->prochainesPuissanceDeDeux($qualifies);
+        return $puissance - $qualifies;
+    }
+
     private function prochainesPuissanceDeDeux(int $n): int
     {
-        $puissance = 1;
-        while ($puissance < $n) {
-            $puissance *= 2;
-        }
-        return $puissance;
+        $p = 1;
+        while ($p < $n) $p *= 2;
+        return $p;
     }
 
     private function getEtape(int $round, int $totalRounds): string
     {
         $roundDepuisFin = $totalRounds - $round + 1;
         return match ($roundDepuisFin) {
-            1 => 'finale',
-            2 => 'demi',
-            3 => 'quart',
+            1 => 'Finale',
+            2 => 'Demi-finale',
+            3 => 'Quart-finale',
             default => 'tour_' . $round,
         };
     }

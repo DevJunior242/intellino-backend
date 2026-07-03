@@ -3,8 +3,11 @@
 namespace App\Http\Controllers;
 
 use Carbon\Carbon;
+use App\Models\Club;
 use App\Models\Role;
 use App\Models\User;
+use App\Models\Saison;
+use App\Models\Licence;
 use App\Models\Student;
 use App\Models\ParentModel;
 use Illuminate\Support\Str;
@@ -30,9 +33,11 @@ class StudentController extends Controller
         $isSuperAdmin = ($role === 'super_admin');
 
         if ($isSuperAdmin) {
-            $students = Student::with('club:id,name')->get();
+            $students = Student::with('clubs:id,name')->get();
         } else {
-            $students = Student::where('club_id', $activeId)->get();
+            $students = Student::whereHas('clubs', function ($query) use ($activeId) {
+                $query->where('club_id', $activeId);
+            })->get();
         }
 
         $formattedStudents = $students->map(function ($student) use ($isSuperAdmin) {
@@ -42,7 +47,7 @@ class StudentController extends Controller
                 'birthdate' => $student->birthdate,
                 'sex' => $student->sex,
                 'status' => $student->status,
-                'club' => $isSuperAdmin ? $student->club : null,
+                'club' => $isSuperAdmin ? $student->clubs->first() : null,
                 'photo' => $student->photo ? url('storage/' . $student->photo) : null,
             ];
         });
@@ -63,11 +68,13 @@ class StudentController extends Controller
             ->whereDoesntHave('grades');
 
         if (!$isSuperAdmin) {
-            $query->where('club_id', $activeId);
+            $query->whereHas('clubs', function ($q) use ($activeId) {
+                $q->where('club_id', $activeId);
+            });
         }
 
         $students = $query
-            ->with('club:id,name')
+            ->with('clubs:id,name')
             ->get();
 
         $formattedStudents = $students->map(function ($student) use ($isSuperAdmin) {
@@ -77,12 +84,13 @@ class StudentController extends Controller
                 'birthdate' => $student->birthdate,
                 'sex' => $student->sex,
                 'status' => $student->status,
-                'club' => $isSuperAdmin ? $student->club : null,
+                'club' => $isSuperAdmin ? $student->clubs->first() : null,
                 'photo' => $student->photo
                     ? url('storage/' . $student->photo)
                     : null,
             ];
         });
+
 
         return response()->json([
             'success' => true,
@@ -95,8 +103,7 @@ class StudentController extends Controller
     {
         $user = auth()->user();
         $activeId = $request->attributes->get('organisateur_id');
-        Log::info('club_id', ['activeId' => $activeId]);
-        $authorizedRoles = ['admin_club', 'secretaire', 'instructeur'];
+        $authorizedRoles = ['admin', 'secretaire', 'instructeur'];
 
         // 3. On vérifie si l'utilisateur a UN de ces rôles dans CE club précis
         $hasPermission = DB::table('club_users')
@@ -132,20 +139,29 @@ class StudentController extends Controller
             'parentUsers' => $parents,
         ]);
     }
-
     public function store(StoreStudentRequest $request)
     {
-
         $this->authorize('create', Student::class);
-        $activeId = $request->attributes->get('organisateur_id');
+        $activeId = $request->attributes->get('organisateur_id'); // L'ID du club actuel
         $validated = $request->validated();
+
         try {
             return DB::transaction(function () use ($validated, $activeId, $request) {
                 $parentId = null;
                 $createdStudents = [];
+
+                // Trouver la saison active actuelle dans la base de données
+                $currentSeason = Saison::where('active', true)->first();
+
+                if (!$currentSeason) {
+                    return response()->json(['success' => false, 'message' => 'Aucune saison sportive active n’a été configurée.'], 400);
+                }
+
+                $seasonId = $currentSeason->id;
+
                 // --- GESTION DU PARENT ---
                 if (!$validated['is_own_responsible']) {
-                    $parentUser = User::firstOrCreate(
+                    $parentUser = User::updateOrCreate(
                         ['email' => $validated['parent_email']],
                         [
                             'id'       => (string) Str::uuid(),
@@ -156,7 +172,6 @@ class StudentController extends Controller
                         ]
                     );
 
-                    // Attribution rôle parent
                     $parentRole = cache()->rememberForever('role_parent', fn() => Role::where('name', 'parent')->first());
                     $parentUser->clubs()->syncWithoutDetaching([$activeId => ['role_id' => $parentRole->id]]);
 
@@ -169,62 +184,117 @@ class StudentController extends Controller
                     $studentUserId = null;
                     $currentStudentParentId = $parentId;
 
-                    // 1. Création du compte User (si responsable ou si accès demandé)
+                    // 1. Gestion du compte User (si responsable ou si accès demandé)
                     if ($validated['is_own_responsible'] || ($studentData['create_account'] ?? false)) {
-                        $studentUser = User::create([
-                            'id'       => (string) Str::uuid(),
-                            'fullname' => $studentData['fullname'],
-                            'email'    => $studentData['email'],
-                            'phone'    => $studentData['phone'] ?? null,
-                            'password' => Hash::make(Str::random(32)),
-                            'current_club_id' => $activeId,
-                        ]);
+
+                        // On cherche si l'utilisateur existe déjà via son email
+                        $studentUser = User::where('email', $studentData['email'])->first();
+
+                        if (!$studentUser) {
+                            // SCÉNARIO A : C'est un nouvel élève, on crée son compte User
+                            $studentUser = User::create([
+                                'id'       => (string) Str::uuid(),
+                                'fullname' => $studentData['fullname'],
+                                'email'    => $studentData['email'],
+                                'phone'    => $studentData['phone'] ?? null,
+                                'password' => Hash::make(Str::random(32)), // Il changera son mot de passe par mail
+                                'current_club_id' => $activeId,
+                            ]);
+                        } else {
+                            // SCÉNARIO B : L'élève existe déjà (Réinscription ou Transfert)
+                            // On met juste à jour son club actuel et ses infos si elles ont changé
+                            $studentUser->update([
+                                'fullname' => $studentData['fullname'],
+                                'phone'    => $studentData['phone'] ?? $studentUser->phone,
+                                'current_club_id' => $activeId,
+                            ]);
+                        }
 
                         $studentUserId = $studentUser->id;
 
-                        // Déterminer le rôle
-                        // $roleName = $validated['is_own_responsible'] ? 'parent' : 'karateka';
+                        // Gestion du rôle dans le nouveau club (club_users)
                         $role = cache()->rememberForever("role_karateka", fn() => Role::where('name', 'karateka')->first());
-
                         if ($role) {
-                            $studentUser->clubs()->attach($activeId, ['role_id' => $role->id]);
+                            // syncWithoutDetaching évite de recréer la ligne si elle existe déjà pour ce club
+                            $studentUser->clubs()->syncWithoutDetaching([$activeId => ['role_id' => $role->id]]);
                         }
-
-                        // Si l'élève est son propre responsable, il devient son propre "ParentModel"
-                        // if ($validated['is_own_responsible']) {
-                        //     $pProfile = ParentModel::firstOrCreate(['user_id' => $studentUserId]);
-                        //     $currentStudentParentId = null;
-                        // }
-                        // $token = Password::createToken($studentUser);
-                        // $studentUser->notify(new WelcomeNewMember($token));
                     }
 
                     // 2. Gestion de la photo
                     $photoPath = null;
                     $photoFile = $request->file("students.$index.photo");
-
                     if ($photoFile) {
                         $photoPath = $photoFile->store('students', 'public');
                     }
+                    // --- 3. GESTION DE LA FICHE STUDENT (Recherche ou Création) ---
+                    $student = null;
 
-                    // 3. Création de la fiche Student
-                    $student = Student::create([
-                        'fullname'  => $studentData['fullname'],
-                        'birthdate' => $studentData['birthdate'],
-                        'sex'       => $studentData['sex'],
-                        'club_id'   => $activeId,
-                        'user_id'   => $studentUserId,
-                        'is_adult'  => Carbon::parse($studentData['birthdate'])->age >= 18,
-                        'photo'     => $photoPath,
+                    if ($studentUserId) {
+                        // Cas A : L'élève a un compte utilisateur, on cherche par son user_id
+                        $student = Student::where('user_id', $studentUserId)->first();
+                    } else {
+                        // Cas B : Enfant sans compte, on cherche par ses données d'identité uniques
+                        $student = Student::where('fullname', $studentData['fullname'])
+                            ->where('birthdate', $studentData['birthdate'])
+                            ->where('sex', $studentData['sex'])
+                            ->first();
+                    }
+
+                    if (!$student) {
+                        // SCÉNARIO 1 : L'élève n'existe nulle part, c'est sa toute première inscription
+                        $student = Student::create([
+                            'fullname'  => $studentData['fullname'],
+                            'birthdate' => $studentData['birthdate'],
+                            'sex'       => $studentData['sex'],
+                            'user_id'   => $studentUserId,
+                            'is_adult'  => Carbon::parse($studentData['birthdate'])->age >= 18,
+                            'photo'     => $photoPath,
+                        ]);
+                    } else {
+                        // SCÉNARIO 2 : L'élève existe déjà ! (Réinscription ou Transfert)
+                        // On met juste à jour sa photo si une nouvelle a été envoyée
+                        if ($photoPath) {
+                            $student->update(['photo' => $photoPath]);
+                        }
+
+                        // SÉCURITÉ TRANSFERT : On désactive ses anciennes liaisons clubs actives pour les saisons passées
+                        $student->clubs()->wherePivot('is_active', true)->updateExistingPivot($student->clubs, ['is_active' => false]);
+                    }
+
+                    // --- 4. LIAISON HISTORIQUE CLUB-ÉLÈVE AVEC LE SAISON_ID ---
+                    // Grâce à syncWithoutDetaching ou un check, on lie l'élève au club pour la saison actuelle
+                    $student->clubs()->syncWithoutDetaching([
+                        $activeId => [
+                            'saison_id' => $seasonId,
+                            'is_active' => true
+                        ]
                     ]);
+                    // On récupère la fédération du club actif
+                    $club = Club::with('league')->find($activeId);
+                    $federationId = $club->league?->federation_id;
 
-                    // 4. Liaison avec le responsable (Le parent créé au début OU l'élève lui-même)
+                    // Licence::firstOrCreate(
+                    //     [
+                    //         'student_id' => $student->id,
+                    //         'saison_id'  => $seasonId,
+                    //     ],
+                    //     [
+                    //         'id'             => (string) Str::uuid(),
+                    //         'club_id'        => $activeId,
+                    //         'federation_id'  => $federationId,
+                    //         'licence_number' => $student->matricule,
+                    //         'status'         => 0,
+                    //         'montant_paye'    => 0.00,
+                    //     ]
+                    // );
+                    // --- 5. Liaison avec le responsable (Parent) ---
                     if ($currentStudentParentId) {
                         $student->parents()->syncWithoutDetaching([$currentStudentParentId]);
                     }
-                }
-                $createdStudents[] = $student->load('user');
 
+                    // On charge la relation pour la réponse JSON
+                    $createdStudents[] = $student->load('user');
+                }
                 return response()->json([
                     'success' => true,
                     'message' => count($createdStudents) . ' élève(s) enregistré(s) avec succès.',
@@ -232,8 +302,8 @@ class StudentController extends Controller
                 ], 201);
             });
         } catch (\Exception $e) {
-            Log::error($e->getMessage());
-            return response()->json(['success' => false, 'message' => 'Une erreur est survenue lors de l\'enregistrement de l\'élève'], 400);
+            Log::error($e);
+            return response()->json(['success' => false, 'message' => 'Une erreur est survenue lors de l\'enregistrement de l\'élève'], 500);
         }
     }
     public function updateStudent(UpdatedStudentReq $request, Student $student)
@@ -263,7 +333,7 @@ class StudentController extends Controller
                 'birthdate' => $student->birthdate,
                 'sex' => $student->sex,
                 'status' => $student->status,
-                'club' => $student->club,
+                'club' => $student->clubs->first(),
                 'photo' => $student->photo ? url('storage/' . $student->photo) : null,
             ],
         ]);
@@ -317,7 +387,9 @@ class StudentController extends Controller
         $this->authorize('viewStats', Student::class);
         $activeId = $request->attributes->get('organisateur_id');
 
-        $latestStudents = Student::where('club_id', $activeId)
+        $latestStudents = Student::whereHas('clubs', function ($query) use ($activeId) {
+            $query->where('club_id', $activeId);
+        })
             ->latest()
             ->take(5)
             ->get()

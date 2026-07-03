@@ -17,6 +17,8 @@ return new class extends Migration
             $table->string('region');
             $table->string('address')->nullable();
             $table->string('logo')->nullable();
+            $table->string('website')->nullable();
+            $table->string('invitation_code')->unique()->nullable();
             $table->softDeletes();
             $table->timestamps();
         });

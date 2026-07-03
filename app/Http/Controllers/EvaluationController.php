@@ -34,15 +34,7 @@ class EvaluationController extends Controller
         //parent 
         if ($role === 'parent') {
 
-            $parent = ParentModel::where('user_id', $user->id)
-                ->with([
-                    'students' => function ($q) {
-                        $q->with('club:id,name,logo')
-
-                            ->select('students.id', 'fullname', 'birthdate', 'sex', 'photo', 'status', 'club_id');
-                    }
-                ])
-                ->first();
+            $parent = ParentModel::where('user_id', $user->id)->first();
 
             if (!$parent) {
                 return response()->json([
@@ -297,8 +289,20 @@ class EvaluationController extends Controller
             // 7. ATTRIBUTION DU GRADE (Sécurisé avec updateOrCreate)
             $studentGrade = null;
             if ($passage == 'Admis') {
-                // On récupère le club de l'élève pour la foreign key
-                $studentClubId = $candidat->student->club_id;
+                // On récupère le club de l'élève pour la foreign key.
+                // Student n'a pas de colonne club_id (relation many-to-many
+                // via club_students) : si l'examen est organisé par un Club,
+                // c'est directement lui ; sinon on prend le club actif de l'élève.
+                $studentClubId = $examen->organisateur_type === 'Club'
+                    ? $examen->organisateur_id
+                    : $candidat->student->clubs()->wherePivot('is_active', true)->value('clubs.id');
+
+                if (!$studentClubId) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Impossible de déterminer le club actif de cet élève pour attribuer le grade.',
+                    ], 422);
+                }
 
                 $studentGrade = StudentGrade::updateOrCreate([
                     'student_id'       => $candidat->student_id,
@@ -437,7 +441,19 @@ class EvaluationController extends Controller
                     'decided_by' => $user->id,
                     'new_grade_id' => $finalGradeId,
                 ]);
-                $studentClubId = $candidat?->student?->club_id;
+                // Student n'a pas de colonne club_id (relation many-to-many via
+                // club_students) : si l'examen est organisé par un Club, c'est
+                // directement lui ; sinon on prend le club actif de l'élève.
+                $studentClubId = $examen->organisateur_type === 'Club'
+                    ? $examen->organisateur_id
+                    : $candidat->student->clubs()->wherePivot('is_active', true)->value('clubs.id');
+
+                if (!$studentClubId) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Impossible de déterminer le club actif de cet élève pour attribuer le grade.',
+                    ], 422);
+                }
 
                 // 6. Mettre à jour le grade actuel de l'étudiant
                 // On cherche le dernier grade créé pour cet examen pour le modifier au lieu d'en créer un nouveau

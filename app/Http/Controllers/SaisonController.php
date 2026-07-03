@@ -12,11 +12,12 @@ class SaisonController extends Controller
     {
         $activeId = $request->attributes->get('organisateur_id');
         $activeType = $request->attributes->get('organisateur_type');
-        if (!$activeId || !$activeType) {
+        //seule la fédération peut créer une saison
+        if ($activeType !== 'Federation') {
             return response()->json([
                 'success' => false,
-                'message' => 'Vous devez Avoir un club ou un league pour créer une saison',
-            ], 422);
+                'message' => 'Vous n\'avez pas les droits pour créer une saison.'
+            ], 403);
         }
         $request->validate([
             'libelle' => 'required|string|max:255',

@@ -3,34 +3,57 @@
 namespace Database\Seeders;
 
 use App\Models\Role;
-use Illuminate\Support\Str;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\DB;
 
 class RolesTableSeeder extends Seeder
 {
-    public function run()
+    public function run(): void
     {
         $roles = [
-            'super_admin',
-            'admin_club',
-            'admin_league',
-            'instructeur',
-            'secretaire',
-            'parent',
-            'karateka',
-            'arbitre_league',
-            'vice_president',
-            'responsable_technique',
-
+            [
+                'name' => 'super_admin',
+                'display_name' => 'Super Administrateur',
+                'description' => 'Accès absolu à toute la plateforme (Toi seul).',
+            ],
+            [
+                'name' => 'admin',
+                'display_name' => 'Administrateur',
+                'description' => 'Gestionnaire principal de la structure (Club, Ligue ou Fédération).',
+            ],
+            [
+                'name' => 'dtn',
+                'display_name' => 'Directeur Technique',
+                'description' => 'Responsable des grades, des sélections et des stages.',
+            ],
+            [
+                'name' => 'secretaire',
+                'display_name' => 'Secrétaire',
+                'description' => 'Gestion administrative, convocations et suivi des dossiers.',
+            ],
+            [
+                'name' => 'instructeur',
+                'display_name' => 'Instructeur / Professeur',
+                'description' => 'Gestion des cours, des fiches techniques et des présences sur le tatami.',
+            ],
+            [
+                'name' => 'arbitre',
+                'display_name' => 'Arbitre / Juge',
+                'description' => 'Officiel convoqué pour superviser les compétitions.',
+            ],
+            [
+                'name' => 'karateka',
+                'display_name' => 'Karatéka / Parent',
+                'description' => 'Élève ou tuteur. Accès aux licences, passeports et inscriptions.',
+            ],
+            [
+                'name' => 'parent',
+                'display_name' => ' Parent karateka',
+                'description' => 'Élève ou tuteur. Accès aux licences, passeports et inscriptions.',
+            ],
         ];
 
-        foreach ($roles as $name) {
-            foreach ($roles as $name) {
-                Role::firstOrCreate(
-                    ['name' => $name]
-                );
-            }
+        foreach ($roles as $role) {
+            Role::updateOrCreate(['name' => $role['name']], $role);
         }
     }
 }

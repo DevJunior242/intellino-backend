@@ -12,44 +12,13 @@ use Illuminate\Auth\Events\PasswordReset;
 
 class ResetPasswordController extends Controller
 {
-    // public function forgotPassword(Request $request)
-    // {
-    //     $request->validate(['email' => 'required|email']);
-
-    //     try {
-
-
-    //         $status = Password::sendResetLink(
-    //             $request->only('email')
-    //         );
-
-
-    //         return $status === Password::ResetLinkSent
-    //             ? response()->json([
-    //                 'success' => true,
-    //                 'message' => 'Email envoyé !'
-    //             ], 200)
-    //             : response()->json([
-    //                 'success' => false,
-    //                 'message' => 'Email introuvable'
-    //             ], 422);
-    //     } catch (\Throwable $e) {
-
-    //         return response()->json([
-    //             'success' => false,
-    //             'message' => 'Erreur SMTP',
-    //             'value' => $e->getMessage()
-
-    //         ], 500);
-    //     }
-    // }
-
+    
 
     public function forgotPassword(Request $request, \App\Services\BrevoService $brevo)
     {
         $request->validate(['email' => 'required|email']);
 
-        $user = \App\Models\User::where('email', $request->email)->first();
+        $user = User::where('email', $request->email)->first();
 
         if (!$user) {
             return response()->json([

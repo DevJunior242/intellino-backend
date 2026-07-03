@@ -15,8 +15,6 @@ class Affiliation extends Model
         'club_id',
         'saison_id',
         'cotisation',
-        'date_debut',
-        'date_fin',
         'status',
     ];
 

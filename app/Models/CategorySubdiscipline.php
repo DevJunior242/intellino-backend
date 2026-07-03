@@ -6,11 +6,11 @@ use App\Models\Category;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 
-class CategoryDisciplineleague extends Model
+class CategorySubdiscipline extends Model
 {
     use HasUuids;
-    protected $table = 'category_disciplineleagues';
-    protected $fillable = ['category_id', 'disciplineleague_id'];
+    protected $table = 'category_subdisciplines';
+    protected $fillable = ['category_id', 'sub_discipline_id'];
 
     protected $keyType = 'string';
     public $incrementing = false;

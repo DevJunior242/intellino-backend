@@ -11,12 +11,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('disciplineleagues', function (Blueprint $table) {
-            $table->uuid('id')->primary();
-            $table->uuidMorphs('organisateur');
-            $table->string('nom'); // kata, kumite
-            $table->string('description')->nullable();
-            $table->timestamps();
+        Schema::table('leagues', function (Blueprint $table) {
+            $table->foreignUuid('federation_id')->nullable()->constrained()->nullOnDelete();
         });
     }
 
@@ -25,6 +21,9 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('disciplineleagues');
+        Schema::table('leagues', function (Blueprint $table) {
+            $table->dropForeign(['federation_id']);
+            $table->dropColumn('federation_id');
+        });
     }
 };

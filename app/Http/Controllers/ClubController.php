@@ -84,11 +84,11 @@ class ClubController extends Controller
             }
 
             // 2. VERIFICATION DU ROLE
-            $adminRoleName = Role::where('name', 'admin_club')->first();
+            $adminRoleName = Role::where('name', 'admin')->first();
             if (!$adminRoleName) {
                return response()->json([
                   'success' => false,
-                  'message' => 'Le role admin_club n\'existe pas',
+                  'message' => 'Le role admin n\'existe pas',
                ], 422);
             }
 
@@ -109,7 +109,8 @@ class ClubController extends Controller
             // 5. MARQUER LA CLÉ COMME CONSOMMÉE
             $key->update([
                'is_used' => true,
-               'used_at' => now()
+               'used_at' => now(),
+               'used_by_user_id' => $user->id,
             ]);
 
             // 6. LOGIQUE UTILISATEUR & ROLES (Ton code d'origine)
@@ -137,12 +138,11 @@ class ClubController extends Controller
                'new_club' => [
                   'id'   => $club->id,
                   'type' => 'Club',
-                  'role' => 'admin_club'
+                  'role' => 'admin'
                ]
             ], 201);
          });
       } catch (\Throwable $th) {
-         Log::error('Erreur lors de la création du club', ['erreur' => $th->getMessage()]);
          return response()->json([
             'success' => false,
             'error'   => $th->getMessage(),

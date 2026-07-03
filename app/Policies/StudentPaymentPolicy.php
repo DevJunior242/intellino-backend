@@ -96,6 +96,6 @@ class StudentPaymentPolicy
             return true;
         }
 
-        return $user->hasClubRole(['instructeur', 'secretaire', 'admin_club']);
+        return $user->hasAccessTo(['instructeur', 'secretaire', 'admin']);
     }
 }

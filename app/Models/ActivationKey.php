@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 class ActivationKey extends Model
 {
     use HasUuids;
-    protected $fillable = ['key_code', 'type', 'comment', 'is_used', 'used_at'];
+    protected $fillable = ['key_code', 'type', 'comment', 'is_used', 'used_at', 'target_league_id'];
 
     protected $keyType = 'string';
     public $incrementing = false;

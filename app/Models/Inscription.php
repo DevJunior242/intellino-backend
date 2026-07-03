@@ -5,11 +5,13 @@ namespace App\Models;
 use App\Models\Club;
 use App\Models\Kata;
 use App\Models\Note;
+use App\Models\Poule;
 use App\Models\Student;
 use App\Models\Category;
 use App\Models\Competition;
 use App\Models\ConfigNotation;
 use App\Models\Disciplineleague;
+use App\Models\PouleInscription;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 
@@ -33,6 +35,7 @@ class Inscription extends Model
         'statut_passage',
         'organisateur_type',
         'organisateur_id',
+        'seed',
     ];
 
     protected $keyType = 'string';
@@ -60,6 +63,12 @@ class Inscription extends Model
     public function club()
     {
         return $this->belongsTo(Club::class, 'club_id');
+    }
+    public function poules()
+    {
+        return $this->belongsToMany(Poule::class, 'poule_inscriptions', 'inscription_id', 'poule_id')
+            ->using(PouleInscription::class)
+            ->withPivot('points_victoire', 'total_points_marques', 'total_points_encaisses');
     }
     // Une fonction magique (Accessor) pour l'affichage
     public function getStatutTexteAttribute()

@@ -8,25 +8,25 @@ return new class extends Migration
 {
     public function up()
     {
-        $tables = ['examens', 'competitions', 'licences', 'affiliations', 'courses', 'attendances'];
+        $tables = ['examens', 'affiliations', 'courses', 'attendances'];
 
         foreach ($tables as $tableName) {
             Schema::table($tableName, function (Blueprint $table) {
                 $table->foreignUuid('saison_id')
                     ->nullable()
                     ->constrained('saisons')
-                    ->onullOnDelete();
+                    ->nullOnDelete();
             });
         }
     }
 
     public function down()
     {
-        $tables = ['examens', 'courses', 'attendances', 'licences', 'affiliations'];
+        $tables = ['examens', 'courses', 'attendances', 'affiliations'];
 
         foreach ($tables as $tableName) {
             Schema::table($tableName, function (Blueprint $table) use ($tableName) {
-                $table->dropForeign([$tableName . '_saison_id_foreign']);
+                $table->dropForeign(['saison_id']);
                 $table->dropColumn('saison_id');
             });
         }

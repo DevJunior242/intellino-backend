@@ -49,7 +49,7 @@ class SessionModel extends Model
     public static function clubAdminRoles()
     {
         return self::whereIn('name', [
-            'admxin_club',
+            'admin',
             'instructeur'
         ])->pluck('id');
     }

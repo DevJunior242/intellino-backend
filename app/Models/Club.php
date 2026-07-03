@@ -26,8 +26,11 @@ class Club extends Model
         'discipline_id',
         'logo',
         'country_id',
+        'league_id',
         'city',
+        'region',
         'address',
+
     ];
 
     protected $keyType = 'string';
@@ -49,7 +52,9 @@ class Club extends Model
     }
     public function students()
     {
-        return $this->hasMany(Student::class);
+        return $this->belongsToMany(Student::class, 'club_students', 'club_id', 'student_id')
+            ->withPivot('saison_id', 'is_active')
+            ->withTimestamps();
     }
 
     public function grades()

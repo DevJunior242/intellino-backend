@@ -11,10 +11,10 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('category_disciplineleagues', function (Blueprint $table) {
+        Schema::create('category_subdisciplines', function (Blueprint $table) {
             $table->foreignUuid('category_id')->constrained('categories')->onDelete('cascade');
-            $table->foreignUuid('disciplineleague_id')->constrained('disciplineleagues')->onDelete('cascade');
-            $table->primary(['category_id', 'disciplineleague_id']);
+            $table->foreignUuid('sub_discipline_id')->constrained('sub_disciplines')->onDelete('cascade');
+            $table->primary(['category_id', 'sub_discipline_id']);
             $table->timestamps();
         });
     }

@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-use App\Models\Club;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -10,7 +9,11 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 class Role extends Model
 {
     use HasUuids;
-    protected $fillable = ['name'];
+    protected $fillable = [
+        'name',
+        'display_name',
+        'description'
+    ];
     protected $keyType = 'string';
     public $incrementing = false;
 
@@ -22,24 +25,23 @@ class Role extends Model
     public static function AccessRoles()
     {
         return self::whereIn('name', [
-            'admin_club',
+            'admin',
             'instructeur',
-            'admin_league',
         ])->pluck('id');
     }
     //clubAdminRoles
     public static function clubAdminRoles()
     {
         return self::whereIn('name', [
-            'admin_club',
+            'admin',
             'instructeur',
         ])->pluck('id');
     }
     public static function leagueAdminRoles()
     {
         return self::whereIn('name', [
-            'admin_league',
-            'arbitre_league',
+            'admin',
+            'arbitre',
         ])->pluck('id');
     }
 

@@ -26,12 +26,11 @@ class DashboardController extends Controller
         $activeId = $request->attributes->get('organisateur_id');
         $activeType = $request->attributes->get('organisateur_type');
 
-        Log::info('role', ['role' => $role]);
         $data = $this->statsService->getStatsByUserRole(
             $request->user(),
-            $request->attributes->get('organisateur_id'),
-            $request->attributes->get('organisateur_type'),
-            $request->attributes->get('role')
+            $activeId,
+            $activeType,
+            $role
         );
 
         if (isset($data['message'])) {

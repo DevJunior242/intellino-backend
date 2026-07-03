@@ -42,20 +42,7 @@ class ExamenPolicy
      */
     public function update(User $user, Examen $examen): bool
     {
-        if ($user->isSuperAdmin()) {
-            return true;
-        }
-
-        $clubId = $examen->club_id;
-
-        if (!$clubId) {
-            return false;
-        }
-
-        return $user->clubs()
-            ->where('clubs.id', $clubId)
-            ->whereIn('club_users.role_id', Role::clubAdminRoles())
-            ->exists();
+        return $this->hasOrganisateurAccess($user, $examen);
     }
 
     /**
@@ -63,19 +50,33 @@ class ExamenPolicy
      */
     public function delete(User $user, Examen $examen): bool
     {
-        $activeType = $examen->organisateur_type;
+        return $this->hasOrganisateurAccess($user, $examen);
+    }
 
+    /**
+     * L'examen appartient à un organisateur polymorphe (Club, Ligue ou
+     * Fédération) — on vérifie que l'utilisateur a un rôle admin/instructeur
+     * sur CETTE organisation précise, quel que soit son type.
+     */
+    private function hasOrganisateurAccess(User $user, Examen $examen): bool
+    {
         if ($user->isSuperAdmin()) {
             return true;
         }
-        $activeId = $examen->organisateur_id;
-        if (!$activeId) {
+
+        $relation = match ($examen->organisateur_type) {
+            'Club' => 'clubs',
+            'Ligue' => 'leagues',
+            'Federation' => 'federations',
+            default => null,
+        };
+
+        if (!$relation || !$examen->organisateur_id) {
             return false;
         }
 
-        $relation = $activeType === 'Club' ? 'clubs' : 'leagues';
         return $user->$relation()
-            ->where($relation . '.id', $activeId)
+            ->where($relation . '.id', $examen->organisateur_id)
             ->whereIn($relation . '_users.role_id', Role::AccessRoles())
             ->exists();
     }
@@ -101,6 +102,10 @@ class ExamenPolicy
             return true;
         }
 
-        return $user->hasAccessTo(['instructeur', 'admin_club', 'admin_league']);
+        // Un seul rôle "admin" existe en base (table roles), commun à
+        // Club/Ligue/Fédération — la distinction se fait via organisateur_type,
+        // pas via le nom du rôle. Les anciens noms "admin_club"/"admin_league"
+        // ne correspondent à aucune ligne de la table roles.
+        return $user->hasAccessTo(['instructeur', 'admin']);
     }
 }

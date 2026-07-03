@@ -38,21 +38,24 @@ class InscriptionController extends Controller
 
     public function getEvenementsOuverts(Request $request)
     {
+        // ->where('status', Evenement::STATUT_EN_COURS)
+
         $activeId = $request->attributes->get('organisateur_id');
 
         $clubId = $activeId;
 
         $leagueId = Club::where('id', $clubId)->value('league_id');
-        $evenements = Evenement::where(function ($q) use ($clubId, $leagueId) {
-            $q->where(function ($q2) use ($clubId) {
-                $q2->where('organisateur_type', 'Club')
-                    ->where('organisateur_id', $clubId);
+        $evenements = Evenement::where('status', Evenement::STATUT_EN_COURS)
+            ->where(function ($q) use ($clubId, $leagueId) {
+                $q->where(function ($q2) use ($clubId) {
+                    $q2->where('organisateur_type', 'Club')
+                        ->where('organisateur_id', $clubId);
+                })
+                    ->orWhere(function ($q2) use ($leagueId) {
+                        $q2->where('organisateur_type', 'Ligue')
+                            ->where('organisateur_id', $leagueId);
+                    });
             })
-                ->orWhere(function ($q2) use ($leagueId) {
-                    $q2->where('organisateur_type', 'Ligue')
-                        ->where('organisateur_id', $leagueId);
-                });
-        })
             ->with([
                 'competitions' => function ($q) {
                     $q->with(['category:id,nom,sexe', 'discipline:id,nom', 'niveau:id,nom'])

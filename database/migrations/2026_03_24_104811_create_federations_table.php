@@ -13,9 +13,15 @@ return new class extends Migration
     {
         Schema::create('federations', function (Blueprint $table) {
             $table->uuid('id')->primary();
-            $table->string('nom_fede');
+            $table->string('name'); // ex: "Fédération Burkinabè de Karaté Do"
+            $table->string('code', 10)->unique(); // ex: "FBK", unique pour éviter les doublons
             $table->string('logo')->nullable();
-            $table->timestamp('date_creation');
+            $table->string('address')->nullable();
+            $table->string('phone')->nullable();
+            $table->string('email')->nullable();
+            $table->string('website')->nullable();
+            $table->string('invitation_code')->unique()->nullable();
+            $table->softDeletes();
             $table->timestamps();
         });
     }

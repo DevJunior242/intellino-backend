@@ -17,7 +17,6 @@ class ConfigNotationController extends Controller
     public function index(Request $request)
     {
 
-        $start = microtime(true);
         $activeId = $request->attributes->get('organisateur_id');
 
         $activeType = $request->attributes->get('organisateur_type');
@@ -41,6 +40,7 @@ class ConfigNotationController extends Controller
                 'plateau:id,nom',
                 'kumiteFormat:id,code',
             ])
+            ->orderBy('created_at', 'desc')
             ->get();
 
         //  On mappe les données pour simplifier l'accès côté React
@@ -77,11 +77,8 @@ class ConfigNotationController extends Controller
                 'raw_plateau'     => $config->plateau,
             ];
         });
-        $globalTime = round(microtime(true) - $start, 2);
+        // En résumé : Competition définit la catégorie, ConfigNotation définit le tatami/session. Le format dépend du nombre d’athlètes par config, pas du nombre d’athlètes de toute la catégorie
 
-        Log::info('Configs endpoint hit', [
-            'time' => now()->format('H:i:s'),
-        ]);
         return response()->json($mappedConfigs);
     }
     public function store(Request $request)
@@ -116,10 +113,6 @@ class ConfigNotationController extends Controller
             'kumite_format_id'   => [
                 'nullable',
                 'exists:kumite_formats,id',
-                Rule::requiredIf(
-                    fn() =>
-                    $estKumite
-                ),
             ],
             'duration'           => [
                 'nullable',
@@ -146,9 +139,21 @@ class ConfigNotationController extends Controller
                 }
 
 
-                $config = ConfigNotation::updateOrCreate(
-                    ['competition_id' => $request->competition_id],
+                // $config = ConfigNotation::updateOrCreate(
+                //     ['competition_id' => $request->competition_id],
+                //     [
+                //         'plateau_id'         => $plateauId,
+                //         'mode_saisie_id'     => $request->mode_saisie_id,
+                //         'kumite_format_id'   => $request->kumite_format_id,
+                //         'nb_juges_option_id' => $request->nb_juges_option_id,
+                //         'duration'           => $request->duration ?? 3,
+                //         'configure_par'      => Auth::id(),
+                //     ]
+                // );
+
+                $config = ConfigNotation::create(
                     [
+                        'competition_id'     => $request->competition_id,
                         'plateau_id'         => $plateauId,
                         'mode_saisie_id'     => $request->mode_saisie_id,
                         'kumite_format_id'   => $request->kumite_format_id,
@@ -157,7 +162,6 @@ class ConfigNotationController extends Controller
                         'configure_par'      => Auth::id(),
                     ]
                 );
-
 
                 Competition::where('id', $request->competition_id)->update([
                     'status' => Competition::STATUT_EN_COURS

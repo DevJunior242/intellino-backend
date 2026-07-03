@@ -15,15 +15,15 @@ class AdminRegisterController extends Controller
     public function register(AdminRegisReq $request)
     {
         $user = auth()->user();
-        $role = $request->validated_role_name;
-        if ($role !== 'admin_club') {
+        $role = $request->attributes->get('role');
+        if ($role !== 'admin') {
             return response()->json([
                 'success' => false,
                 'message' => 'Vous n\'avez pas les droits pour effectuer cette action',
             ], 403);
         }
         $selectedRole = Role::find($request->role_id);
-        if (in_array($selectedRole->name, ['super_admin', 'admin_club'])) {
+        if (in_array($selectedRole->name, ['super_admin', 'admin'])) {
             return response()->json([
                 'success' => false,
                 'message' => 'Ce rôle ne peut pas être attribué par un admin de club',

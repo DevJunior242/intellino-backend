@@ -3,8 +3,10 @@
 namespace App\Models;
 
 use App\Models\Club;
+use App\Models\Federation;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Country extends Model
 {
@@ -16,5 +18,10 @@ class Country extends Model
     public function clubs()
     {
         return $this->hasMany(Club::class);
+    }
+
+    public function federations(): HasMany
+    {
+        return $this->hasMany(Federation::class);
     }
 }

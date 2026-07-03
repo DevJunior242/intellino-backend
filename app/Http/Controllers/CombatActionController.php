@@ -21,10 +21,10 @@ class CombatActionController extends Controller
         $data = $request->validate([
             'combat_id'        => 'required|uuid|exists:combats,id',
             'juge_numero'      => 'required|integer|between:1,4',
-            'type' => 'required|in:yuko,waza_ari,ippon,chukoku,keikoku,hansoku_chui,hansoku',
+            'type' => 'required|in:yuko,waza_ari,ippon,penalite,hansoku,hantei',
             'combattant'       => 'required|in:aka,ao',
             'valeur'           => 'required|integer|min:0|max:3',
-            'client_timestamp' => 'nullable'
+            'client_timestamp' => 'nullable|string'
         ]);
 
         $combat = Combat::where('id', $data['combat_id'])
@@ -32,10 +32,19 @@ class CombatActionController extends Controller
             ->firstOrFail();
 
         // 2. Le combat doit être actif
-        if ($combat->status !== 1) {
+        if (!in_array($combat->status, [1, 3])) {
             return response()->json(['message' => 'Le combat n\'est pas actif.'], 422);
         }
 
+        //temps écoulé
+        if ($combat->yame_at) {
+            $combat->load('configNotation');
+            $duree = $combat->configNotation->duration * 60;
+
+            if ($combat->temps_ecoule >= $duree && !in_array($data['type'], ['hantei', 'hansoku'])) {
+                return response()->json(['message' => 'Temps écoulé, votes non autorisés'], 422);
+            }
+        }
         // 3. Vérifier la rotation active de l'arbitre connecté
         $rotation = RotationArbitre::where('config_notation_id', $combat->config_notation_id)
             ->whereHas('arbitreCompetition', fn($q) => $q->where('user_id', auth()->id()))
@@ -57,6 +66,41 @@ class CombatActionController extends Controller
         $windowBase    = config('kumite.window_seconds', 2);
         $windowSeconds = $windowBase + min($decalage, 5); // max +5s de bonus
 
+        //hantei
+
+        if ($data['type'] === 'hantei') {
+            $estSuperviseur = RotationArbitre::where('config_notation_id', $combat->config_notation_id)
+                ->whereHas('arbitreCompetition', fn($q) => $q->where('user_id', auth()->id()))
+                ->where('est_superviseur', true)
+                ->exists();
+
+            if (!$estSuperviseur) {
+                return response()->json(['message' => 'Seul le superviseur peut donner un hansoku direct'], 403);
+            }
+
+            // Validation directe sans vote
+            $this->ValiderHantei($combat, $data['combattant']);
+
+            broadcast(new TatamiUpdated($combat->config_notation_id));
+            return response()->json(['success' => true, 'action_validated' => true]);
+        }
+
+        if ($data['type'] === 'hansoku') {
+            $estSuperviseur = RotationArbitre::where('config_notation_id', $combat->config_notation_id)
+                ->whereHas('arbitreCompetition', fn($q) => $q->where('user_id', auth()->id()))
+                ->where('est_superviseur', true)
+                ->exists();
+
+            if (!$estSuperviseur) {
+                return response()->json(['message' => 'Seul le superviseur peut donner un hansoku direct'], 403);
+            }
+
+            // Validation directe sans vote
+            $this->appliquerHansoku($combat, $data['combattant']);
+
+            broadcast(new TatamiUpdated($combat->config_notation_id));
+            return response()->json(['success' => true, 'action_validated' => true]);
+        }
         return DB::transaction(function () use ($combat, $data, $rotation, $clickTime, $windowSeconds) {
 
             // 4. Vérifier si cette action n'a pas déjà été validée récemment (anti-doublon)
@@ -111,6 +155,7 @@ class CombatActionController extends Controller
                 ])
                 ->first();
 
+
             if ($matchingVote) {
                 // ACCORD TROUVÉ : supprimer les deux votes et valider l'action
                 JudgeVote::whereIn('id', [$currentVote->id, $matchingVote->id])->delete();
@@ -119,11 +164,10 @@ class CombatActionController extends Controller
                 JudgeVote::where('combat_id', $combat->id)
                     ->where('clicked_at', '<', $clickTime->copy()->subSeconds($windowSeconds))
                     ->delete();
-                $penaliteTypes = ['chukoku', 'keikoku', 'hansoku_chui', 'hansoku'];
-                if (in_array($data['type'], $penaliteTypes)) {
+                if ($data['type'] === 'penalite') {
                     $this->traiterPenaliteAutomatique($combat, $data, $rotation);
                 } else {
-                    $this->validerPointOfficiel($combat, $data, $rotation);
+                    $this->validerPointOfficiel($combat, $data, $rotation, $clickTime, $windowSeconds);
                 }
 
                 $combat->refresh();
@@ -141,7 +185,7 @@ class CombatActionController extends Controller
         });
     }
 
-    private function validerPointOfficiel($combat, $data, $rotation)
+    private function validerPointOfficiel($combat, $data, $rotation, $clickTime, $windowSeconds)
     {
         // Créer l'action définitive et propre (Directement validée !)
         CombatAction::create([
@@ -152,32 +196,30 @@ class CombatActionController extends Controller
             'type'                => $data['type'], // yuko, waza_ari, ippon
             'valeur'              => $data['valeur'],
             'signale_a'           => now(),
-            'temps_match'         => $combat->temps_ecoule, // On fige la seconde du chrono
+            'temps_match'         => $combat->temps_ecoule,
         ]);
 
         // Incrémenter le score du combattant
         $champ = $data['combattant'] === 'aka' ? 'score_final_aka' : 'score_final_ao';
         $combat->increment($champ, $data['valeur']);
-        // GESTION DU SENSHU (Avantage du premier point)
-        if (is_null($combat->senshu_id)) {
+        // GESTION DU SENSHU (Avantage du premier point) 
+        $combattantAdverse = $data['combattant'] === 'aka' ? 'ao' : 'aka';
 
-            // Sécurité Anti-Simultané : On vérifie si l'ADVERSAIRE a aussi un vote validé 
-            // à la même seconde exacte dans l'historique de ce combat
-            $combattantAdverse = $data['combattant'] === 'aka' ? 'ao' : 'aka';
+        // Vérifier si l'adversaire a marqué dans la même fenêtre de 2 secondes
+        $aMarqueEnMemeTemps = CombatAction::where('combat_id', $combat->id)
+            ->where('combattant', $combattantAdverse)
+            ->whereBetween('signale_a', [
+                $clickTime->copy()->subSeconds($windowSeconds),
+                $clickTime->copy()->addSeconds($windowSeconds)
+            ])
+            ->exists();
 
-            $aMarqueEnMemeTemps = CombatAction::where('combat_id', $combat->id)
-                ->where('combattant', $combattantAdverse)
-                ->where('temps_match', $combat->temps_ecoule)
-                ->exists();
-
-            // Si l'adversaire n'a pas marqué à la même seconde, on attribue le Senshu définitivement
-            if (!$aMarqueEnMemeTemps) {
-                $combat->update([
-                    'senshu_id' => $data['combattant'] === 'aka'
-                        ? $combat->inscription_aka_id
-                        : $combat->inscription_ao_id
-                ]);
-            }
+        if (!$aMarqueEnMemeTemps && !$combat->senshu_id) {
+            $combat->update([
+                'senshu_id' => $data['combattant'] === 'aka'
+                    ? $combat->inscription_aka_id
+                    : $combat->inscription_ao_id
+            ]);
         }
 
         // 4. SÉCURITÉ : RÈGLE DES 8 POINTS D'ÉCART (Victoire Directe)
@@ -193,10 +235,9 @@ class CombatActionController extends Controller
 
             // On arrête le combat immédiatement
             $combat->update([
-                'status'         => 2, // 2 = Terminé
                 'vainqueur_id'   => $vainqueurId,
-                'type_victoire'  => 'Points', // Victoire par supériorité de points (Écart de 8)
-                'yame_at'        => now(),    // On enregistre le stop final du chrono
+                'type_victoire'  => 'Points',
+                'yame_at'        => now(),
             ]);
         }
     }
@@ -206,11 +247,14 @@ class CombatActionController extends Controller
         // Compter les pénalités existantes dans combat_actions
         $nb = CombatAction::where('combat_id', $combat->id)
             ->where('combattant', $data['combattant'])
-            ->whereIn('type', ['chukoku', 'keikoku', 'hansoku_chui', 'hansoku'])
+            ->where('type', 'penalite')
             ->count();
 
-        $niveaux = ['chukoku', 'keikoku', 'hansoku_chui', 'hansoku'];
-        $typePenalite = $niveaux[$nb] ?? 'hansoku';
+        // 4ème penalite = hansoku  élimination
+        if ($nb >= 3) {
+            $this->appliquerHansoku($combat, $data['combattant']);
+            return;
+        }
 
         // Créer la pénalité officielle
         CombatAction::create([
@@ -218,23 +262,46 @@ class CombatActionController extends Controller
             'combat_id'           => $combat->id,
             'rotation_arbitre_id' => $rotation->id,
             'combattant'          => $data['combattant'],
-            'type'                => $typePenalite,
+            'type'                => $data['type'],
             'valeur'              => 0,
             'signale_a'           => now(),
             'temps_match'         => $combat->temps_ecoule,
         ]);
+    }
 
-        // Si le combattant atteint le Hansoku -> Disqualification et victoire de l'autre
-        if ($typePenalite === 'hansoku') {
-            $vainqueur = $data['combattant'] === 'aka'
-                ? $combat->inscription_ao_id
-                : $combat->inscription_aka_id;
+    private function appliquerHansoku($combat, $combattant)
+    {
+        $scoreAka = $combattant === 'aka' ? 0 : $combat->score_final_aka;
+        $scoreAo  = $combattant === 'ao'  ? 0 : $combat->score_final_ao;
 
-            $combat->update([
-                'vainqueur_id'  => $vainqueur,
-                'type_victoire' => 'hansoku',
-                'status'        => 2, // Terminé
-            ]);
+        if ($combattant === 'aka') {
+            $scoreAo = max(4, $combat->score_final_ao);
+        } else {
+            $scoreAka = max(4, $combat->score_final_aka);
         }
+
+        $combat->update([
+            'vainqueur_id'    => $combattant === 'aka'
+                ? $combat->inscription_ao_id
+                : $combat->inscription_aka_id,
+            'type_victoire'   => 'hansoku',
+            'score_final_aka' => $scoreAka,
+            'score_final_ao'  => $scoreAo,
+        ]);
+
+        broadcast(new TatamiUpdated($combat->config_notation_id));
+    }
+    private function ValiderHantei(Combat $combat, string $combattant): void
+    {
+        $vainqueurId = $combattant === 'aka'
+            ? $combat->inscription_aka_id
+            : $combat->inscription_ao_id;
+
+        $combat->update([
+            'vainqueur_id'  => $vainqueurId,
+            'type_victoire' => 'hantei',
+        ]);
+
+        broadcast(new TatamiUpdated($combat->config_notation_id));
     }
 }

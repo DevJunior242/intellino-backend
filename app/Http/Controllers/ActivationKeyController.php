@@ -11,7 +11,8 @@ class ActivationKeyController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'type' => 'required|in:league,club',
+            'type' => 'required|in:league,club,federation,takeover_league,takeover_fede',
+            'target_league_id' => 'nullable|exists:leagues,id',
             'comment' => 'nullable|string|max:255'
         ]);
 
@@ -21,7 +22,12 @@ class ActivationKeyController extends Controller
                 'used_at' => now(),
             ]);
         // Génère un format pro : LIGUE-2026-ABCD-1234
-        $prefix = $request->type === 'league' ? 'LIGUE' : 'CLUB';
+        $prefix = match ($request->type) {
+            'club'       => 'CLUB',
+            'league'     => 'LIGUE',
+            'federation' => 'FED',
+            default      => 'ORG',
+        };
         $annee = now()->year;
         $random = strtoupper(Str::random(4)) . '-' . strtoupper(Str::random(4));
 
@@ -31,6 +37,7 @@ class ActivationKeyController extends Controller
             'key_code' => $keyCode,
             'type' => $request->type,
             'comment' => $request->comment,
+            'target_league_id' => $request->target_league_id,
             'is_used' => false
         ]);
 

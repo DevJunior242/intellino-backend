@@ -24,7 +24,7 @@ class Plateau extends Model
     {
         return $this->belongsTo(Evenement::class);
     }
-    public function configNotation()
+    public function configNotations()
     {
         return $this->belongsTo(ConfigNotation::class);
     }

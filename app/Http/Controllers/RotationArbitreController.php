@@ -58,7 +58,6 @@ class RotationArbitreController extends Controller
 
         return DB::transaction(function () use ($request, $configId) {
             // 1. On retire le badge superviseur à TOUT LE MONDE sur cette config
-            $start = microtime(true);
 
             RotationArbitre::where('config_notation_id', $configId)
                 ->update(['est_superviseur' => false]);
@@ -72,8 +71,32 @@ class RotationArbitreController extends Controller
                     'actif' => true
                 ]);
             broadcast(new TatamiUpdated($configId))->toOthers();
-            Log::info('Temps execution', ['ms' => round((microtime(true) - $start) * 1000, 2)]);
             return response()->json(['success' => true, 'message' => 'Superviseur désigné avec succès']);
+        });
+    }
+    //retirer le superviseur 
+    public function retirerSuperviseur(Request $request, $configId)
+    {
+        $request->validate([
+            'arbitre_competition_id' => 'required|exists:arbitre_competitions,id'
+        ]);
+
+        return DB::transaction(function () use ($request, $configId) {
+            // 1. On retire le badge superviseur à TOUT LE MONDE sur cette config
+
+            RotationArbitre::where('config_notation_id', $configId)
+                ->update(['est_superviseur' => false]);
+
+            // 2. On l'attribue à l'élu
+            RotationArbitre::where('config_notation_id', $configId)
+                ->where('arbitre_competition_id', $request->arbitre_competition_id)
+                ->update([
+                    'est_superviseur' => false,
+                    'poste' => null,
+                    'actif' => false
+                ]);
+            broadcast(new TatamiUpdated($configId))->toOthers();
+            return response()->json(['success' => true, 'message' => 'Superviseur retiré avec succès']);
         });
     }
 
@@ -82,7 +105,7 @@ class RotationArbitreController extends Controller
         $start = microtime(true);
         $request->validate([
             'rotation_id' => 'required|exists:rotation_arbitres,id',
-            'poste'       => 'nullable|integer|min:1|max:7', // null pour remettre au banc
+            'poste'       => 'nullable|integer|min:1|max:8', // null pour remettre au banc
         ]);
 
         $rotation = RotationArbitre::find($request->rotation_id);
@@ -103,7 +126,6 @@ class RotationArbitreController extends Controller
             'actif' => !is_null($request->poste)
         ]);
         broadcast(new TatamiUpdated($rotation->config_notation_id))->toOthers();
-        Log::info('Temps execution', ['ms' => round((microtime(true) - $start) * 1000, 2)]);
         return response()->json(['success' => true]);
     }
 }

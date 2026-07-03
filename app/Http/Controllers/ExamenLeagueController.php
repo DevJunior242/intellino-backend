@@ -38,7 +38,7 @@ class ExamenLeagueController extends Controller
 
     public function getClubExams(Request $request)
     {
-        $club = Club::findOrFail($request->validated_club_id);
+        $club = Club::findOrFail($request->attributes->get('club_id'));
         Log::info('club', [$club]);
         $examens = ExamenLeague::where('league_id', $club->league_id)->get();
         return response()->json($examens);

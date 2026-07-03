@@ -15,11 +15,11 @@ use Illuminate\Support\Facades\DB;
 
 class ClubDashService
 {
-    public function getStatsByUserRole($user, $activeId, $activeType, $role)
+    public function   getStatsByUserRole($user, $activeId, $activeType, $role)
     {
         return match ($role) {
             'super_admin' => $this->superAdminStats(),
-            'admin_club'  => $this->clubAdminStats($activeId),
+            'admin'  => $this->clubAdminStats($activeId),
             'instructeur' => $this->instructorStats($activeId, $activeType),
             'secretaire'  => $this->secretaireStats($activeId, $activeType),
             'parent'      => $this->parentStats($user),
@@ -79,6 +79,10 @@ class ClubDashService
             ->count()
             : 0;
 
+        $totalStudents = Student::whereHas('clubs', function ($q) use ($activeId) {
+            $q->where('club_id', $activeId);
+        })->count();
+
         $month = now()->month;
         // Total encaissé ce mois-ci
         $total_collected = StudentPayment::where('club_id', $activeId)
@@ -89,48 +93,61 @@ class ClubDashService
         $total_debts = StudentPayment::where('club_id', $activeId)
             ->sum('balance');
 
-        // Répartition par mode de paiement
-        $payment_methods = StudentPayment::where('club_id', $activeId)
-            ->whereMonth('created_at', $month)
-            ->select('payment_method', DB::raw('sum(amount_paid) as total'))
-            ->groupBy('payment_method')
-            ->get();
-
         return [
-            'admin stats pour club' => $activeId,
-            'total_students' => Student::where('club_id', $activeId)->count(),
-            'total_instructors' =>  $totalInstructors,
-            'total_parents' => ParentModel::whereHas('students', function ($q) use ($activeId) {
-                $q->where('club_id', $activeId);
-            })
-                ->distinct()
-                ->count(),
+            'total_students' => $totalStudents,
+            'total_instructors' => $totalInstructors,
             'total_secretaries' => $totalSecretaries,
             'total_collected' => $total_collected,
             'total_debts' => $total_debts,
         ];
     }
 
-    private function instructorStats($activeId, $activeType)
+    /**
+     * Stats club (élèves/cours/examens) communes aux rôles instructeur/secrétaire/karateka.
+     * Student n'a pas de colonne club_id (relation many-to-many via club_students),
+     * Course/Examen sont scopés par organisateur_id/organisateur_type (pas club_id),
+     * et Examen n'a pas de colonne "date" (seulement start_date/end_date).
+     */
+    private function studentCourseExamStats($activeId, $activeType)
     {
-        $baseExamenQuery = Examen::where('organisateur_id', $activeId)
+        $examenQuery = Examen::where('organisateur_id', $activeId)
             ->where('organisateur_type', $activeType);
         $today = now()->toDateString();
 
+        return [
+            'total_students' => Student::whereHas('clubs', function ($q) use ($activeId) {
+                $q->where('club_id', $activeId);
+            })->count(),
+            'total_courses' => Course::where('organisateur_id', $activeId)
+                ->where('organisateur_type', $activeType)
+                ->count(),
+            'total_examens' => (clone $examenQuery)->count(),
+            'total_examens_encours' => (clone $examenQuery)
+                ->whereDate('start_date', '<=', $today)
+                ->whereDate('end_date', '>=', $today)
+                ->count(),
+            'total_examens_avenir' => (clone $examenQuery)
+                ->whereDate('start_date', '>', $today)
+                ->count(),
+            'total_examens_termines' => (clone $examenQuery)
+                ->whereDate('end_date', '<', $today)
+                ->count(),
+        ];
+    }
 
-        $examenEncours = (clone $baseExamenQuery)->whereDate('date', $today)->count();
-        $examenAVenir = (clone $baseExamenQuery)->where('date', '>', $today)->count();
-        $examenTermines = (clone $baseExamenQuery)->where('date', '<', $today)->count();
+    private function instructorStats($activeId, $activeType)
+    {
+        $stats = $this->studentCourseExamStats($activeId, $activeType);
 
         return [
             'role' => 'instructeur pour club ' . $activeId,
             'club_id' => $activeId,
-            'total_students' => Student::where('club_id', $activeId)->count(),
-            'total_courses' => Course::where('club_id', $activeId)->count(),
-            'total_examens' => $baseExamenQuery->count(),
-            'total_examens_encours' => $examenEncours,
-            'total_examens_avenir' => $examenAVenir,
-            'total_examens_termines' => $examenTermines,
+            'total_students' => $stats['total_students'],
+            'total_courses' => $stats['total_courses'],
+            'total_examens' => $stats['total_examens'],
+            'total_examens_encours' => $stats['total_examens_encours'],
+            'total_examens_avenir' => $stats['total_examens_avenir'],
+            'total_examens_termines' => $stats['total_examens_termines'],
         ];
     }
 
@@ -142,8 +159,8 @@ class ClubDashService
 
         $parent = ParentModel::where('user_id', $user->id)
             ->with(['students' => function ($q) {
-                $q->select('id', 'fullname', 'birthdate', 'sex', 'photo', 'status', 'club_id')
-                    ->with('club:id,name,logo');
+                $q->select('id', 'fullname', 'birthdate', 'sex', 'photo', 'status')
+                    ->with('clubs:id,name,logo');
             }])
             ->first();
 
@@ -174,62 +191,23 @@ class ClubDashService
 
     private function etudiantStats($activeId, $activeType)
     {
-        $initExamen = Examen::where('organisateur_id', $activeId)
-            ->where('organisateur_type', $activeType);
-        $today = now()->toDateString();
-        $examenEncours = (clone $initExamen)
-            ->where('date', '<=', $today)
-            ->count();
-        $examenAVenir = (clone $initExamen)
-            ->where('date', '>', $today)
-            ->count();
-        $examenTermines = (clone $initExamen)
-            ->where('date', '<', $today)
-            ->count();
+        $stats = $this->studentCourseExamStats($activeId, $activeType);
+
         return [
-            'total_students' =>
-            Student::where('club_id', $activeId)->count(),
-            'total_courses' =>
-            Course::where('club_id', $activeId)->count(),
-            'toltals_examens' => $initExamen->count(),
-            'total_examens_encours' => $examenEncours,
-            'total_examens_avenir' => $examenAVenir,
-            'total_examens_termines' => $examenTermines,
+            'total_students' => $stats['total_students'],
+            'total_courses' => $stats['total_courses'],
+            'toltals_examens' => $stats['total_examens'],
+            'total_examens_encours' => $stats['total_examens_encours'],
+            'total_examens_avenir' => $stats['total_examens_avenir'],
+            'total_examens_termines' => $stats['total_examens_termines'],
         ];
     }
 
 
     private function secretaireStats($activeId, $activeType)
     {
-
-        $initExamen = Examen::where('organisateur_id', $activeId)
-            ->where('organisateur_type', $activeType);
-        $today = now()->toDateString();
-
-
-        $examenEncours = (clone $initExamen)
-            ->where('date', '<=', $today)
-            ->count();
-
-        $examenAVenir = (clone $initExamen)
-            ->where('date', '>', $today)
-            ->count();
-
-        $examenTermines = (clone $initExamen)
-            ->where('date', '<', $today)
-            ->count();
-
-        return [
-            'total_students' =>
-            Student::where('club_id', $activeId)->count(),
-
-            'total_courses' =>
-            Course::where('club_id', $activeId)->count(),
-            'toltals_examens' => $initExamen->count(),
-            'total_examens_encours' => $examenEncours,
-            'total_examens_avenir' => $examenAVenir,
-            'total_examens_termines' => $examenTermines,
-
-        ];
+        // Mêmes clés que etudiantStats() — préservées telles quelles (y compris
+        // la faute de frappe historique "toltals_examens") pour ne pas casser le front.
+        return $this->etudiantStats($activeId, $activeType);
     }
 }

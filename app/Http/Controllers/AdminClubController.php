@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Role;
 use App\Models\Attendance;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class AdminClubController extends Controller
 {
@@ -29,5 +31,14 @@ class AdminClubController extends Controller
             'presences' => $attendances,
             'chartData' => $chartData
         ]);
+    }
+
+    public function getRoles(Request $request)
+    {
+        $roleInclus = ['admin', 'instructeur', 'secretaire', 'karateka'];
+
+        $roles = Role::whereIn('name', $roleInclus)->get();
+        Log::info('roles', ['roles' => $roles]);
+        return response()->json(['success' => true, 'roles' => $roles]);
     }
 }

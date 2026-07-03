@@ -21,8 +21,6 @@ class StoreExamenRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'organisateur_id' => 'required|uuid',
-            'organisateur_type' => 'required|string|in:Ligue,Club',
             'current_grade_id' => [
                 'required',
                 'uuid',
@@ -33,7 +31,9 @@ class StoreExamenRequest extends FormRequest
                 'uuid',
                 function ($attribute, $value, $fail) {
                     $nextGrade = \App\Models\Grade::find($value);
-                    $type = $this->input('organisateur_type');
+                    // L'organisateur vient du contexte authentifié (middleware),
+                    // jamais du payload client — voir ExamenController::store().
+                    $type = $this->attributes->get('organisateur_type');
 
                     if ($nextGrade && str_contains(strtolower($nextGrade->name), 'noire')) {
                         if ($type !== 'Ligue') {

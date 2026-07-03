@@ -27,7 +27,7 @@ class StoreLeagueReq extends FormRequest
             'region' => ['bail', 'regex:/^[\pL\s\d\-\.,\#\/\(\)\']+$/u', 'max:50'],
             'address' => ['bail', 'nullable', 'regex:/^[\pL\s\d\-\.,\#\/\(\)\']+$/u', 'max:50'],
             'logo' => 'nullable|image|mimes:jpeg,png,jpg,svg|max:1024',
-            'activation_key' => 'required|string',
+            // 'activation_key' => 'required|string',
         ];
     }
 

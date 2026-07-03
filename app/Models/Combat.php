@@ -36,7 +36,11 @@ class Combat extends Model
         'type',
         'valeur',
     ];
-
+    //constantes de statut
+    const STATUS_EN_ATTENTE = 0;
+    const STATUS_EN_COURS = 1;
+    const STATUS_TERMINE = 2;
+    const STATUS_HANTEI = 3;
 
 
     public function poule()
@@ -59,5 +63,28 @@ class Combat extends Model
     public function actions()
     {
         return $this->hasMany(CombatAction::class);
+    }
+
+    public function nextCombat()
+    {
+        return $this->belongsTo(Combat::class, 'next_combat_id');
+    }
+    public function sourceAkaCombat()
+    {
+        return $this->belongsTo(Combat::class, 'source_aka_combat_id');
+    }
+    public function sourceAoCombat()
+    {
+        return $this->belongsTo(Combat::class, 'source_ao_combat_id');
+    }
+    public function getStatutLabelAttribute()
+    {
+        return match ($this->status) {
+            self::STATUS_EN_ATTENTE => 'En attente',
+            self::STATUS_EN_COURS  => 'En cours',
+            self::STATUS_TERMINE   => 'Terminée',
+            self::STATUS_HANTEI    => 'Hantei',
+            default                => 'Inconnu',
+        };
     }
 }

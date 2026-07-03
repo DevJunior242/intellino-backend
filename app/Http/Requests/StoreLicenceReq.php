@@ -36,7 +36,6 @@ class StoreLicenceReq extends FormRequest
             ],
             // 'saison' => 'required|string|regex:/^\d{4,10}-\d{4,10}$/',
             'type' => 'required|string',
-            'grade_au_moment' => 'nullable|string|max:50',
             'montant' => 'nullable|numeric|min:0',
             'date_emission' => 'required|date',
             'date_expiration' => 'required|date|after:date_emission',

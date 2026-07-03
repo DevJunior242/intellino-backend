@@ -27,13 +27,12 @@ class StoreEvenementRequest extends FormRequest
             'lieu' => 'required|string|max:255',
             'date_debut' => 'required|date',
             'date_fin' => 'required|date|after_or_equal:date_debut',
-            'organisateur_id' => 'required|uuid',
-            'organisateur_type' => 'required|string|in:Ligue,Federation',
+
 
             // Validation du tableau des catégories
             'epreuves' => 'required|array|min:1',
             'epreuves.*.category_id' => 'required|uuid|exists:categories,id',
-            'epreuves.*.disciplineleague_id' => 'required|uuid|exists:disciplineleagues,id',
+            'epreuves.*.sub_discipline_id' => 'required|uuid|exists:sub_disciplines,id',
             'epreuves.*.niveau_id' => 'required|uuid|exists:niveaux_competitions,id',
             'epreuves.*.heure_debut_prevu' => [
                 'required',
@@ -42,7 +41,20 @@ class StoreEvenementRequest extends FormRequest
             'epreuves.*.heure_fin_prevue' => [
                 'required',
                 'date',
-                'after:epreuves.*.heure_debut_prevu'
+                function ($attribute, $value, $fail) {
+                    preg_match('/epreuves\.(\d+)\.heure_fin_prevue/', $attribute, $matches);
+                    $index = $matches[1] ?? null;
+
+                    if ($index === null) {
+                        return;
+                    }
+
+                    $debut = $this->input("epreuves.$index.heure_debut_prevu");
+
+                    if ($debut && strtotime($value) <= strtotime($debut)) {
+                        $fail("L'heure de fin de l'épreuve doit être après l'heure de début.");
+                    }
+                },
             ],
 
         ];
@@ -59,8 +71,10 @@ class StoreEvenementRequest extends FormRequest
             'organisateur_type.required' => 'Le type de l\'organisateur est obligatoire.',
             'organisateur_type.in' => 'Le type de l\'organisateur doit être Ligue ou Federation.',
             'epreuves.*.category_id.exists' => 'La catégorie sélectionnée n\'existe pas.',
-            'epreuves.*.disciplineleague_id.exists' => 'Le disciplineleague sélectionnée n\'existe pas.',
+            'epreuves.*.sub_discipline_id.exists' => 'Le disciplineleague sélectionnée n\'existe pas.',
             'epreuves.*.niveau_id.exists' => 'Le niveau sélectionné n\'existe pas.',
+            'epreuves.*.heure_debut_prevu.date' => 'La date de début doit être une date.',
+            'epreuves.*.heure_fin_prevue.date' => 'La date de fin doit être une date.',
         ];
     }
 }

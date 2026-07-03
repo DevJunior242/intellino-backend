@@ -13,14 +13,18 @@ use App\Http\Controllers\RoleController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\GradeController;
 use App\Http\Controllers\MedalController;
+use App\Http\Controllers\StageController;
 use App\Http\Controllers\CombatController;
 use App\Http\Controllers\CourseController;
 use App\Http\Controllers\ExamenController;
 use App\Http\Controllers\LeagueController;
+use App\Http\Controllers\MandatController;
 use App\Http\Controllers\MemberController;
 use App\Http\Controllers\NbJugeController;
+use App\Http\Controllers\PodiumController;
 use App\Http\Controllers\SaisonController;
 use App\Http\Controllers\SeanceController;
+use App\Http\Controllers\VuePubController;
 use App\Http\Controllers\ArbitreController;
 use App\Http\Controllers\ContactController;
 use App\Http\Controllers\CountryController;
@@ -41,12 +45,13 @@ use App\Http\Controllers\EvaluationController;
 use App\Http\Controllers\FederationController;
 use App\Http\Controllers\GovernanceController;
 use App\Http\Controllers\InstructorController;
+use App\Http\Controllers\InvitationController;
 use App\Http\Controllers\ModeSaisieController;
 use App\Http\Controllers\AffiliationController;
 use App\Http\Controllers\CandidatureController;
 use App\Http\Controllers\CompetitionController;
 use App\Http\Controllers\InscriptionController;
-use App\Http\Controllers\LeagueSetupController;
+use App\Http\Controllers\LicenceTypeController;
 use App\Http\Controllers\PricingPlanController;
 use App\Http\Controllers\AffiliationControllerr;
 use App\Http\Controllers\ArbitreStatsController;
@@ -59,20 +64,27 @@ use App\Http\Controllers\KumiteFormatController;
 use App\Http\Controllers\LeagueMemberController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\OrdrePassageController;
+use App\Http\Controllers\StagePaymentController;
 use App\Http\Controllers\StudentGradeController;
 use App\Http\Controllers\SubscriptionController;
 use App\Http\Controllers\ActivationKeyController;
+use App\Http\Controllers\AddManuelClubController;
 use App\Http\Controllers\Auth\RegisterController;
+use App\Http\Controllers\LicenceleagueController;
+use App\Http\Controllers\PaymentMethodController;
 use App\Http\Controllers\ResetPasswordController;
+use App\Http\Controllers\SubDisciplineController;
 use App\Http\Controllers\ConfigNotationController;
+use App\Http\Controllers\LicencePaymentController;
 use App\Http\Controllers\StudentPaymentController;
 use App\Http\Controllers\DashBoardLeagueController;
 use App\Http\Controllers\PaymentCategoryController;
 use App\Http\Controllers\RotationArbitreController;
 use App\Http\Controllers\DisciplineConfigController;
+use App\Http\Controllers\StageRegistrationController;
 use App\Http\Controllers\Auth\AdminRegisterController;
 use App\Http\Controllers\NiveauxCompetitionController;
-
+use App\Http\Controllers\FederationDashboardController;
 
 
 Route::post('/register', [RegisterController::class, 'register']);
@@ -86,14 +98,15 @@ Route::get('/reset-password/{token}', [ResetPasswordController::class, 'sentToke
 Route::post('/reset-password', [ResetPasswordController::class, 'resetPassword']);
 Route::get('configs/{config}/vue-publique', [SeanceController::class, 'vuePublique']);
 Route::get('configs/{config}/next-athlete', [SeanceController::class, 'nextAthlete']);
-
+//public
+Route::get('/public/configs/{config}/combat-en-cours', [VuePubController::class, 'combatEnCours']);
+Route::get('/public/configs/{config}/next-combat', [VuePubController::class, 'nextCombat']);
+//podium 
+Route::get('/podium/{config}', [PodiumController::class, 'obtenirPodium']);
+Route::get('/configs/{config}/bracket', [CombatController::class, 'bracket']);
 
 Route::middleware(['auth:sanctum'])->group(function () {
-    Route::get('/user', function (Request $request) {
-        return $request->user();
-    });
-    //roles  leagues 
-    Route::get('leagues/getRoles', [LeagueMemberController::class, 'getRoles']);
+    Route::get('/user', [LoginController::class, 'me']);
     //keys
     Route::apiResource('/activation-keys', ActivationKeyController::class);
 
@@ -103,7 +116,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
     //discipline 
     Route::apiResource('/disciplines', DisciplineController::class);
     //roles 
-    Route::get('/roles', [RoleController::class, 'roles']);
+
     //register
     Route::post('/Admin/register', [AdminRegisterController::class, 'register']);
     //logout 
@@ -117,6 +130,8 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::put('/password', [SettingController::class, 'updatePassword']);
         Route::delete('/account', [SettingController::class, 'deleteAccount']);
     });
+    //federations
+    Route::apiResource('/federations', FederationController::class);
 
 
 
@@ -161,34 +176,8 @@ Route::middleware(['auth:sanctum'])->group(function () {
     });
 
 
-    //niveaux competitions
-    Route::prefix('niveaux-competitions')->group(function () {
-        Route::apiResource('/niveaux-competitions', NiveauxCompetitionController::class);
-    });
-    //modes saisie
-    Route::prefix('modes-saisie')->group(function () {
-        Route::apiResource('/modes-saisie', ModeSaisieController::class);
-    });
-    //nb juges
-    Route::prefix('nb-juges')->group(function () {
-        Route::apiResource('/nb-juges', NbJugeController::class);
-    });
-    //config notation
-    Route::get('evenements/{evenementId}/plateaux', [ConfigNotationController::class, 'getPlateauxByEvenement']);
 
 
-    Route::prefix('seances')->group(function () {
-
-        Route::post('configs/{config}/valider',          [SeanceController::class, 'valider']);
-        Route::post('configs/{config}/lancer',            [SeanceController::class, 'lancerSeance']);
-        Route::post('configs/{config}/athlete-suivant',  [SeanceController::class, 'athleteSuivant']);
-        Route::get('configs/{config}/etat',              [SeanceController::class, 'etat']);
-        Route::get('configs/{config}/pret', [SeanceController::class, 'estPret']);
-        Route::get('competition/{config}/en-cours', [SeanceController::class, 'enCours']);
-
-        Route::post('configs/{config}/connecter-tablette', [SeanceController::class, 'connecterTablette']);
-        Route::get('configs/{config}/arbitres-rotation',    [SeanceController::class, 'arbitresRotation']);
-    });
     //combats
     Route::post('/combats/{combat}/start-chrono', [CombatController::class, 'startChrono']);
     Route::post('/combats/{combat}/stop-chrono', [CombatController::class, 'stopChrono']);
@@ -196,7 +185,6 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::get('/configs/{config}/combat-en-cours', [CombatController::class, 'combatEnCours']);
     Route::get('/configs/{config}/next-combat', [CombatController::class, 'nextCombat']);
     Route::post('/configs/{config}/combat-suivant', [CombatController::class, 'combatSuivant']);
-    Route::get('configs/{config}/bracket', [CombatController::class, 'bracket']);
     // Actions
     Route::post('combat-actions', [CombatActionController::class, 'store']);
     Route::post('/combat-penalite', [CombatActionController::class, 'penalite']);
@@ -207,45 +195,18 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::delete('/reset-all-judges/{config}', [JudgeSessionController::class, 'resetAllJudges']);
 
     //arbitre dispo
-    Route::get('/arbitres/disponibles/{evenementId}/{configId}', [ArbitreController::class, 'getDisponibles']);
+    Route::get('/arbitres/disponibles/{evenementId}', [ArbitreController::class, 'getDisponibles']);
     //rotation arbitres
     Route::post('/rotation-arbitres/assigner-poste', [RotationArbitreController::class, 'update']);
     Route::patch('rotation-arbitres/{config}/superviseur',         [RotationArbitreController::class, 'designerSuperviseur']);
+    Route::patch('rotation-arbitres/{config}/superviseur/retirer', [RotationArbitreController::class, 'retirerSuperviseur']);
 
     Route::apiResource('/rotation-arbitres', RotationArbitreController::class);
     //katas
     Route::prefix('katas')->group(function () {
         Route::apiResource('/katas', KataController::class);
     });
-    //ordre passage
-    Route::get('ordre-passages/{competitionId}/non-assign', [OrdrePassageController::class, 'getNonAssignees']);
-    Route::post('ordre-passages/assigner', [OrdrePassageController::class, 'assigner']);
-    Route::delete('ordre-passages/inscription/{inscriptionId}', [OrdrePassageController::class, 'retirer']);
-    Route::get('ordre-passages/{configId}', [OrdrePassageController::class, 'index']);
-    //notes
-    Route::post('notes', [NoteController::class, 'store']);
-    Route::post('notes/centralise', [NoteController::class, 'storeCentralise']);
-    Route::get('inscriptions/{ordrePassage}/notes', [NoteController::class, 'notesInscription']);
 
-    Route::patch(
-        'inscriptions/{inscription}/assigner-tatami',
-        [InscriptionController::class, 'assignerTatami']
-    );
-
-    // Athlètes non assignés d'une compétition
-    Route::get(
-        'competitions/{competition}/inscriptions-non-assignees',
-        [InscriptionController::class, 'nonAssignees']
-    );
-
-    // Athlètes d'un tatami
-    Route::get(
-        'configs/{config}/inscriptions',
-        [InscriptionController::class, 'parTatami']
-    );
-    Route::prefix('kumite')->group(function () {
-        Route::apiResource('/kumite-formats', KumiteFormatController::class);
-    });
 
 
     //student grade 
@@ -257,11 +218,133 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::prefix('leagues')->group(function () {
         Route::apiResource('/leagues', LeagueController::class);
     });
-    Route::middleware('permission:instructeur,secretaire,admin_club,parent,karateka,super_admin,admin_league,arbitre_league')->group(function () {
+    Route::get('leagues/getLeaguesForAdmin', [LeagueController::class, 'getLeaguesForAdmin']);
+    ///api/leagues/public-info/{leagueId}
+    Route::get('leagues/public-info/{leagueId}', [LeagueController::class, 'getLeaguePublicInfo']);
+    Route::post('/leagues/takeover', [MandatController::class, 'takeoverLeague']);
+
+    Route::middleware('permission:instructeur,secretaire,admin,parent,karateka,super_admin,arbitre')->group(function () {
+
+        Route::get('/federation/dashboard-stats', [FederationDashboardController::class, 'getStats']);
+        Route::get('/federation/clubs-par-ligue', [FederationDashboardController::class, 'clubsParLigue']);
+        Route::get('/payment-methods', [PaymentMethodController::class, 'index']);
+        Route::post('/payment-methods', [PaymentMethodController::class, 'store']);
+        Route::patch('/payment-methods/{paymentMethod}', [PaymentMethodController::class, 'update']);
+        Route::patch('/payment-methods/{paymentMethod}/toggle', [PaymentMethodController::class, 'toggleActive']);
+        Route::delete('/payment-methods/{paymentMethod}', [PaymentMethodController::class, 'destroy']);
+        // --- Consultation publique au moment de payer un stage/une licence ---
+        // Exemple d'appel : GET /api/payment-methods/Ligue/019ed526-af33-73ec-99c0-6791cb0ccee4
+        Route::get('/payment-methods/{type}/{id}', [PaymentMethodController::class, 'pourOrganisateur']);
+
+        // --- Paiements de licences : côté Club ---
+        Route::get('/licence-payments/mes-lots', [LicencePaymentController::class, 'mesLots']);
+        Route::post('/licence-payments/{payment}/declarer', [LicencePaymentController::class, 'declarer']);
+
+        // --- Paiements de licences : côté Fédération (index/statistiques/toggle consolidés plus bas) ---
+        Route::patch('/licence-payments/{payment}/confirmer', [LicencePaymentController::class, 'confirmer']);
+        Route::patch('/licence-payments/{payment}/rejeter', [LicencePaymentController::class, 'rejeter']);
+        //LicenceleagueController
+        Route::get('/licences', [LicenceleagueController::class, 'index']);
+
+        Route::get('/federation/ligues-clubs', [FederationController::class, 'mesLiguesEtClubs']);
+        Route::get('/roles', [RoleController::class, 'getRoles']);
+        //invitation
+        Route::post('clubs/rejoindre-ligue', [InvitationController::class, 'rejoindreLigue']);
+        Route::post('league/rejoindre-federation', [InvitationController::class, 'rejoindreFederation']);
+
+
+        //seance config
+        Route::prefix('seances')->group(function () {
+
+            Route::post('configs/{config}/valider',          [SeanceController::class, 'valider']);
+            Route::post('configs/{config}/lancer',            [SeanceController::class, 'lancerSeance']);
+            Route::post('configs/{config}/athlete-suivant',  [SeanceController::class, 'athleteSuivant']);
+            Route::get('configs/{config}/etat',              [SeanceController::class, 'etat']);
+            Route::get('configs/{config}/pret', [SeanceController::class, 'estPret']);
+            Route::get('competition/{config}/en-cours', [SeanceController::class, 'enCours']);
+            Route::post('configs/{config}/connecter-tablette', [SeanceController::class, 'connecterTablette']);
+            Route::get('configs/{config}/arbitres-rotation',    [SeanceController::class, 'arbitresRotation']);
+        });
+        // Athlètes d'un tatami
+
+        Route::patch(
+            'inscriptions/{inscription}/assigner-tatami',
+            [InscriptionController::class, 'assignerTatami']
+        );
+
+        // Athlètes non assignés d'une compétition
+        Route::get(
+            'competitions/{competition}/inscriptions-non-assignees',
+            [InscriptionController::class, 'nonAssignees']
+        );
+
+        Route::get(
+            'configs/{config}/inscriptions',
+            [InscriptionController::class, 'parTatami']
+        );
+        Route::prefix('kumite')->group(function () {
+            Route::apiResource('/kumite-formats', KumiteFormatController::class);
+        });
+
+        //ordre passage
+        Route::get('ordre-passages/{competitionId}/non-assign', [OrdrePassageController::class, 'getNonAssignees']);
+        Route::post('ordre-passages/assigner', [OrdrePassageController::class, 'assigner']);
+        Route::delete('ordre-passages/inscription/{inscriptionId}', [OrdrePassageController::class, 'retirer']);
+        Route::get('ordre-passages/{configId}', [OrdrePassageController::class, 'index']);
+        //notes
+        Route::post('notes', [NoteController::class, 'store']);
+        Route::post('notes/centralise', [NoteController::class, 'storeCentralise']);
+        Route::get('inscriptions/{ordrePassage}/notes', [NoteController::class, 'notesInscription']);
+
+
+        //niveaux competitions
+        Route::prefix('niveaux-competitions')->group(function () {
+            Route::apiResource('/niveaux-competitions', NiveauxCompetitionController::class);
+        });
+        //modes saisie
+        Route::prefix('modes-saisie')->group(function () {
+            Route::apiResource('/modes-saisie', ModeSaisieController::class);
+        });
+        //nb juges
+        Route::prefix('nb-juges')->group(function () {
+            Route::apiResource('/nb-juges', NbJugeController::class);
+        });
+        //config notation
+        Route::get('evenements/{evenementId}/plateaux', [ConfigNotationController::class, 'getPlateauxByEvenement']);
+
+
+
         Route::apiResource('/saisons', SaisonController::class);
+
+        // Côté Club
+        Route::get('/stage-payments/mes-lots', [StagePaymentController::class, 'mesLotsClub']); // à créer
+        Route::post('/stage-payments/{payment}/declarer', [StagePaymentController::class, 'declarer']);
+
+        // Côté organisateur (Ligue, Fédération, Club organisateur)
+        Route::get('/stage-payments/a-verifier', [StagePaymentController::class, 'paiementsAVerifier']);
+        Route::get('/stages/{stage}/paiements', [StagePaymentController::class, 'parStage']);
+        Route::patch('/stage-payments/{payment}/confirmer', [StagePaymentController::class, 'confirmer']);
+        Route::patch('/stage-payments/{payment}/rejeter', [StagePaymentController::class, 'rejeter']);
+        Route::get('/stage-payments/statistiques', [StagePaymentController::class, 'statistiques']);
+        //stages 
+        Route::get('/stages/ma-ligue', [StageController::class, 'stagesDeMaLigue']);
+        // routes/api.php
+        Route::get('/stages/{stage}/mes-inscrits', [StageRegistrationController::class, 'mesInscriptionsDetail']);
+        Route::delete('/inscriptions/{registration}', [StageRegistrationController::class, 'destroy']);
+        Route::get('/mes-pratiquants', [StageRegistrationController::class, 'mesPratiquants']);
+        Route::post('/stages/{stage}/inscriptions', [StageRegistrationController::class, 'store']);
+        // Côté Ligue
+        Route::get('/stages/{stage}/inscriptions', [StageRegistrationController::class, 'parStage']);
+        Route::patch('/inscriptions/{registration}/presence', [StageRegistrationController::class, 'togglePresence']);
+        Route::apiResource('/stages', StageController::class);
+
+        //mandat 
+        Route::prefix('mandat')->group(function () {
+            Route::post('transfer-mandate', [MandatController::class, 'transferMandate']);
+        });
         //setup
         Route::prefix('setup')->group(function () {
-            Route::apiResource('/setup', LeagueSetupController::class);
+            Route::apiResource('/setup', SubDisciplineController::class);
         });
         //ajout membre league
         Route::prefix('membres')->group(function () {
@@ -269,16 +352,15 @@ Route::middleware(['auth:sanctum'])->group(function () {
             //arbitres
             Route::get('arbitres', [LeagueMemberController::class, 'arbitres']);
         });
+        //AddManuelClubController
+        Route::post('leagues/addClubManuel', [AddManuelClubController::class, 'store']);
 
         //ligues
+
         Route::get('leagues/myClubs', [LeagueController::class, 'myClubs']);
 
         Route::post('leagues/addClub/{clubId}', [LeagueController::class, 'addClub']);
-        Route::post('leagues/addClubManuel', [LeagueController::class, 'addClubManuel']);
-        //licences
-        Route::prefix('licences')->group(function () {
-            Route::apiResource('/licences', LicenceController::class);
-        });
+
         //categories
         Route::get('/categories', [CategoryController::class, 'index']);
         Route::get('/getCategories', [CategoryController::class, 'getCategories']);
@@ -330,6 +412,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::prefix('config-notation')->group(function () {
             Route::apiResource('/config-notation', ConfigNotationController::class);
         });
+
         //plan controller
         Route::post('/plan/store', [PlanController::class, 'storePlan']);
 
@@ -354,11 +437,34 @@ Route::middleware(['auth:sanctum'])->group(function () {
 
         Route::get('/dashboard/stats', [DashboardController::class, 'stats']);
         Route::get('/dashboard/activity', [DashboardController::class, 'getDashboardActivity']);
-        Route::get('/attendances/chart', [\App\Http\Controllers\AdminClubController::class, 'presence']);
+        Route::get('/attendances/chart', [AdminClubController::class, 'presence']);
+
+
         //dashboard league
         Route::get('/dashboard/league/stats', [DashBoardLeagueController::class, 'stats']);
         Route::get('/dashboard/league/alert', [DashBoardLeagueController::class, 'Alert']);
         Route::get('/dashboard/league/exmenstates', [DashBoardLeagueController::class, 'exmenstates']);
+        Route::get('/stage-payments/statistiques-mensuelles', [StagePaymentController::class, 'statistiquesMensuelles']);
+
+        // --- Côté Fédération : gestion des types de licence ---
+        Route::get('/licence-types', [LicenceTypeController::class, 'index']);
+        Route::post('/licence-types', [LicenceTypeController::class, 'store']);
+        Route::patch('/licence-types/{licenceType}', [LicenceTypeController::class, 'update']);
+        Route::delete('/licence-types/{licenceType}', [LicenceTypeController::class, 'destroy']);
+
+        // --- Côté Club : achat et consultation ---
+        Route::get('/licence-types/{licenceType}/licencies', [LicenceTypeController::class, 'licencies']);
+        Route::get('/licences/types-disponibles', [LicenceController::class, 'typesDisponibles']);
+        Route::post('/licences', [LicenceController::class, 'store']);
+        Route::get('/licences/mes-licences', [LicenceController::class, 'mesLicences']);
+        Route::get('/licences/mes-etudiants', [LicenceController::class, 'mesEtudiants']);
+        Route::delete('/licences/{licence}', [LicenceController::class, 'destroy']);
+
+        // --- Paiements de licences (Fédération) ---
+        Route::get('/licence-payments', [LicencePaymentController::class, 'index']);
+        Route::patch('/licence-payments/{payment}/toggle', [LicencePaymentController::class, 'togglePayment']);
+        Route::get('/licence-payments/statistiques', [LicencePaymentController::class, 'statistiques']);
+        Route::get('/licence-payments/statistiques-mensuelles', [LicencePaymentController::class, 'statistiquesMensuelles']);
 
 
         Route::post('/grade/store', [GradeController::class, 'store']);
@@ -505,6 +611,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
             Route::post('/loans/{equipmentLoan}/return', [EquipementController::class, 'returnEquipment']);
         });
         Route::get('/programmes', [ProgrammeController::class, 'index']);
+        Route::get('/programmes/activites', [ProgrammeController::class, 'activites']);
     });
 
     //pdf 

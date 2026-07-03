@@ -13,9 +13,8 @@ class ArbitreController extends Controller
 {
     public function sInscrire(Competition $competition, ConfigNotation $config)
     {
-        $estArbitre = $competition->league->members()
+        $estArbitre = $competition->league->arbitres()
             ->where('user_id', auth()->id())
-            ->where('role', 'arbitre_league')
             ->exists();
 
         if (!$estArbitre) {
@@ -52,13 +51,22 @@ class ArbitreController extends Controller
     }
 
     // Récupérer les arbitres de l'événement qui ne sont pas encore sur ce plateau
-    public function getDisponibles($evenementId, $configId)
+    public function getDisponibles($evenementId)
     {
-        $dejaAffectes = RotationArbitre::where('config_notation_id', $configId)->pluck('arbitre_competition_id');
+        $idsExclus = RotationArbitre::whereHas('arbitreCompetition', function ($q) use ($evenementId) {
+            $q->where('evenement_id', $evenementId);
+        })
+            ->where(function ($q) {
+                $q->whereNotNull('poste')
+                    ->orWhere('est_superviseur', true);
+            })
+            ->pluck('arbitre_competition_id')
+            ->unique()
+            ->toArray();
 
         $arbitres = ArbitreCompetition::with('user')
             ->where('evenement_id', $evenementId)
-            ->whereNotIn('id', $dejaAffectes)
+            ->whereNotIn('id', $idsExclus)
             ->get();
 
         return response()->json($arbitres);

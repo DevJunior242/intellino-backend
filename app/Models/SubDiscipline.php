@@ -6,10 +6,10 @@ use App\Models\Category;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 
-class Disciplineleague extends Model
+class SubDiscipline extends Model
 {
     use HasUuids;
-    protected $table = 'disciplineleagues';
+    protected $table = 'sub_disciplines';
     protected $fillable = ['nom', 'description', 'organisateur_id', 'organisateur_type'];
     protected $keyType = 'string';
     public $incrementing = false;
@@ -17,7 +17,7 @@ class Disciplineleague extends Model
 
     public function categories()
     {
-        return $this->belongsToMany(Category::class, 'category_disciplineleagues')
+        return $this->belongsToMany(Category::class, 'category_subdisciplines')
             ->withTimestamps();
     }
     public function organisateur()

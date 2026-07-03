@@ -121,6 +121,6 @@ class EventPolicy
             return true;
         }
 
-        return $user->hasLeagueRole(['admin_league', 'arbitre_league']);
+        return $user->hasLeagueRole(['admin', 'arbitre']);
     }
 }

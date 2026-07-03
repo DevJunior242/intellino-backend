@@ -5,149 +5,343 @@ namespace App\Http\Controllers;
 use App\Models\Saison;
 use App\Models\Licence;
 use App\Models\Student;
+use App\Models\LicenceType;
+use Illuminate\Support\Str;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
 use App\Http\Controllers\Controller;
-use App\Http\Requests\StoreLicenceReq;
 
 class LicenceController extends Controller
 {
-
-    public function index(Request $request)
+    /**
+     * Liste des types de licences disponibles pour le club connecté,
+     * proposés par la fédération de sa ligue, pour la saison active.
+     * Utilisé pour peupler le formulaire d'achat côté Club.
+     */
+    public function typesDisponibles(Request $request)
     {
-        $activeId = $request->attributes->get('organisateur_id');
-        $search = $request->search;
-        $status = $request->status;
-        $saisonActive =  Saison::where('active', true)->first();
+        $activeId   = $request->attributes->get('organisateur_id');
+        $activeType = $request->attributes->get('organisateur_type');
 
-        $licenses = Licence::with(['student', 'club'])
+        if (!$activeId || $activeType !== 'Club') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Impossible d\'identifier le club connecté.'
+            ], 403);
+        }
+
+        $club = \App\Models\Club::find($activeId);
+
+        if (!$club || !$club->league_id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Ce club n\'est rattaché à aucune ligue.'
+            ], 422);
+        }
+
+        $league = \App\Models\League::find($club->league_id);
+
+        if (!$league || !$league->federation_id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Votre ligue n\'est rattachée à aucune fédération.'
+            ], 422);
+        }
+
+        $saisonActive = Saison::where('active', true)->first();
+
+        if (!$saisonActive) {
+            return response()->json(['message' => 'Aucune saison active trouvée'], 422);
+        }
+
+        $types = LicenceType::where('federation_id', $league->federation_id)
             ->where('saison_id', $saisonActive->id)
-            ->where('league_id', $activeId)
-            ->when($status, fn($q) => $q->where('status', $status))
-            ->when(
-                $search,
-                fn($q) => $q
-                    ->where('numero', 'like', "%$search%")
-                    ->orWhereHas(
-                        'student',
-                        fn($sq) =>
-                        $sq->where('fullname', 'like', "%$search%")
-                    )
-            )
-            ->latest()
-            ->paginate(10);
+            ->orderBy('nom')
+            ->get();
 
-        return response()->json($licenses);
-    }
-
-
-
-
-    public function LicenceStat()
-    {
-        $user = auth()->user();
-        $activeId = $user->current_league_id;
-        Log::info('activeId$activeId', ['activeId$activeId' => $activeId]);
-        if (!$activeId) {
+        if ($types->isEmpty()) {
             return response()->json([
-                'success' => false,
-                'message' => 'Vous devez être dans une ligue pour accéder à ses clubs',
-            ], 400);
+                'success' => true,
+                'data'    => [],
+                'message' => 'Votre fédération n\'a pas encore défini de tarif de licence pour cette saison.'
+            ]);
         }
-        //licences actives count 
-        $activeLicences = Licence::where('league_id', $activeId)
-            ->where('date_expiration', '>=', now())
-            ->count();
-
-        //licences expirees count
-        $expiredLicences = Licence::where('league_id', $activeId)
-            ->where('date_expiration', '<', now())
-            ->count();
-        //licence en attente count
-        $pendingLicences = Licence::where('league_id', $activeId)
-            ->where('status', Licence::STATUS_ACTIVE)
-            ->count();
-
-
-        //somme des montants des licences actives
-        $totalActiveLicences = Licence::where('league_id', $activeId)
-            ->where('date_expiration', '>=', now())
-            ->sum('montant');
-        $totalActiveLicences = $totalActiveLicences / 100;
 
         return response()->json([
             'success' => true,
-            'message' => 'Licences list',
-            'active' => $activeLicences,
-            'expired' => $expiredLicences,
-            'pending' => $pendingLicences,
-            'total_active' => $totalActiveLicences,
+            'data'    => $types,
         ]);
     }
 
-
-
-
-    public function store(StoreLicenceReq $request)
+    /**
+     * Achète une ou plusieurs licences pour des élèves du club connecté.
+     * Body attendu : { items: [{ student_id, licence_type_id }, ...] }
+     *
+     * Vérifie :
+     * - le club appartient bien à la fédération qui propose ce type de licence (via sa ligue)
+     * - chaque student appartient bien à ce club
+     * - chaque student n'a pas déjà une licence pour cette saison (contrainte unique student/saison)
+     */
+    public function store(Request $request)
     {
+        $activeId   = $request->attributes->get('organisateur_id');
+        $activeType = $request->attributes->get('organisateur_type');
 
-        $activeId = $request->attributes->get('organisateur_id');
-        if (!$activeId) {
+        if (!$activeId || $activeType !== 'Club') {
             return response()->json([
                 'success' => false,
-                'message' => 'Vous devez être dans une ligue pour créer une licence',
-            ], 422);
+                'message' => 'Seul un club peut acheter des licences.'
+            ], 403);
         }
-        // Validation des données
-        $validated = $request->validated();
-        $saisonActive =  Saison::where('active', true)->first();
 
-        // 1. Génération du numéro de licence unique 
-        $annee = explode('-', $saisonActive->libelle)[0];
-        $validated['numero'] = $this->generateLicenceNumber($annee);
+        $club = \App\Models\Club::find($activeId);
 
-        $student = Student::with('currentGrade.grade')->findOrFail($validated['student_id']);
-        $gradeName = $student?->currentGrade?->grade->name;
-        if (!$activeId) {
+        if (!$club) {
+            return response()->json(['message' => 'Club introuvable.'], 404);
+        }
+
+        $league = \App\Models\League::find($club->league_id);
+
+        if (!$league || !$league->federation_id) {
             return response()->json([
                 'success' => false,
-                'message' => 'Vous devez définir une saison pour créer une licence',
+                'message' => 'Votre ligue n\'est rattachée à aucune fédération.'
             ], 422);
         }
 
+        $federationId = $league->federation_id;
 
+        $saisonActive = Saison::where('active', true)->first();
 
-        $licence = Licence::create($validated + [
-            'club_id' => $request->input('club_id'),
-            'league_id' => $activeId,
-            'grade_au_moment' => $gradeName,
-            'saison_id' => $saisonActive->id,
+        if (!$saisonActive) {
+            return response()->json(['message' => 'Aucune saison active trouvée'], 422);
+        }
+
+        $validated = $request->validate([
+            'items'                     => 'required|array|min:1',
+            'items.*.student_id'        => 'required|uuid|exists:students,id',
+            'items.*.licence_type_id'   => 'required|uuid',
         ]);
+
+        $studentIds = array_column($validated['items'], 'student_id');
+        $typeIds    = array_unique(array_column($validated['items'], 'licence_type_id'));
+
+        // Vérifie que tous les élèves appartiennent bien à ce club
+        $validStudentIds = Student::whereHas('clubs', function ($q) use ($club) {
+            $q->where('club_id', $club->id);
+        })
+            ->whereIn('id', $studentIds)
+            ->pluck('id')
+            ->toArray();
+
+        if (count($validStudentIds) !== count(array_unique($studentIds))) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Un ou plusieurs élèves sélectionnés n\'appartiennent pas à votre club.'
+            ], 403);
+        }
+
+        // Vérifie que tous les types de licence appartiennent bien à la fédération de la ligue du club
+        $validTypes = LicenceType::where('federation_id', $federationId)
+            ->where('saison_id', $saisonActive->id)
+            ->whereIn('id', $typeIds)
+            ->get()
+            ->keyBy('id');
+
+        if ($validTypes->count() !== count($typeIds)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Un ou plusieurs types de licence ne sont pas proposés par votre fédération.'
+            ], 403);
+        }
+
+        // Vérifie qu'aucun élève n'a déjà une licence pour cette saison
+        $alreadyLicensed = Licence::where('saison_id', $saisonActive->id)
+            ->whereIn('student_id', $studentIds)
+            ->pluck('student_id');
+
+        if ($alreadyLicensed->isNotEmpty()) {
+            $names = Student::whereIn('id', $alreadyLicensed)->pluck('fullname')->implode(', ');
+            return response()->json([
+                'success' => false,
+                'message' => "Déjà licencié(s) cette saison : $names"
+            ], 422);
+        }
+        $lot = null;
+        $licences = DB::transaction(function () use ($validated, $validTypes, $club, $federationId, $saisonActive, &$lot) {
+            $created = [];
+
+            foreach ($validated['items'] as $item) {
+                $type = $validTypes->get($item['licence_type_id']);
+
+                $created[] = Licence::create([
+                    'saison_id'       => $saisonActive->id,
+                    'club_id'         => $club->id,
+                    'student_id'      => $item['student_id'],
+                    'federation_id'   => $federationId,
+                    'licence_type_id' => $type->id,
+                    'montant_paye'    => $type->tarif,
+                    'numero'          => null,
+                    'status'          => Licence::STATUS_EN_ATTENTE,
+                ]);
+            }
+
+            // Créer un nouveau lot de paiement pour ces licences
+            $montantLot = collect($created)->sum('montant_paye');
+
+            $lot = \App\Models\LicencePayment::create([
+                'saison_id'     => $saisonActive->id,
+                'federation_id' => $federationId,
+                'club_id'       => $club->id,
+                'amount'        => $montantLot,
+                'status'        => 'pending',
+            ]);
+
+            // Lier chaque licence créée à ce lot
+            foreach ($created as $licence) {
+                \App\Models\LicencePaymentItem::create([
+                    'licence_payment_id' => $lot->id,
+                    'licence_id'         => $licence->id,
+                ]);
+            }
+
+            return $created;
+        });
 
         return response()->json([
             'success' => true,
-            'message' => 'Licence générée avec succès',
-            'data' => $licence
+            'message' => 'Licence(s) créée(s) avec succès.',
+            'data'    => $licences,
+            'payment' => $lot,
         ], 201);
     }
 
     /**
-     * Génère un numéro de type LIG-2025-00001
+     * Génère un numéro de licence unique, séquentiel par saison.
+     * Format : LIC-{ANNEE_DEBUT_SAISON}-XXXX
      */
-    private function generateLicenceNumber($year): string
+    public static function genererNumero(Saison $saison): string
     {
-        $lastLicence = Licence::where('numero', 'LIKE', "LIG-$year-%")
-            ->orderBy('numero', 'desc')
-            ->first();
+        $prefix = 'LIC-' . \Carbon\Carbon::parse($saison->dateDebut)->format('Y') . '-';
 
-        if (!$lastLicence) {
-            $number = 1;
-        } else {
-            // On extrait le dernier nombre (ex: de LIG-2025-00042 on prend 42)
-            $lastNumber = (int) substr($lastLicence->numero, -5);
-            $number = $lastNumber + 1;
+        $sequenceNumber = Licence::where('saison_id', $saison->id)
+            ->where('numero', 'LIKE', "{$prefix}%")
+            ->count() + 1;
+
+        return $prefix . str_pad($sequenceNumber, 4, '0', STR_PAD_LEFT);
+    }
+    public function mesEtudiants(Request $request)
+    {
+        $activeId   = $request->attributes->get('organisateur_id');
+        $activeType = $request->attributes->get('organisateur_type');
+
+        if (!$activeId || $activeType !== 'Club') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Impossible d\'identifier le club connecté.'
+            ], 403);
         }
 
-        return 'LIG-' . $year . '-' . str_pad($number, 5, '0', STR_PAD_LEFT);
+        //  On liste les élèves (majeurs comme mineurs) inscrits dans ce club
+        $students = Student::query()
+            ->join('club_students', 'club_students.student_id', '=', 'students.id')
+            ->where('club_students.club_id', $activeId)
+            ->whereNull('club_students.deleted_at') // Exclure si l'élève a été retiré du club
+            ->select('students.id', 'students.fullname', 'students.birthdate', 'students.sex')
+            ->orderBy('students.fullname')
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'data'    => $students,
+        ]);
+    }
+    /**
+     * Liste des licences du club connecté pour la saison active.
+     */
+    public function mesLicences(Request $request)
+    {
+        $activeId   = $request->attributes->get('organisateur_id');
+        $activeType = $request->attributes->get('organisateur_type');
+
+        if (!$activeId || $activeType !== 'Club') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Impossible d\'identifier le club connecté.'
+            ], 403);
+        }
+
+        $licences = Licence::with(['student', 'licenceType', 'saison'])
+            ->where('club_id', $activeId)
+            ->latest('created_at')
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'data'    => $licences,
+        ]);
+    }
+
+    /**
+     * Annule une licence — uniquement par le club propriétaire,
+     * et seulement si elle n'a pas encore été validée par la fédération.
+     */
+    public function destroy(Request $request, Licence $licence)
+    {
+        $activeId   = $request->attributes->get('organisateur_id');
+        $activeType = $request->attributes->get('organisateur_type');
+
+        if (!$activeId || $activeType !== 'Club' || $licence->club_id !== $activeId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Vous n\'êtes pas autorisé à annuler cette licence.'
+            ], 403);
+        }
+
+        if ((int) $licence->status === Licence::STATUS_VALIDE) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Cette licence est déjà validée et ne peut plus être annulée.'
+            ], 422);
+        }
+
+        $saisonId     = $licence->saison_id;
+        $federationId = $licence->federation_id;
+        $clubId       = $licence->club_id;
+
+        // Retrouver le lot de paiement auquel appartient cette licence
+        $item = \App\Models\LicencePaymentItem::where('licence_id', $licence->id)->first();
+
+        $licence->delete(); // softDelete — cascade supprime l'item automatiquement
+
+        // Si le lot existe et n'est pas encore payé, recalculer son montant
+        if ($item) {
+            $lot = \App\Models\LicencePayment::find($item->licence_payment_id);
+
+            if ($lot && $lot->status !== 'paid') {
+                $nouveauMontant = \App\Models\LicencePaymentItem::where('licence_payment_id', $lot->id)
+                    ->join('licences', 'licences.id', '=', 'licence_payment_items.licence_id')
+                    ->whereNull('licences.deleted_at') // respecte le softDelete
+                    ->sum('licences.montant_paye');
+
+                if ($nouveauMontant <= 0) {
+                    // Plus aucune licence dans ce lot — on supprime le lot aussi
+                    $lot->delete();
+                } else {
+                    $lot->update([
+                        'amount' => $nouveauMontant,
+                        // Si déclaré et montant change → repasse en pending
+                        // pour que le club re-déclare avec le bon montant
+                        'status' => $lot->status === 'declared' ? 'pending' : $lot->status,
+                        'declared_at' => $lot->status === 'declared' ? null : $lot->declared_at,
+                    ]);
+                }
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Licence annulée.'
+        ]);
     }
 }

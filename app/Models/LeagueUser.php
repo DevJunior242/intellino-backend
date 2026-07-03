@@ -6,14 +6,23 @@ use App\Models\Role;
 use App\Models\User;
 use App\Models\League;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
 
 class LeagueUser extends Model
 {
+    use HasUuids;
+
     protected $fillable = [
         'league_id',
         'user_id',
         'role_id',
+        'mandate_start_at',
+        'mandate_end_at',
+        'mandate_status',
     ];
+    protected $keyType = 'string';
+    public $incrementing = false;
+
 
     public function league()
     {

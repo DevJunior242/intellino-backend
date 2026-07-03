@@ -15,6 +15,7 @@ use Illuminate\Validation\Rule;
 use App\Services\BracketService;
 use Illuminate\Support\Benchmark;
 use App\Models\ArbitreCompetition;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Cache;
@@ -33,62 +34,102 @@ class SeanceController extends Controller
     public function valider(ConfigNotation $config)
     {
         $start = microtime(true);
-        $problemes = $config->estPrete();
-        if (!empty($problemes)) {
+
+        try {
+            $problemes = $config->estPrete();
+            if (!empty($problemes)) {
+                return response()->json([
+                    'success'   => false,
+                    'problemes' => $problemes,
+                ], 422);
+            }
+
+            $nbCombattants = OrdrePassage::where('config_notation_id', $config->id)->count();
+            $minimumsFormat = ['poules' => 3, 'poules_eliminatoire' => 3, 'eliminatoire' => 2];
+
+            // Si l'appel envoie un `kumite_format_id`, valider sa compatibilité
+            // avec l'effectif avant de le persister (permet au client de remplir le choix).
+            $request = request();
+            if ($request->filled('kumite_format_id')) {
+                $fmt = \App\Models\KumiteFormat::find($request->input('kumite_format_id'));
+                if ($fmt) {
+                    $minRequis = $minimumsFormat[$fmt->code] ?? 2;
+                    if ($nbCombattants < $minRequis) {
+                        return response()->json([
+                            'success' => false,
+                            'error'   => 'format_incompatible',
+                            'message' => "Le format « {$fmt->libelle} » nécessite au moins {$minRequis} combattants (actuellement {$nbCombattants}).",
+                        ], 422);
+                    }
+
+                    $config->updateQuietly(['kumite_format_id' => $fmt->id]);
+                    $config->load('kumiteFormat');
+                }
+            }
+
+            // Si kumite et aucun format choisi, demander au client de sélectionner
+            // un format explicitement plutôt que de le choisir automatiquement.
+            if ($config->estKumite() && !$config->kumite_format_id) {
+                $formats = \App\Models\KumiteFormat::all()
+                    ->filter(fn($f) => $nbCombattants >= ($minimumsFormat[$f->code] ?? 2))
+                    ->values();
+
+                return response()->json([
+                    'success' => false,
+                    'error'   => 'missing_kumite_format',
+                    'message' => 'Veuillez choisir un format kumite avant de valider la séance',
+                    'formats' => $formats,
+                ], 422);
+            }
+
+            DB::transaction(function () use ($config) {
+                if ($config->estKumite()) {
+                    app(BracketService::class)->generer($config);
+                }
+
+                if (!$config->relationLoaded('competition')) {
+                    $config->load('competition');
+                }
+
+                $evenementId = $config?->competition?->evenement_id;
+                $arbitresSansCode = ArbitreCompetition::where('evenement_id', $evenementId)
+                    ->whereNull('code_acces')
+                    ->get();
+
+                foreach ($arbitresSansCode as $arbitre) {
+                    $arbitre->updateQuietly([
+                        'code_acces' => str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT)
+                    ]);
+                }
+
+                if ($config->estModeTablettes()) {
+                    $arbitresSansCode->load('user');
+                    Notification::send(
+                        $arbitresSansCode,
+                        new SendArbitreAccessCodesNotif()
+                    );
+                }
+                $config->updateQuietly([
+                    'configuration_validee' => true,
+                    'validee_a'             => now(),
+                ]);
+            });
+
+            broadcast(new TatamiUpdated($config->id));
+
             return response()->json([
-                'success'   => false,
-                'problemes' => $problemes,
+                'success' => true,
+                'message' => 'Séance ouverte',
+                'debug'   => [
+                    'temps_execution_ms' => round((microtime(true) - $start) * 1000, 2),
+                ],
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
             ], 422);
         }
-
-        $config->updateQuietly([
-            'configuration_validee' => true,
-            'validee_a'             => now(),
-        ]);
-
-        if ($config->estKumite()) {
-            // Générer le tableau de combats
-            app(BracketService::class)->generer($config);
-        }
-        // Générer les PIN si mode tablettes
-
-
-        // Générer PIN arbitres
-        // load competition
-        if (!$config->relationLoaded('competition')) {
-            $config->load('competition');
-        }
-        $evenementId = $config?->competition?->evenement_id;
-
-        $arbitresSansCode = ArbitreCompetition::where('evenement_id', $evenementId)
-            ->whereNull('code_acces')
-            ->get();
-
-        foreach ($arbitresSansCode as $arbitre) {
-            $arbitre->updateQuietly([
-                'code_acces' => str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT)
-            ]);
-        }
-
-        if ($config->estModeTablettes()) {
-
-            $arbitresSansCode->load('user');
-
-            Notification::send(
-                $arbitresSansCode,
-                new SendArbitreAccessCodesNotif()
-            );
-        }
-
-        broadcast(new TatamiUpdated($config->id));
-        return response()->json([
-            'success' => true,
-            'message' => 'Séance ouverte',
-            'debug' => [
-                'temps_execution_ms' => round((microtime(true) - $start) * 1000, 2),
-            ],
-            //'etat'    => $this->rotationService->etat($config),
-        ]);
     }
     public function lancerSeance(ConfigNotation $config)
     {

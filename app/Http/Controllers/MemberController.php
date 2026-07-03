@@ -10,13 +10,18 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Hash;
-use App\Notifications\AddedToNewClub;
-use App\Notifications\WelcomeNewMember;
-use Illuminate\Support\Facades\Password;
+use App\Services\RoleSecurityService;
 use App\Http\Requests\StoreMemberRequest;
 
 class MemberController extends Controller
 {
+
+    protected $roleSecurity;
+
+    public function __construct(RoleSecurityService $roleSecurity)
+    {
+        $this->roleSecurity = $roleSecurity;
+    }
     public function index(Request $request)
     {
         $clubId = $request->attributes->get('club_id');
@@ -83,8 +88,13 @@ class MemberController extends Controller
     public function store(StoreMemberRequest $request)
     {
         $validated = $request->validated();
-        $user = auth()->user();
         $clubId = $request->attributes->get('club_id');
+        $activeType = $request->attributes->get('organisateur_type');
+        $this->roleSecurity->checkPermission(
+            $activeType,
+            $request->attributes->get('role'),
+            $validated['role_id']
+        );
 
         $targetUser = User::where('email', $validated['email'])
             ->orWhere('phone', $validated['phone'])
@@ -166,12 +176,12 @@ class MemberController extends Controller
     {
         $clubId = $request->attributes->get('club_id');
         Log::info('clubId', ['clubId' => $clubId]);
-        $role = $request->validated_role_name;
+        $role = $request->attributes->get('role');
         $me = $request->user();
         $meRole = $me->globalRole?->name;
         Log::info('meRole', ['meRole' => $meRole]);
 
-        if ($role !== 'admin_club' && $meRole !== 'super_admin') {
+        if ($role !== 'admin' && $meRole !== 'super_admin') {
             return response()->json([
                 'success' => false,
                 'message' => "Vous n'avez pas le droit de faire cela",
@@ -208,10 +218,10 @@ class MemberController extends Controller
         // 1. L'admin connecté et les infos du middleware
         $admin = $request->user();
         $adminRole = $request->attributes->get('role');
-        $clubId = $request->attributes->get('club_id'); 
+        $clubId = $request->attributes->get('club_id');
 
 
-        if ($adminRole !== 'admin_club') {
+        if ($adminRole !== 'admin') {
             return response()->json([
                 'success' => false,
                 'message' => "Accès refusé : privilèges insuffisants.",

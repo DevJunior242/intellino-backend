@@ -11,13 +11,13 @@ return new class extends Migration
      */
     public function up(): void
     {
-        $tables = ['clubs', 'leagues'];
+        $tables = ['clubs', 'leagues', 'federations'];
         foreach ($tables as $tableName) {
             Schema::table($tableName, function (Blueprint $table) {
                 $table->foreignUuid('country_id')
                     ->nullable()
                     ->constrained('countries')
-                    ->onullOnDelete();
+                    ->nullOnDelete();
             });
         }
     }
@@ -27,10 +27,11 @@ return new class extends Migration
      */
     public function down(): void
     {
-        $tables = ['clubs', 'leagues'];
+        $tables = ['clubs', 'leagues', 'federations'];
+
         foreach ($tables as $tableName) {
-            Schema::table($tableName, function (Blueprint $table) use ($tableName) {
-                $table->dropForeign([$tableName . '_country_id_foreign']);
+            Schema::table($tableName, function (Blueprint $table) {
+                $table->dropForeign(['country_id']);
                 $table->dropColumn('country_id');
             });
         }

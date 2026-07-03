@@ -18,7 +18,7 @@ class PlanController extends Controller
     }
     public function storePlan(StorePlanRequest $request)
     {
-        $role = $request->validated_role_name;
+        $role = $request->attributes->get('role');
         if ($role !== 'super_admin') {
             return response()->json([
                 'success' => false,

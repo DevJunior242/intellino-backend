@@ -12,10 +12,14 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('league_users', function (Blueprint $table) {
+            $table->uuid('id')->primary();
             $table->foreignUuid('league_id')->constrained('leagues')->cascadeOnDelete();
             $table->foreignUuid('user_id')->constrained('users')->cascadeOnDelete();
             $table->foreignUuid('role_id')->constrained('roles')->cascadeOnDelete();
-            $table->primary(['user_id', 'league_id']);
+            // Champs pour le mandat
+            $table->date('mandate_start_at')->nullable();
+            $table->date('mandate_end_at')->nullable();
+            $table->boolean('mandate_status')->default(true); // true = 1 (actif), false = 0 (expiré/révoqué)
             $table->timestamps();
         });
     }

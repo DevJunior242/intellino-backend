@@ -7,6 +7,7 @@ use App\Models\Club;
 use App\Models\User;
 use App\Models\Licence;
 use App\Models\ParentModel;
+use Illuminate\Support\Str;
 use App\Models\ExamenLeague;
 use App\Models\ExamenResult;
 use App\Models\StudentGrade;
@@ -24,11 +25,11 @@ class Student extends Model
 
     protected $fillable = [
         'id',
-        'club_id',
         'user_id',
         'is_adult',
         'fullname',
         'birthdate',
+        'matricule',
         'sex',
         'photo',
         'status',
@@ -48,9 +49,10 @@ class Student extends Model
         return $this->belongsToMany(ParentModel::class, 'parent_students', 'student_id', 'parent_model_id')->withTimestamps();
     }
 
-    public function club()
+    public function clubs()
     {
-        return $this->belongsTo(Club::class);
+        return $this->belongsToMany(Club::class, 'club_students', 'student_id', 'club_id')->withPivot('saison_id', 'is_active')
+            ->withTimestamps();
     }
 
     public function candidates()
@@ -135,5 +137,29 @@ class Student extends Model
             self::STATUS_INACTIV => 'Inactif',
             default => 'Inconnu',
         };
+    }
+    protected static function booted()
+    {
+        static::creating(function ($student) {
+            if (empty($student->id)) {
+                $student->id = (string) Str::uuid();
+            }
+
+            $currentYear = date('Y');
+
+
+            $club = Club::with('country')->find(request()->attributes->get('organisateur_id'));
+
+            // On récupère le code du pays (ex: 'BF', 'SN'). Si introuvable, on met 'XX'
+            $countryCode = $club && $club->country ? $club->country->code : 'XX';
+
+            // Compteur annuel pour ce pays spécifique
+            $sequenceNumber = self::where('matricule', 'LIKE', "ATH-{$countryCode}-{$currentYear}-%")
+                ->count() + 1;
+
+            $paddedSequence = str_pad($sequenceNumber, 4, '0', STR_PAD_LEFT);
+
+            $student->matricule = "ATH-" . strtoupper($countryCode) . "-" . $currentYear . "-" . $paddedSequence;
+        });
     }
 }

@@ -66,7 +66,7 @@ class CompetitionController extends Controller
                 $query->select('id', 'nom');
             }
         ])
-            ->where('statut', 'ouverte')
+            ->where('status', Competition::STATUT_EN_COURS)
             ->get();
 
         return response()->json($competitions);
@@ -81,7 +81,7 @@ class CompetitionController extends Controller
             ->withCount('inscriptions')
             ->where('organisateur_id', $user->current_league_id)
             ->where('organisateur_type', 'Ligue')
-            ->where('statut', 'ouverte')
+            ->where('status', Competition::STATUT_EN_COURS)
             ->latest()
             ->first();
 

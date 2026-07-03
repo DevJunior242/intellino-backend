@@ -4,68 +4,89 @@ namespace App\Http\Controllers;
 
 use App\Models\Role;
 use App\Models\User;
+use App\Models\LeagueUser;
 use Illuminate\Support\Str;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Hash;
+use App\Services\RoleSecurityService;
 use App\Notifications\WelcomeToLeague;
 use App\Notifications\WelcomeNewMember;
 use App\Http\Requests\StoreMemberRequest;
 
 class LeagueMemberController extends Controller
 {
+    protected $roleSecurity;
+
+    public function __construct(RoleSecurityService $roleSecurity)
+    {
+        $this->roleSecurity = $roleSecurity;
+    }
 
     public function index(Request $request)
     {
-
-        // On détermine l'ID et le type dynamiquement
+        // On détermine l'ID de la ligue active dynamiquement
         $activeId = $request->attributes->get('organisateur_id');
-        $activeType = $request->attributes->get('organisateur_type');
-        $relation = $activeType === 'Ligue' ? 'leagues' : 'federations';
-        $roleinclus = ["admin_league", "secretaire_league", "directeur_technique", "responsable_technique", "vice_president_league"];
+
+        $roleinclus = ["admin", "secretaire", "directeur_technique", "responsable_technique", "vice_president"];
 
         $roleIds = Role::whereIn('name', $roleinclus)->pluck('id');
-
         $allRoles = Role::whereIn('name', $roleinclus)->get();
 
-        $members = User::whereHas($relation, function ($q) use ($activeId, $roleIds) {
-
+        $members = User::whereHas('leagues', function ($q) use ($activeId, $roleIds) {
             $q->where('leagues.id', $activeId)
                 ->whereIn('league_users.role_id', $roleIds);
         })
-            ->with([$relation => function ($q) use ($activeId) {
-
-                $q->where('id', $activeId)
-                    ->withPivot('role_id');
+            ->with(['leagues' => function ($q) use ($activeId) {
+                $q->where('leagues.id', $activeId)
+                    ->withPivot('role_id', 'mandate_start_at', 'mandate_end_at', 'mandate_status');
             }])
             ->get()
-            ->map(function ($member) use ($relation, $allRoles) {
+            ->map(function ($member) use ($allRoles) {
+                $leagueData = $member->leagues->first();
 
-                $orgData = $member->$relation->first();
-
-                $roleId = $orgData?->pivot?->role_id;
+                // Récupération des données de la table pivot league_users
+                $roleId = $leagueData?->pivot?->role_id;
+                $startAt = $leagueData?->pivot?->mandate_start_at;
+                $endAt = $leagueData?->pivot?->mandate_end_at;
+                $status = $leagueData?->pivot?->mandate_status;
 
                 $roleObj = $allRoles->firstWhere('id', $roleId);
+                $roleName = $roleObj ? $roleObj->name : 'Membre';
+
+                // Le mandat s'affiche uniquement pour l'admin de la ligue
+                if ($roleName === 'admin') {
+                    $startYear = $startAt ? date('Y', strtotime($startAt)) : '';
+                    $endYear = $endAt ? date('Y', strtotime($endAt)) : 'En cours';
+                    $mandateString = "$startYear – $endYear";
+                } else {
+                    $mandateString = '';
+                }
+
                 return [
-                    'id'         => $member->id,
-                    'name'       => $member->fullname,
-                    'email'      => $member->email,
-                    'initials'   => strtoupper(substr($member->fullname, 0, 2)),
-                    'role'       => $roleObj ? $roleObj->name : 'Membre',
-                    'badge'      => $roleObj ? $roleObj->name : 'Inconnu',
-                    'badgeColor' => $this->getBadgeColor($roleObj?->name),
-                    'avatarBg'   => $this->generateAvatarColor($member->fullname),
-                    'mandate'    => '2023–2027',
+                    'id'             => $member->id,
+                    'name'           => $member->fullname,
+                    'email'          => $member->email,
+                    'initials'       => strtoupper(substr($member->fullname, 0, 2)),
+                    'role'           => $roleName,
+                    'badge'          => $roleName,
+                    'badgeColor'     => $this->getBadgeColor($roleObj?->name),
+                    'avatarBg'       => $this->generateAvatarColor($member->fullname),
+                    'mandate'        => $mandateString,
+                    'mandate_status' => $status,
                 ];
             });
 
         return response()->json([
             'success' => true,
-            'organization_type' => $activeType,
+            'organization_type' => 'Ligue',
             'members' => $members
         ]);
     }
+
+
 
     public function store(StoreMemberRequest $request)
     {
@@ -73,11 +94,29 @@ class LeagueMemberController extends Controller
         $activeId = $request->attributes->get('organisateur_id');
         $activeType = $request->attributes->get('organisateur_type');
 
+        $this->roleSecurity->checkPermission(
+            $activeType,
+            $request->attributes->get('role'),
+            $validated['role_id']
+        );
 
-        $targetUser = User::where('email', $validated['email'])
-            ->orWhere('phone', $validated['phone'])
-            ->first();
+        // 1. Rechercher si l'email ou le téléphone existe individuellement
+        $userByEmail = User::where('email', $validated['email'])->first();
+        $userByPhone = User::where('phone', $validated['phone'])->first();
+
+        // Si l'email et le téléphone appartiennent à deux comptes différents, c'est un conflit majeur
+        if ($userByEmail && $userByPhone && $userByEmail->id !== $userByPhone->id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Conflit : Cet email et ce numéro de téléphone appartiennent à deux utilisateurs différents.'
+            ], 422);
+        }
+
+        // On définit l'utilisateur cible s'il existe (soit par email, soit par téléphone)
+        $targetUser = $userByEmail ?? $userByPhone;
+
         if ($targetUser) {
+            // Vérifier s'il est déjà membre de cette ligue spécifique
             $isAlreadyMember = DB::table('league_users')
                 ->where('user_id', $targetUser->id)
                 ->where('league_id', $activeId)
@@ -86,10 +125,11 @@ class LeagueMemberController extends Controller
             if ($isAlreadyMember) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Cet utilisateur est deja membre.'
+                    'message' => 'Cet utilisateur est déjà membre de cette ligue.'
                 ], 422);
             }
         }
+
         // 2. Créer ou récupérer l'utilisateur
         if (!$targetUser) {
             $targetUser = User::create([
@@ -106,10 +146,14 @@ class LeagueMemberController extends Controller
             ->where('role_id', $validated['role_id'])
             ->exists();
 
+
+
         if (!$exists) {
-            $targetUser->leagues()->sync([
-                $activeId => ['role_id' => $validated['role_id']]
-            ], false);
+            LeagueUser::create([
+                'league_id' => $activeId,
+                'user_id' => $targetUser->id,
+                'role_id' => $validated['role_id'],
+            ]);
         }
 
         $targetUser->current_league_id = $activeId;
@@ -127,7 +171,7 @@ class LeagueMemberController extends Controller
     public function getRoles(Request $request)
     {
 
-        $roles = Role::whereNotIn('name', ['super_admin', 'admin_club', 'admin_league', 'parent', 'karateka', 'instructeur', 'secretaire'])
+        $roles = Role::whereNotIn('name', ['super_admin', 'admin', 'parent', 'karateka', 'instructeur', 'secretaire'])
             ->get();
         return response()->json(['success' => true, 'roles' => $roles]);
     }
@@ -135,8 +179,8 @@ class LeagueMemberController extends Controller
     private function getBadgeColor($roleName)
     {
         return match ($roleName) {
-            'Admin_league'   => 'error',   // Rouge
-            'Arbitre_league' => 'info',    // Bleu
+            'admin'   => 'error',   // Rouge
+            'arbitre' => 'info',    // Bleu
             'Coach'   => 'warning', // Orange
             default   => 'success', // Vert
         };
@@ -152,47 +196,37 @@ class LeagueMemberController extends Controller
 
     public function arbitres(Request $request)
     {
+        // On détermine l'ID de la ligue active dynamiquement
         $activeId = $request->attributes->get('organisateur_id');
-        $activeType = $request->attributes->get('organisateur_type');
-        $relation = $activeType === 'Ligue' ? 'leagues' : 'federations';
-        $roleinclus = ["arbitre_league"];
+
+        // Uniquement pour le rôle arbitre
+        $roleinclus = ["arbitre"];
 
         $roleIds = Role::whereIn('name', $roleinclus)->pluck('id');
 
-        $allRoles = Role::whereIn('name', $roleinclus)->get();
-
-        $members = User::whereHas($relation, function ($q) use ($activeId, $roleIds) {
-
+        $members = User::whereHas('leagues', function ($q) use ($activeId, $roleIds) {
             $q->where('leagues.id', $activeId)
                 ->whereIn('league_users.role_id', $roleIds);
         })
-            ->with([$relation => function ($q) use ($activeId) {
-
-                $q->where('id', $activeId)
+            ->with(['leagues' => function ($q) use ($activeId) {
+                $q->where('leagues.id', $activeId)
                     ->withPivot('role_id');
             }])
             ->get()
-            ->map(function ($member) use ($relation, $allRoles) {
-
-                $orgData = $member->$relation->first();
-
-                $roleId = $orgData?->pivot?->role_id;
-
-                $roleObj = $allRoles->firstWhere('id', $roleId);
+            ->map(function ($member) {
                 return [
-                    'id'         => $member->id,
-                    'name'       => $member->fullname,
-                    'email'      => $member->email,
-                    'phone'      => $member->phone,
-                    'initials'   => strtoupper(substr($member->fullname, 0, 2)),
-
+                    'id'       => $member->id,
+                    'name'     => $member->fullname,
+                    'email'    => $member->email,
+                    'phone'    => $member->phone,
+                    'initials' => strtoupper(substr($member->fullname, 0, 2)),
                 ];
             });
 
         return response()->json([
-            'success' => true,
-            'organization_type' => $activeType,
-            'members' => $members
+            'success'           => true,
+            'organization_type' => 'Ligue',
+            'members'           => $members
         ]);
     }
 }

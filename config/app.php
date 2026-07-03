@@ -52,9 +52,9 @@ return [
     |
     */
 
-    'url' => env('APP_URL', 'https://intellino-app.netlify.app'),
+    'url' => env('APP_URL', 'http://178.105.189.230'),
     // config/app.php
-    'frontend_url' => env('FRONTEND_URL', 'https://intellino-app.netlify.app'),
+    'frontend_url' => env('FRONTEND_URL', 'http://178.105.189.230:3000'),
 
     /*
     |--------------------------------------------------------------------------

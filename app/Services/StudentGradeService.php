@@ -21,7 +21,9 @@ class StudentGradeService
 
     private function getSummary($activeId)
     {
-        $totalStudents = Student::where('club_id', $activeId)->count();
+        $totalStudents = Student::whereHas('clubs', function ($q) use ($activeId) {
+            $q->where('club_id', $activeId);
+        })->count();
         $totalAwards = StudentGrade::where('club_id', $activeId)->count();
 
         // Calcul du taux de passage (exemple: élèves ayant eu un grade cette année)
