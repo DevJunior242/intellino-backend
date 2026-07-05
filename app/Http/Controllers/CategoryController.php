@@ -87,6 +87,8 @@ class CategoryController extends Controller
                 'age_min'         => $cat->age_min,
                 'age_max'         => $cat->age_max,
                 'sexe'            => $cat->sexe,
+                'poids_min'       => $cat->poids_min,
+                'poids_max'       => $cat->poids_max,
                 'licencies_count' => $licenciesCount,
                 'student_count'   => $studentCount,
                 'taux'            => $studentCount > 0

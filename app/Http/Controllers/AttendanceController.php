@@ -26,7 +26,7 @@ class AttendanceController extends Controller
         $activeId = $request->attributes->get('organisateur_id');
 
         $query = Attendance::with([
-            'student.club:id,name,logo',
+            'student.clubs:id,name,logo',
             'session.course:id,name',
         ]);
 
@@ -46,7 +46,7 @@ class AttendanceController extends Controller
             $query->whereIn('student_id', $studentIds);
         }
         //student presence
-        if ($role === 'etudiant') {
+        if ($role === 'karateka') {
             $student = Student::where('user_id', $user->id)->first();
             if (!$student) {
                 return response()->json(['message' => 'Vous n\'etes pas inscrit à ce club'], 403);
@@ -55,6 +55,14 @@ class AttendanceController extends Controller
         }
 
         $attendances = $query->latest()->paginate(6);
+
+        // Student::clubs() est un many-to-many (pivot club_students) ;
+        // le frontend attend un `club` singulier (le premier club de l'élève)
+        $attendances->getCollection()->each(function ($attendance) {
+            if ($attendance->student) {
+                $attendance->student->setRelation('club', $attendance->student->clubs->first());
+            }
+        });
 
         return response()->json([
             'success' => true,

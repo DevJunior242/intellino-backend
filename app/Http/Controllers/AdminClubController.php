@@ -13,11 +13,17 @@ class AdminClubController extends Controller
     {
         $activeId = $request->attributes->get('organisateur_id');
         $user = auth()->user();
-        $attendances = Attendance::with(['student.club:id,name,logo', 'session'])
-            ->whereHas('student', function ($q) use ($request, $activeId) {
-                $q->where('club_id', $activeId);
-            })
+        $attendances = Attendance::with(['student.clubs:id,name,logo', 'session'])
+            ->where('club_id', $activeId)
             ->get();
+
+        // Student::clubs() est un many-to-many (pivot club_students) ;
+        // le frontend attend un `club` singulier (le premier club de l'élève)
+        $attendances->each(function ($attendance) {
+            if ($attendance->student) {
+                $attendance->student->setRelation('club', $attendance->student->clubs->first());
+            }
+        });
         $chartData = $attendances->groupBy('session.session_date')->map(function ($items, $sessionDate) {
             return [
                 'session' => $sessionDate,

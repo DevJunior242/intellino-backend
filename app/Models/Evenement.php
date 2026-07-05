@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Competition;
+use App\Models\ArbitreCompetition;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 
@@ -35,6 +36,11 @@ class Evenement extends Model
     public function competitions()
     {
         return $this->hasMany(Competition::class);
+    }
+
+    public function arbitreCompetitions()
+    {
+        return $this->hasMany(ArbitreCompetition::class);
     }
 
 

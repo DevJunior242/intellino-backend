@@ -22,12 +22,11 @@ class StoreInscriptionReq extends FormRequest
     public function rules(): array
     {
         return [
-            'organisateur_id' => 'required|uuid',
-            'organisateur_type' => 'required|string|in:Ligue,Club',
-            'competition_id'      => 'required|exists:competitions,id',
-            'athlete_id'          => 'required|exists:students,id',
-            'poids_declare'       => 'nullable|numeric|min:0',
-            'kata'                => 'nullable|string|max:255',
+            'competition_id'                => 'required|exists:competitions,id',
+            'inscriptions'                  => 'required|array|min:1',
+            'inscriptions.*.athlete_id'      => 'required|distinct|exists:students,id',
+            'inscriptions.*.poids_declare'   => 'nullable|numeric|min:0',
+            'inscriptions.*.kata'            => 'nullable|string|max:255',
         ];
     }
 
@@ -36,13 +35,40 @@ class StoreInscriptionReq extends FormRequest
         return [
             'competition_id.required' => 'Le champ competition est obligatoire.',
             'competition_id.exists' => 'Le champ competition est invalide.',
-            'athlete_id.required' => 'Le champ athlete est obligatoire.',
-            'athlete_id.exists' => 'Le champ athlete est invalide.',
-            'poids_declare.required' => 'Le champ poids_declare est obligatoire.',
-            'poids_declare.numeric' => 'Le champ poids_declare doit être un nombre.',
-            'poids_declare.min' => 'Le champ poids_declare doit être supérieur à 0.',
-            'kata.required' => 'Le champ kata est obligatoire.',
-            'kata.max' => 'Le champ kata doit être de 255 caractères maximum.',
+            'inscriptions.required' => 'Veuillez sélectionner au moins un athlète.',
+            'inscriptions.min' => 'Veuillez sélectionner au moins un athlète.',
+            'inscriptions.*.athlete_id.required' => 'Le champ athlete est obligatoire.',
+            'inscriptions.*.athlete_id.exists' => 'Le champ athlete est invalide.',
+            'inscriptions.*.athlete_id.distinct' => 'Un athlète ne peut être sélectionné qu\'une fois.',
+            'inscriptions.*.poids_declare.numeric' => 'Le champ poids_declare doit être un nombre.',
+            'inscriptions.*.poids_declare.min' => 'Le champ poids_declare doit être supérieur à 0.',
+            'inscriptions.*.kata.max' => 'Le champ kata doit être de 255 caractères maximum.',
         ];
+    }
+
+    /**
+     * Rejette les poids déclarés hors des bornes de la catégorie (Kumite).
+     */
+    public function withValidator($validator): void
+    {
+        $validator->after(function ($validator) {
+            $competition = \App\Models\Competition::with('category')->find($this->input('competition_id'));
+            $category = $competition?->category;
+
+            if (!$category || (is_null($category->poids_min) && is_null($category->poids_max))) {
+                return;
+            }
+
+            foreach ($this->input('inscriptions', []) as $index => $inscription) {
+                $poids = $inscription['poids_declare'] ?? null;
+
+                if (!is_null($poids) && !$category->isPoidsValide((float) $poids)) {
+                    $validator->errors()->add(
+                        "inscriptions.{$index}.poids_declare",
+                        "Le poids déclaré ({$poids}kg) est hors de la catégorie {$category->nom} ({$category->poids_label})."
+                    );
+                }
+            }
+        });
     }
 }

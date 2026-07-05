@@ -26,6 +26,11 @@ class RolesTableSeeder extends Seeder
                 'description' => 'Responsable des grades, des sélections et des stages.',
             ],
             [
+                'name' => 'vice-president',
+                'display_name' => 'Vice-Président',
+                'description' => 'Assistant du directeur technique, responsable des grades, des sélections et des stages.',
+            ],
+            [
                 'name' => 'secretaire',
                 'display_name' => 'Secrétaire',
                 'description' => 'Gestion administrative, convocations et suivi des dossiers.',

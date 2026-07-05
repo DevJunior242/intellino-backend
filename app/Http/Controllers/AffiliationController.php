@@ -4,54 +4,82 @@ namespace App\Http\Controllers;
 
 use App\Models\Saison;
 use App\Models\Affiliation;
+use Illuminate\Http\Request;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreAffiliationRequest;
 
+/**
+ * Le tarif d'affiliation (cotisation) d'une saison est toujours défini par
+ * la Fédération elle-même — voir AffiliationPaymentController pour le suivi,
+ * club par club, du paiement de ce tarif.
+ */
 class AffiliationController extends Controller
 {
+    public function index(Request $request)
+    {
+        $activeId = $request->attributes->get('organisateur_id');
+        $activeType = $request->attributes->get('organisateur_type');
+
+        if ($activeType !== 'Federation') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Seule une fédération peut consulter ses tarifs d\'affiliation',
+            ], 422);
+        }
+
+        $affiliations = Affiliation::where('federation_id', $activeId)
+            ->with('saison')
+            ->latest()
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'data' => $affiliations,
+        ]);
+    }
+
     public function store(StoreAffiliationRequest $request)
     {
-
         $activeId = $request->attributes->get('organisateur_id');
+        $activeType = $request->attributes->get('organisateur_type');
 
-        $saisonActive =  Saison::where('active', true)->first();
+        if ($activeType !== 'Federation') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Seule une fédération peut définir un tarif d\'affiliation',
+            ], 422);
+        }
+
+        $saisonActive = Saison::where('active', true)
+            ->where('organisateur_id', $activeId)
+            ->where('organisateur_type', 'Federation')
+            ->first();
+
         if (!$saisonActive) {
             return response()->json([
                 'success' => false,
-                'message' => 'Vous devez définir une saison pour créer une affiliation',
+                'message' => 'Vous devez d\'abord définir une saison active pour créer un tarif d\'affiliation',
             ], 422);
         }
 
-        if (!$activeId) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Vous devez être dans une ligue pour créer une affiliation',
-            ], 422);
-        }
         $validated = $request->validated();
-        //verifier si club deja dans une affiliation
-        $affiliation = Affiliation::where('club_id', $validated['club_id'])
-            ->where('saison_id', $saisonActive->id)
-            ->where('league_id', $activeId)->first();
-        if ($affiliation) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Ce club est déjà dans une affiliation',
-            ], 422);
-        }
 
-        $affiliation = Affiliation::create(
-            $validated + [
-                'league_id' => $activeId,
+        // Une seule affiliation par saison : si elle existe déjà, on met à jour le tarif.
+        $affiliation = Affiliation::updateOrCreate(
+            [
+                'federation_id' => $activeId,
                 'saison_id' => $saisonActive->id,
+            ],
+            [
+                'cotisation' => $validated['cotisation'],
             ]
         );
 
         return response()->json([
             'success' => true,
-            'message' => 'Affiliation enregistrée avec succès',
-            'data' => $affiliation
+            'message' => 'Tarif d\'affiliation enregistré avec succès',
+            'data' => $affiliation,
         ], 201);
     }
 }

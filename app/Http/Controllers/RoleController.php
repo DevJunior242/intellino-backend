@@ -31,8 +31,9 @@ class RoleController extends Controller
                 'instructeur',
             ],
             'federation' => [
-                'directeur_technique',
-                'arbitre'
+                'dtn',
+                'arbitre',
+                'vice-president',
             ],
             default => [],
         };

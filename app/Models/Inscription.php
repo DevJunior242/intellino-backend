@@ -9,8 +9,8 @@ use App\Models\Poule;
 use App\Models\Student;
 use App\Models\Category;
 use App\Models\Competition;
+use App\Models\SubDiscipline;
 use App\Models\ConfigNotation;
-use App\Models\Disciplineleague;
 use App\Models\PouleInscription;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -35,7 +35,6 @@ class Inscription extends Model
         'statut_passage',
         'organisateur_type',
         'organisateur_id',
-        'seed',
     ];
 
     protected $keyType = 'string';
@@ -55,9 +54,9 @@ class Inscription extends Model
         return $this->belongsTo(Competition::class, 'competition_id');
     }
 
-    public function disciplineleague()
+    public function subDiscipline()
     {
-        return $this->belongsTo(Disciplineleague::class, 'disciplineleague_id');
+        return $this->belongsTo(SubDiscipline::class, 'sub_discipline_id');
     }
     //club
     public function club()

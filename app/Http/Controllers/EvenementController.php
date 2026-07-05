@@ -7,7 +7,6 @@ use App\Models\Competition;
 use Illuminate\Http\Request;
 use App\Models\ArbitreCompetition;
 use App\Models\NiveauxCompetition;
-use App\Http\Controllers\Concerns\ResolvesFederationSaison;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use App\Http\Controllers\Controller;
@@ -16,6 +15,7 @@ use App\Services\ArbitreVerificationService;
 use App\Http\Requests\UpdateEvenementRequest;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use App\Http\Controllers\Concerns\ResolvesFederationSaison;
 
 class EvenementController extends Controller
 {
@@ -42,12 +42,15 @@ class EvenementController extends Controller
             ->where('saison_id', $saisonActive->id)
             ->with([
                 'competitions' => function ($query) {
-                    $query->with(['niveau:id,nom', 'category:id,nom,sexe', 'discipline:id,nom'])
+                    $query->with(['niveau:id,nom', 'category:id,nom,sexe', 'subDiscipline:id,nom'])
                         ->withCount('inscriptions')
                         ->orderBy('heure_debut_prevu', 'asc');
                 }
             ])
             ->withCount('competitions')
+            ->withCount(['arbitreCompetitions as arbitre_inscrit_count' => function ($query) {
+                $query->where('user_id', auth()->id());
+            }])
             ->orderBy('date_debut', 'desc')
             ->latest()
             ->paginate(2);
@@ -74,7 +77,7 @@ class EvenementController extends Controller
             ->where('organisateur_type', $activeType)
             ->where('saison_id', $saisonActive->id)
             ->with(['competitions' => function ($query) {
-                $query->with(['niveau:id,nom', 'category:id,nom,sexe', 'discipline:id,nom'])
+                $query->with(['niveau:id,nom', 'category:id,nom,sexe', 'subDiscipline:id,nom'])
                     ->withCount('inscriptions')
                     ->orderBy('heure_debut_prevu', 'asc');
             }])
@@ -149,7 +152,7 @@ class EvenementController extends Controller
                     ]);
                 }
 
-                return $evenement->load('competitions.category', 'competitions.discipline');
+                return $evenement->load('competitions.category', 'competitions.subDiscipline');
             });
 
             return response()->json([
@@ -260,7 +263,7 @@ class EvenementController extends Controller
                     }
                 }
 
-                return $evenement->load('competitions.category', 'competitions.discipline');
+                return $evenement->load('competitions.category', 'competitions.subDiscipline');
             });
 
             return response()->json([

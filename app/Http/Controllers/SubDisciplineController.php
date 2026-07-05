@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use App\Models\SubDiscipline;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
 
 class SubDisciplineController extends Controller
 {
@@ -39,6 +40,22 @@ class SubDisciplineController extends Controller
         }
 
         // ──  VALIDATION DU PAYLOAD ───────────────────────────────────────
+        $msg = [
+            'disciplines.required' => 'Vous devez définir au moins une discipline.',
+            'disciplines.*.nom.required' => 'La discipline doit avoir un nom.',
+            'disciplines.*.nom.max' => 'Le nom de la discipline doit faire moins de 100 caractères.',
+            'disciplines.*.description.max' => 'La description de la discipline doit faire moins de 1000 caractères.',
+            'categories.required' => 'Vous devez définir au moins une catégorie.',
+            'categories.*.nom.required' => 'La catégorie doit avoir un nom.',
+            'categories.*.sexe.required' => 'La catégorie doit avoir un sexe.',
+            'categories.*.age_min.required' => 'La catégorie doit avoir une borne inférieure.',
+            'categories.*.age_max.required' => 'La catégorie doit avoir une borne supérieure.',
+            'categories.*.age_min.min' => 'La borne inférieure doit être supérieure ou égale à la borne supérieure.',
+            'categories.*.age_max.min' => 'La borne supérieure doit être supérieure ou égale à la borne inférieure.',
+            'categories.*.age_max.gt' => 'La borne supérieure doit être supérieure à la borne inférieure.',
+            'categories.*.disciplines.required' => 'Vous devez définir au moins un discipline pour la catégorie.',
+            'categories.*.disciplines.*.required' => 'Vous devez définir un discipline valide pour la catégorie.',
+        ];
         $validated = $request->validate([
             // Disciplines
             'disciplines'                => 'required|array|min:1',
@@ -52,8 +69,29 @@ class SubDisciplineController extends Controller
             'categories.*.age_min'       => 'required|integer|min:0',
             'categories.*.age_max'       => 'required|integer|gt:categories.*.age_min',
             'categories.*.disciplines'   => 'required|array|min:1',
-            'categories.*.disciplines.*' => 'integer',
-        ]);
+            'categories.*.disciplines.*' => 'string',
+            'categories.*.poids_min'     => 'nullable|numeric|min:0',
+            'categories.*.poids_max'     => 'nullable|numeric|min:0',
+        ], $msg);
+
+        // Une catégorie rattachée au Kumite doit obligatoirement avoir une borne de poids
+        // (au moins poids_min ou poids_max), pour permettre la pesée officielle.
+        foreach ($validated['categories'] as $index => $catData) {
+            $estKumite = collect($catData['disciplines'])
+                ->contains(fn($nom) => str_contains(strtolower($nom), 'kumite'));
+
+            if ($estKumite && empty($catData['poids_min']) && empty($catData['poids_max'])) {
+                throw ValidationException::withMessages([
+                    "categories.{$index}.poids_max" => "La catégorie « {$catData['nom']} » est rattachée au Kumite : au moins une borne de poids (min ou max) est requise.",
+                ]);
+            }
+
+            if (!empty($catData['poids_min']) && !empty($catData['poids_max']) && $catData['poids_max'] <= $catData['poids_min']) {
+                throw ValidationException::withMessages([
+                    "categories.{$index}.poids_max" => "La catégorie « {$catData['nom']} » : le poids max doit être supérieur au poids min.",
+                ]);
+            }
+        }
 
         try {
             $result = DB::transaction(function () use ($validated, $saison, $activeId) {
@@ -61,7 +99,7 @@ class SubDisciplineController extends Controller
                 // ── ÉTAPE 1 : Créer / Récupérer les Disciplines de la Fédé ─────
                 $disciplinesCreees = [];
 
-                foreach ($validated['disciplines'] as $index => $disc) {
+                foreach ($validated['disciplines'] as $disc) {
                     $discipline = SubDiscipline::firstOrCreate(
                         [
                             'nom'             => $disc['nom'],
@@ -72,28 +110,30 @@ class SubDisciplineController extends Controller
                             'organisateur_type' => 'Federation',
                         ]
                     );
-                    $disciplinesCreees[$index] = $discipline->id;
+                    $disciplinesCreees[strtolower($disc['nom'])] = $discipline->id;
                 }
 
                 // ── ÉTAPE 2 : Créer les Catégories Officielles de la Saison ──
                 $categoriesCreees = [];
 
                 foreach ($validated['categories'] as $catData) {
-                    $categorie = Category::firstOrCreate(
+                    $categorie = Category::updateOrCreate(
                         [
                             'nom'       => $catData['nom'],
                             'sexe'      => $catData['sexe'],
                             'saison_id' => $saison->id, // Lié à la saison Fédérale
                         ],
                         [
-                            'age_min' => $catData['age_min'],
-                            'age_max' => $catData['age_max'],
+                            'age_min'   => $catData['age_min'],
+                            'age_max'   => $catData['age_max'],
+                            'poids_min' => $catData['poids_min'] ?? null,
+                            'poids_max' => $catData['poids_max'] ?? null,
                         ]
                     );
 
-                    // Mapping des index du tableau React vers les IDs auto-incrémentés
+                    // Mapping des noms de disciplines vers les IDs créés/existants
                     $discIds = collect($catData['disciplines'])
-                        ->map(fn($index) => $disciplinesCreees[$index] ?? null)
+                        ->map(fn($nom) => $disciplinesCreees[strtolower($nom)] ?? null)
                         ->filter()
                         ->values()
                         ->toArray();

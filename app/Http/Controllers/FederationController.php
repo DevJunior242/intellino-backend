@@ -4,10 +4,13 @@
 namespace App\Http\Controllers;
 
 use App\Models\Role;
+use App\Models\Saison;
 use App\Models\League;
 use App\Models\Federation;
+use App\Models\Affiliation;
 use Illuminate\Http\Request;
 use App\Models\ActivationKey;
+use App\Models\AffiliationPayment;
 use Illuminate\Support\Facades\DB;
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Storage;
@@ -33,6 +36,27 @@ class FederationController extends Controller
         $leagues =  League::where('federation_id', $activeId)
             ->with('clubs')
             ->get();
+
+        // Statut d'affiliation (saison active) de chaque club, pour l'affichage
+        // d'un badge "à jour / en vérification / non affilié" dans l'arborescence.
+        $saisonActive = Saison::where('active', true)
+            ->where('organisateur_id', $activeId)
+            ->where('organisateur_type', 'Federation')
+            ->first();
+
+        $affiliation = $saisonActive
+            ? Affiliation::where('federation_id', $activeId)->where('saison_id', $saisonActive->id)->first()
+            : null;
+
+        $statusByClub = $affiliation
+            ? AffiliationPayment::where('affiliation_id', $affiliation->id)->pluck('status', 'club_id')
+            : collect();
+
+        $leagues->each(function ($league) use ($statusByClub) {
+            $league->clubs->each(function ($club) use ($statusByClub) {
+                $club->affiliation_status = $statusByClub->get($club->id);
+            });
+        });
 
         return response()->json([
             'success' => true,

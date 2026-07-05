@@ -53,8 +53,8 @@ use App\Http\Controllers\CompetitionController;
 use App\Http\Controllers\InscriptionController;
 use App\Http\Controllers\LicenceTypeController;
 use App\Http\Controllers\PricingPlanController;
-use App\Http\Controllers\AffiliationControllerr;
 use App\Http\Controllers\ArbitreStatsController;
+use App\Http\Controllers\AffiliationPaymentController;
 use App\Http\Controllers\Auth\SettingController;
 use App\Http\Controllers\CombatActionController;
 use App\Http\Controllers\EnchainementController;
@@ -62,6 +62,7 @@ use App\Http\Controllers\ExamenLeagueController;
 use App\Http\Controllers\JudgeSessionController;
 use App\Http\Controllers\KumiteFormatController;
 use App\Http\Controllers\LeagueMemberController;
+use App\Http\Controllers\FederationMemberController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\OrdrePassageController;
 use App\Http\Controllers\StagePaymentController;
@@ -351,6 +352,10 @@ Route::middleware(['auth:sanctum'])->group(function () {
             Route::apiResource('league', LeagueMemberController::class);
             //arbitres
             Route::get('arbitres', [LeagueMemberController::class, 'arbitres']);
+
+            //ajout membre federation
+            Route::apiResource('federation', FederationMemberController::class);
+            Route::get('federation-arbitres', [FederationMemberController::class, 'arbitres']);
         });
         //AddManuelClubController
         Route::post('leagues/addClubManuel', [AddManuelClubController::class, 'store']);
@@ -368,15 +373,26 @@ Route::middleware(['auth:sanctum'])->group(function () {
 
         Route::apiResource('/disciplineLeague', DisciplineConfigController::class);
 
-        //affiliations
+        //affiliations : tarif fixé par la fédération pour la saison
         Route::prefix('affiliations')->group(function () {
             Route::apiResource('/affiliations', AffiliationController::class);
+        });
+
+        //affiliation-payments : suivi, club par club, du paiement de ce tarif
+        Route::prefix('affiliation-payments')->group(function () {
+            Route::get('mon-statut', [AffiliationPaymentController::class, 'monStatut']);
+            Route::get('/', [AffiliationPaymentController::class, 'index']);
+            Route::post('{payment}/declarer', [AffiliationPaymentController::class, 'declarer']);
+            Route::post('{payment}/confirmer', [AffiliationPaymentController::class, 'confirmer']);
+            Route::post('{payment}/rejeter', [AffiliationPaymentController::class, 'rejeter']);
         });
 
         //inscription 
 
         Route::post('inscriptions',                               [InscriptionController::class, 'store']);
-        Route::delete('inscriptions/{inscription}',               [InscriptionController::class, 'destroy']);
+        // NB: "inscriptions/{inscription}" collides with the StageRegistrationController
+        // delete route above, which is registered first and would otherwise swallow this one.
+        Route::delete('inscriptions/desinscrire/{inscription}',   [InscriptionController::class, 'destroy']);
         //adin inscription index
         Route::get('/admin/inscriptions', [InscriptionController::class, 'index']);
         Route::prefix('inscriptions')->group(function () {
@@ -388,6 +404,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::get('/inscriptions/competition/{competitionId}', [InscriptionController::class, 'getByCompetition']);
         Route::get('evenements/ouverts',                          [InscriptionController::class, 'getEvenementsOuverts']);
         Route::get('inscriptions/epreuve/{competition}',          [InscriptionController::class, 'parEpreuve']);
+        Route::get('inscriptions/epreuve/{competition}/disponibles', [InscriptionController::class, 'studentsDisponibles']);
         //evenements
         Route::prefix('evenements')->group(function () {
             //ouvrir et cloturer evenement
@@ -429,6 +446,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
         //course
         Route::post('/course/full-store', [CourseController::class, 'storeFullCourse']);
         Route::post('/course/storeSession', [CourseController::class, 'storeSession']);
+        Route::get('/course/eligible-instructors', [CourseController::class, 'eligibleInstructorsList']);
 
 
         Route::get('/medals', [MedalController::class, 'getMedals']);
@@ -458,6 +476,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::post('/licences', [LicenceController::class, 'store']);
         Route::get('/licences/mes-licences', [LicenceController::class, 'mesLicences']);
         Route::get('/licences/mes-etudiants', [LicenceController::class, 'mesEtudiants']);
+        Route::get('/licences/mes-licences-etudiant', [LicenceController::class, 'mesLicencesEtudiant']);
         Route::delete('/licences/{licence}', [LicenceController::class, 'destroy']);
 
         // --- Paiements de licences (Fédération) ---
@@ -480,6 +499,8 @@ Route::middleware(['auth:sanctum'])->group(function () {
         //student 
 
         Route::get('/students', [StudentController::class, 'index']);
+        Route::get('/students/mon-club', [StudentController::class, 'monClub']);
+        Route::get('/students/mes-parents', [StudentController::class, 'mesParents']);
         Route::get('/students/without-grade', [StudentController::class, 'studentsWithoutGrade']);
         Route::get('/students/latest', [StudentController::class, 'latestStudent']);
         Route::get('/parents-users', [StudentController::class, 'getParent']);
@@ -533,6 +554,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
             Route::get('/', [ExamenController::class, 'index']);
             Route::post('/', [ExamenController::class, 'store']);
             Route::get('/stats', [ExamenController::class, 'stats']);
+            Route::get('/mes-examens', [ExamenController::class, 'mesExamens']);
 
             Route::get('/{examen}', [ExamenController::class, 'getExamenCandidats']);
             Route::get('/{examen}/show', [ExamenController::class, 'show']);

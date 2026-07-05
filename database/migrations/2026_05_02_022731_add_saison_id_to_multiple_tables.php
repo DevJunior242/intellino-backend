@@ -8,7 +8,7 @@ return new class extends Migration
 {
     public function up()
     {
-        $tables = ['examens', 'affiliations', 'courses', 'attendances'];
+        $tables = ['examens', 'courses', 'attendances'];
 
         foreach ($tables as $tableName) {
             Schema::table($tableName, function (Blueprint $table) {

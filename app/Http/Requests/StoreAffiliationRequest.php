@@ -22,17 +22,14 @@ class StoreAffiliationRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'club_id' => 'required|uuid|exists:clubs,id',
-            'cotisation' => 'nullable|numeric|min:0',
-
+            'cotisation' => 'required|numeric|min:0',
         ];
     }
 
     public function messages(): array
     {
         return [
-            'club_id.required' => 'Vous devez sélectionner un club.',
-            'club_id.exists' => 'Le club sélectionné n\'existe pas.',
+            'cotisation.required' => 'Vous devez indiquer le montant de la cotisation.',
             'cotisation.min' => 'La cotisation doit être supérieure à 0.',
         ];
     }

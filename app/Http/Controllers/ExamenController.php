@@ -8,6 +8,7 @@ use App\Models\Grade;
 use App\Models\Examen;
 use App\Models\Student;
 use Illuminate\Support\Str;
+use App\Models\ExamenResult;
 use Illuminate\Http\Request;
 use App\Models\ExamenCandidat;
 use App\Services\BrevoService;
@@ -21,8 +22,8 @@ use App\Notifications\ExamenCanceled;
 use Illuminate\Database\QueryException;
 use App\Http\Requests\StoreExamenRequest;
 use Illuminate\Support\Facades\Notification;
-use App\Http\Controllers\Concerns\ResolvesFederationSaison;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use App\Http\Controllers\Concerns\ResolvesFederationSaison;
 
 class ExamenController extends Controller
 {
@@ -251,7 +252,7 @@ class ExamenController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Le grade actuel ne peut pas être identique au grade visé.',
-            ], 400);
+            ], 422);
         }
 
         $nextGrade = Grade::findOrFail($validated['next_grade_id']);
@@ -434,6 +435,50 @@ class ExamenController extends Controller
             'success' => true,
             'message' => 'examen actualisée avec succès'
         ], 201);
+    }
+
+    /**
+     * Candidatures et résultats d'examens de l'élève (karateka) connecté.
+     */
+    public function mesExamens(Request $request)
+    {
+        $role = $request->attributes->get('role');
+
+        if ($role !== 'karateka') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Accès réservé aux élèves.'
+            ], 403);
+        }
+
+        $student = Student::where('user_id', auth()->id())->first();
+
+        if (!$student) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Profil élève introuvable.'
+            ], 404);
+        }
+
+        $candidatures = ExamenCandidat::where('student_id', $student->id)
+            ->with([
+                'examen:id,start_date,status,current_grade_id,next_grade_id',
+                'examen.currentGrade:id,name',
+                'examen.nextGrade:id,name',
+            ])
+            ->latest('created_at')
+            ->get();
+
+        $resultats = ExamenResult::where('student_id', $student->id)
+            ->with('examen:id,start_date')
+            ->latest('created_at')
+            ->get();
+
+        return response()->json([
+            'success'      => true,
+            'candidatures' => $candidatures,
+            'resultats'    => $resultats,
+        ]);
     }
 
     public function stats(ExamenStatService $stats, Request $request)

@@ -39,12 +39,14 @@ class StoreStudentRequest extends FormRequest
 
             // Validation conditionnelle pour l'email et le téléphone
             // Si is_own_responsible est TRUE, on force l'email/phone au sein de l'objet student
+            // Pas de règle "unique" ici : un email/téléphone déjà présent dans users
+            // correspond à une réinscription ou un transfert d'un élève existant,
+            // géré explicitement par StudentController::store (scénario B).
             'students.*.email' => [
                 'bail',
                 'nullable',
                 'required_if:is_own_responsible,true',
                 'email',
-                'unique:users,email'
             ],
             'students.*.phone' => [
                 'bail',
@@ -52,7 +54,6 @@ class StoreStudentRequest extends FormRequest
                 'required_if:is_own_responsible,true',
                 'string',
                 'regex:/^(\+226|00226)?[0567]\d{7}$/',
-                'unique:users,phone'
             ],
         ];
     }
@@ -62,8 +63,6 @@ class StoreStudentRequest extends FormRequest
         return [
             'students.*.fullname.required' => 'Le nom complet de l\'élève est requis',
             'students.*.email.required_if' => 'L\'email est obligatoire pour créer le compte du responsable',
-            'students.*.email.unique' => 'Cet email est déjà utilisé',
-            'students.*.phone.unique' => 'Ce numéro de téléphone est déjà utilisé',
             'students.*.phone.regex' => 'Le numéro de téléphone est invalide',
             'students.*.is_own_responsible.boolean' => 'Le champ est_own_responsible doit être un booléen',
             'students.*.create_account.boolean' => 'Le champ create_account doit être un booléen',

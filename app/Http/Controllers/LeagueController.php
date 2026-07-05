@@ -22,7 +22,7 @@ class LeagueController extends Controller
     public function index()
     {
         //recuperer toutes les ligues
-        $leagues = League::with(['clubs.affiliations'])
+        $leagues = League::with(['clubs.affiliationPayments'])
             ->select('id', 'name', 'city', 'phone', 'logo')
             ->get()
             ->map(function ($league) {
@@ -174,11 +174,11 @@ class LeagueController extends Controller
         $status = $request->status;
 
         $clubs = Club::where('league_id', $activeId)
-            ->with(['users', 'affiliations', 'country:id,name'])
+            ->with(['users', 'affiliationPayments', 'country:id,name'])
             ->withCount('licences')
             ->when($search, fn($q) => $q->where('name', 'like', "%$search%"))
             ->when($status, fn($q) => $q->whereHas(
-                'affiliations',
+                'affiliationPayments',
                 fn($sq) =>
                 $sq->where('status', $status)
             ))

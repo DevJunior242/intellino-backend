@@ -21,7 +21,8 @@ return new class extends Migration
             $table->string('matricule')->nullable();
             $table->enum('sex', ['M', 'F']);
             $table->string('photo')->nullable();
-
+            //subscription_expires_at
+            $table->timestamp('subscription_expires_at')->nullable();
 
             $table->softDeletes();
             $table->timestamps();

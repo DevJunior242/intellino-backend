@@ -7,7 +7,6 @@ use App\Models\Category;
 use App\Models\Evenement;
 use App\Models\Inscription;
 use App\Models\SubDiscipline;
-use App\Models\Disciplineleague;
 use App\Models\NiveauxCompetition;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -48,7 +47,7 @@ class Competition extends Model
         return $this->hasMany(Inscription::class);
     }
 
-    public function discipline()
+    public function subDiscipline()
     {
         return $this->belongsTo(SubDiscipline::class, 'sub_discipline_id');
     }

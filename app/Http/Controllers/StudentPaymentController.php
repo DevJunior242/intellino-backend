@@ -133,9 +133,9 @@ class StudentPaymentController extends Controller
         if ($isNewPurchase) {
             $currentExpiry = $student->subscription_expires_at;
             // Prolongation si abonnement déjà actif
-            if ($currentExpiry && $currentExpiry->isFuture() && $plan->paymentCategory->slug === 'subscription') {
-                $startsAt = $currentExpiry->copy()->addDay();
-            }
+            // if ($currentExpiry && $currentExpiry->isFuture() && $plan->paymentCategory->slug === 'subscription') {
+            //     $startsAt = $currentExpiry->copy()->addDay();
+            // }
 
             if ($plan->duration_value && $plan->duration_unit) {
                 $method = 'add' . ucfirst($plan->duration_unit) . 's';
@@ -169,9 +169,9 @@ class StudentPaymentController extends Controller
         ]);
 
         // 5. MISE À JOUR DE LA VALIDITÉ (Seulement si c'est le premier versement)
-        if ($isNewPurchase && $endsAt && ($plan->paymentCategory->affects_validity || $plan->paymentCategory->slug === 'registration')) {
-            $student->update(['subscription_expires_at' => $endsAt]);
-        }
+        // if ($isNewPurchase && $endsAt && ($plan->paymentCategory->affects_validity || $plan->paymentCategory->slug === 'registration')) {
+        //     $student->update(['subscription_expires_at' => $endsAt]);
+        // }
 
         return response()->json([
             'success' => true,
@@ -258,7 +258,7 @@ class StudentPaymentController extends Controller
 
         $debts = StudentPayment::where('club_id', $activeId)
             ->where('balance', '>', 0)
-            ->with(['student.user:id,fullname,phone', 'pricingPlan:id,label', 'student.parents.user:id,fullname,phone', 'student.club:id,name,logo'])
+            ->with(['student.user:id,fullname,phone', 'pricingPlan:id,label', 'student.parents.user:id,fullname,phone', 'student.clubs:id,name,logo'])
             ->select('student_id', 'pricing_plan_id', 'balance', 'updated_at', 'total_amount')
             ->whereIn('id', function ($query) {
                 $query->selectRaw('max(id)')
@@ -268,6 +268,14 @@ class StudentPaymentController extends Controller
             ->orderBy('balance', 'desc')
             ->latest()
             ->paginate(6);
+
+        // Student::clubs() est un many-to-many (pivot club_students) ;
+        // le frontend attend un `club` singulier (le premier club de l'élève)
+        $debts->getCollection()->each(function ($debt) {
+            if ($debt->student) {
+                $debt->student->setRelation('club', $debt->student->clubs->first());
+            }
+        });
 
         return response()->json([
             'success' => true,

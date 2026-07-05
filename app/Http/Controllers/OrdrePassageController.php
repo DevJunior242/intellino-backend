@@ -20,6 +20,9 @@ class OrdrePassageController extends Controller
             ]
         )
             ->withCount('inscription')
+            ->whereHas('inscription', function ($q) {
+                $q->where('status', Inscription::STATUS_VALIDE);
+            })
             ->where('config_notation_id', $configId)
             ->orderBy('ordre', 'asc')
             ->get();
@@ -33,9 +36,10 @@ class OrdrePassageController extends Controller
         // On récupère les IDs des inscriptions déjà présentes dans une file d'attente (ordre_passages)
         $dejaAssigneesIds = OrdrePassage::pluck('inscription_id');
 
-        // On retourne les inscriptions de cette compétition qui NE SONT PAS dans cette liste
+        // On retourne les inscriptions validées de cette compétition qui NE SONT PAS dans cette liste
         $inscriptions = Inscription::with(['athlete:id,fullname', 'organisateur:id,name'])
             ->where('competition_id', $competitionId)
+            ->where('status', Inscription::STATUS_VALIDE)
             ->whereNotIn('id', $dejaAssigneesIds)
             ->get();
 

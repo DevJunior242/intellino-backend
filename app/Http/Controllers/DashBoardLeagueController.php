@@ -12,6 +12,7 @@ use App\Models\Competition;
 use App\Models\ExamenResult;
 use Illuminate\Http\Request;
 use App\Models\ExamenCandidat;
+use App\Models\AffiliationPayment;
 use Illuminate\Support\Facades\Log;
 use App\Http\Controllers\Controller;
 
@@ -58,10 +59,20 @@ class DashBoardLeagueController extends Controller
         $event = Evenement::where('organisateur_id', $activeId)
             ->withCount('competitions')
             ->count();
+        // Nombre de clubs de la ligue à jour de leur affiliation (saison active)
+        $league = \App\Models\League::find($activeId);
+        $clubIds = $league->clubs->pluck('id');
 
-        $afiliation = Affiliation::where('league_id', $activeId)
-            ->where('saison_id', $saisonActive->id) // Ajouté pour filtrer sur la saison en cours
-            ->count();
+        $affiliation = Affiliation::where('federation_id', $league->federation_id)
+            ->where('saison_id', $saisonActive->id)
+            ->first();
+
+        $afiliation = $affiliation
+            ? AffiliationPayment::where('affiliation_id', $affiliation->id)
+            ->where('status', 'paid')
+            ->whereIn('club_id', $clubIds)
+            ->count()
+            : 0;
 
         return response()->json([
             'total_students' => $studentsCount,
@@ -84,7 +95,7 @@ class DashBoardLeagueController extends Controller
 
         if ($saisonActive) {
             // 2. Vérification de la fin de saison nationale (< 7 jours)
-            if ($saisonActive->date_fin && now()->diffInDays($saisonActive->date_fin, false) <= 7) {
+            if ($saisonActive->dateFin && now()->diffInDays($saisonActive->dateFin, false) <= 7) {
                 $expiredLicences = Licence::join('clubs', 'clubs.id', '=', 'licences.club_id')
                     ->where('clubs.league_id', $activeId)
                     ->where('licences.saison_id', $saisonActive->id)
@@ -100,12 +111,19 @@ class DashBoardLeagueController extends Controller
             }
 
             // Cotisations impayées pour la ligue sur cette saison
-            $unpaidAffiliations = Affiliation::where('league_id', $activeId)
-                ->where('status', Affiliation::STATUS_EN_ATTENTE)
-                ->where('saison_id', $saisonActive->id)
-                ->get();
+            $league = \App\Models\League::find($activeId);
+            $clubIds = $league->clubs->pluck('id');
 
-            $unpaidCount = $unpaidAffiliations->count();
+            $affiliation = Affiliation::where('federation_id', $league->federation_id)
+                ->where('saison_id', $saisonActive->id)
+                ->first();
+
+            $unpaidCount = $affiliation
+                ? $clubIds->count() - AffiliationPayment::where('affiliation_id', $affiliation->id)
+                ->where('status', 'paid')
+                ->whereIn('club_id', $clubIds)
+                ->count()
+                : 0;
         }
 
         // Examens propres à la ligue
@@ -218,8 +236,8 @@ class DashBoardLeagueController extends Controller
         // Trouver la saison fédérale précédente
         $previousSaison = Saison::where('organisateur_id', $currentSaison->organisateur_id)
             ->where('organisateur_type', 'Federation')
-            ->where('date_fin', '<', $currentSaison->date_debut) // Ajusté selon tes colonnes (date_fin / date_debut)
-            ->orderBy('date_fin', 'desc')
+            ->where('dateFin', '<', $currentSaison->dateDebut)
+            ->orderBy('dateFin', 'desc')
             ->first();
 
         // Compter les admis de la saison précédente pour cette ligue

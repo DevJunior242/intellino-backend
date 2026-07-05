@@ -73,8 +73,18 @@ class StudentGradeController extends Controller
         try {
             $user = auth()->user();
             $activeId = $request->attributes->get('organisateur_id');
+            $activeType = $request->attributes->get('organisateur_type');
 
             $validated = $request->validated();
+
+            $grade = Grade::findOrFail($validated['current_grade_id']);
+
+            if ($grade->isNoire() && $activeType !== 'Ligue') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'L\'attribution de la ceinture noire est réservée aux Ligues.',
+                ], 422);
+            }
 
             $hasGrades = StudentGrade::where('student_id', $request->student_id)->exists();
 

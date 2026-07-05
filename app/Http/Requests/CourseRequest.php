@@ -25,6 +25,7 @@ class CourseRequest extends FormRequest
             'course.organisateur_id' => 'required|uuid',
             'course.organisateur_type' => 'required|string|in:Ligue,Club',
             'course.current_grade_id' => ['bail', 'required', 'exists:grades,id'],
+            'course.instructor_id' => ['bail', 'required', 'uuid', 'exists:users,id'],
             'course.name' => ['bail', 'required', 'regex:/^[\pL\s\d\-,.\']+$/u', 'max:50'],
             'sessions' => ['bail', 'required', 'array', 'min:1'],
             'sessions.*.title' => ['bail', 'required', 'max:50'],
@@ -54,8 +55,8 @@ class CourseRequest extends FormRequest
             'course.name.regex' => 'Le nom complet ne peut contenir que des lettres, des chiffres et des tirets',
             'course.level.max' => 'La relation est trop longue',
 
-            'instructor_id.required' => 'L\'instructeur est requis',
-            'instructor_id.exists' => 'L\'instructeur est invalide',
+            'course.instructor_id.required' => 'L\'instructeur est requis',
+            'course.instructor_id.exists' => 'L\'instructeur est invalide',
             'sessions.*.session_date.required' => 'La date est requise',
             'sessions.*.session_date.date' => 'La date est invalide',
             'sessions.*.start_time.required' => 'L\'heure de début est requise',

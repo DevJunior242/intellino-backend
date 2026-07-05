@@ -32,7 +32,7 @@ class RoleSecurityService
         // 3. Sécurité au niveau LIGUE
         if ($context === 'ligue' || $context === 'league') {
             // Un admin de ligue ne peut pas nommer un autre admin de ligue ou un rôle fédéral (dtn)
-            if (in_array($roleTarget->name, ['admin', 'dtn'])) {
+            if (in_array($roleTarget->name, ['admin'])) {
                 $this->deny("En tant qu'administrateur de ligue, vous ne pouvez pas attribuer ce rôle.");
             }
         }

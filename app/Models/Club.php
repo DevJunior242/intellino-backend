@@ -12,8 +12,8 @@ use App\Models\Licence;
 use App\Models\Student;
 use App\Models\ClubUser;
 use App\Models\Discipline;
-use App\Models\Affiliation;
 use App\Models\Subscription;
+use App\Models\AffiliationPayment;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 
@@ -92,9 +92,9 @@ class Club extends Model
         return $this->belongsTo(League::class);
     }
 
-    public function affiliations()
+    public function affiliationPayments()
     {
-        return  $this->hasMany(Affiliation::class);
+        return $this->hasMany(AffiliationPayment::class);
     }
 
     public function licences()

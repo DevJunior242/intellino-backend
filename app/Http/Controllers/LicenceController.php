@@ -256,6 +256,41 @@ class LicenceController extends Controller
             'data'    => $students,
         ]);
     }
+
+    /**
+     * Liste des licences de l'élève (karateka) connecté, toutes saisons confondues.
+     */
+    public function mesLicencesEtudiant(Request $request)
+    {
+        $role = $request->attributes->get('role');
+
+        if ($role !== 'karateka') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Accès réservé aux élèves.'
+            ], 403);
+        }
+
+        $student = Student::where('user_id', auth()->id())->first();
+
+        if (!$student) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Profil élève introuvable.'
+            ], 404);
+        }
+
+        $licences = $student->licences()
+            ->with(['licenceType', 'saison', 'club:id,name,logo'])
+            ->latest('created_at')
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'data'    => $licences,
+        ]);
+    }
+
     /**
      * Liste des licences du club connecté pour la saison active.
      */

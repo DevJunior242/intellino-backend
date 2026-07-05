@@ -13,11 +13,13 @@ return new class extends Migration
     {
         Schema::create('affiliations', function (Blueprint $table) {
             $table->uuid('id')->primary();
-            $table->foreignUuid('league_id')->constrained('leagues')->cascadeOnDelete();
-            $table->foreignUuid('club_id')->constrained('clubs')->cascadeOnDelete();
-            $table->tinyInteger('status')->default(1);
-            $table->decimal('cotisation', 10, 2)->nullable();
+            $table->foreignUuid('federation_id')->constrained('federations')->cascadeOnDelete();
+            $table->foreignUuid('saison_id')->constrained('saisons')->cascadeOnDelete();
+            //tarif d'affiliation fixé par la fédération pour la saison, payé par chaque club
+            $table->decimal('cotisation', 10, 2);
             $table->timestamps();
+            $table->softDeletes();
+            $table->unique(['federation_id', 'saison_id']);
         });
     }
 

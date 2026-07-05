@@ -2,47 +2,41 @@
 
 namespace App\Models;
 
-use App\Models\Club;
-use App\Models\League;
+use App\Models\Saison;
+use App\Models\Federation;
+use App\Models\AffiliationPayment;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 
+/**
+ * Le tarif d'affiliation fixé par une Fédération pour une saison donnée.
+ * Une seule ligne par (federation_id, saison_id) : voir AffiliationPayment
+ * pour le suivi, club par club, du paiement de ce tarif.
+ */
 class Affiliation extends Model
 {
     use HasUuids;
     protected $fillable = [
-        'league_id',
-        'club_id',
+        'federation_id',
         'saison_id',
         'cotisation',
-        'status',
     ];
 
     protected $keyType = 'string';
     public $incrementing = false;
 
-    const STATUS_EN_ATTENTE = 0;
-    const STATUS_EN_ACTIF = 1;
-    const STATUS_EN_EXPIRE = 2;
-    const STATUS_SUSPENDU = 3;
-
-    public function league()
+    public function federation()
     {
-        return $this->belongsTo(League::class);
-    }
-    public function club()
-    {
-        return $this->belongsTo(Club::class);
+        return $this->belongsTo(Federation::class);
     }
 
-    public function getStatusLabelAttribute()
+    public function saison()
     {
-        return match ($this->status) {
-            self::STATUS_EN_ATTENTE => 'En attente',
-            self::STATUS_EN_ACTIF => 'Active',
-            self::STATUS_EN_EXPIRE => 'Expirée',
-            self::STATUS_SUSPENDU => 'Suspendue',
-            default => 'Inconnu',
-        };
+        return $this->belongsTo(Saison::class);
+    }
+
+    public function payments()
+    {
+        return $this->hasMany(AffiliationPayment::class);
     }
 }

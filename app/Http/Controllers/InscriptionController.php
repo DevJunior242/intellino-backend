@@ -3,11 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Models\Club;
+use App\Models\Student;
 use App\Models\Evenement;
 use App\Models\Competition;
 
 use App\Models\Inscription;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreInscriptionReq;
 
@@ -26,8 +28,8 @@ class InscriptionController extends Controller
             ->with([
                 'athlete:id,fullname,sex',
                 'organisateur',
-                'competition.category:id,nom,sexe',
-                'competition.discipline:id,nom'
+                'competition.category:id,nom,sexe,poids_min,poids_max',
+                'competition.subDiscipline:id,nom'
             ])
             ->orderBy('organisateur_id')
             ->get();
@@ -38,7 +40,6 @@ class InscriptionController extends Controller
 
     public function getEvenementsOuverts(Request $request)
     {
-        // ->where('status', Evenement::STATUT_EN_COURS)
 
         $activeId = $request->attributes->get('organisateur_id');
 
@@ -58,7 +59,7 @@ class InscriptionController extends Controller
             })
             ->with([
                 'competitions' => function ($q) {
-                    $q->with(['category:id,nom,sexe', 'discipline:id,nom', 'niveau:id,nom'])
+                    $q->with(['category:id,nom,sexe', 'subDiscipline:id,nom', 'niveau:id,nom'])
                         ->withCount('inscriptions');
                 }
             ])
@@ -83,57 +84,144 @@ class InscriptionController extends Controller
         return response()->json([
             'success'      => true,
             'inscriptions' => $inscriptions,
-            'epreuve'      => $competition->load(['category:id,nom,sexe', 'discipline:id,nom', 'niveau:id,nom']),
+            'epreuve'      => $competition->load(['category:id,nom,sexe,poids_min,poids_max', 'subDiscipline:id,nom', 'niveau:id,nom']),
         ]);
     }
 
-    // Inscrire un athlète à une épreuve
+    // Élèves du club éligibles à une épreuve (bonne catégorie, sexe, pas déjà
+    // inscrits) — utilisé pour peupler la liste à cocher d'InscriptionForm
+    public function studentsDisponibles(Competition $competition, Request $request)
+    {
+        $activeId   = $request->attributes->get('organisateur_id');
+        $activeType = $request->attributes->get('organisateur_type');
+
+        if (!$activeId || $activeType !== 'Club') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Impossible d\'identifier le club connecté.'
+            ], 403);
+        }
+
+        $competition->loadMissing('category');
+        $category = $competition->category;
+
+        $dejaInscrits = Inscription::where('competition_id', $competition->id)
+            ->pluck('athlete_id');
+
+        $students = Student::query()
+            ->join('club_students', 'club_students.student_id', '=', 'students.id')
+            ->where('club_students.club_id', $activeId)
+            ->whereNull('club_students.deleted_at') // Exclure si l'élève a été retiré du club
+            ->whereNotIn('students.id', $dejaInscrits) // Déjà inscrit à cette épreuve
+            ->when($category && $category->sexe !== 'Mixte', function ($q) use ($category) {
+                $q->where('students.sex', $category->sexe);
+            })
+            ->when($category && !is_null($category->age_min) && !is_null($category->age_max), function ($q) use ($category) {
+                $aujourdhui = \Carbon\Carbon::now();
+                $dateNaissanceMin = $aujourdhui->copy()->subYears($category->age_max)->format('Y-m-d');
+                $dateNaissanceMax = $aujourdhui->copy()->subYears($category->age_min)->format('Y-m-d');
+                $q->whereBetween('students.birthdate', [$dateNaissanceMin, $dateNaissanceMax]);
+            })
+            ->select('students.id', 'students.fullname', 'students.birthdate', 'students.sex')
+            ->orderBy('students.fullname')
+            ->get();
+
+        return response()->json([
+            'success'  => true,
+            'students' => $students,
+            'category' => $category ? $category->only(['id', 'nom', 'sexe', 'poids_min', 'poids_max']) : null,
+        ]);
+    }
+
+    // Inscrire plusieurs athlètes à une épreuve en une seule fois
     public function store(StoreInscriptionReq $request)
     {
         $validated = $request->validated();
+        $competitionId = $validated['competition_id'];
+        $activeId = $request->attributes->get('organisateur_id');
+        $activeType = $request->attributes->get('organisateur_type');
 
-        // Vérifier doublon
-        $existe = Inscription::where('competition_id', $validated['competition_id'])
-            ->where('athlete_id', $validated['athlete_id'])
-            ->exists();
+        $athleteIds = collect($validated['inscriptions'])->pluck('athlete_id')->all();
 
-        if ($existe) {
+        // Ignorer les athlètes déjà inscrits à cette épreuve
+        $dejaInscrits = Inscription::where('competition_id', $competitionId)
+            ->whereIn('athlete_id', $athleteIds)
+            ->pluck('athlete_id')
+            ->all();
+
+        $aInscrire = collect($validated['inscriptions'])
+            ->reject(fn($i) => in_array($i['athlete_id'], $dejaInscrits))
+            ->values();
+
+        if ($aInscrire->isEmpty()) {
             return response()->json([
                 'success' => false,
-                'message' => 'Cet athlète est déjà inscrit à cette épreuve',
+                'message' => 'Tous les athlètes sélectionnés sont déjà inscrits à cette épreuve',
             ], 422);
         }
 
-        // Ordre de passage automatique
-        $dernierOrdre = Inscription::where('competition_id', $validated['competition_id'])
-            ->lockForUpdate()
-            ->max('ordre_passage') ?? 0;
+        $inscriptions = DB::transaction(function () use ($competitionId, $activeId, $activeType, $aInscrire) {
+            $ordre = Inscription::where('competition_id', $competitionId)
+                ->lockForUpdate()
+                ->max('ordre_passage') ?? 0;
 
-        $inscription = Inscription::create([
-            ...$validated,
-            'ordre_passage'   => $dernierOrdre + 1,
-        ]);
+            $ids = [];
+            foreach ($aInscrire as $i) {
+                $inscription = Inscription::create([
+                    'competition_id'    => $competitionId,
+                    'organisateur_id'   => $activeId,
+                    'organisateur_type' => $activeType,
+                    'athlete_id'        => $i['athlete_id'],
+                    'poids_declare'     => $i['poids_declare'] ?? null,
+                    'kata'              => $i['kata'] ?? null,
+                    'ordre_passage'     => ++$ordre,
+                ]);
+                $ids[] = $inscription->id;
+            }
+
+            return Inscription::whereIn('id', $ids)->with('athlete')->get();
+        });
+
+        $nbIgnores = count($dejaInscrits);
+        $message = $inscriptions->count() . ' athlète(s) inscrit(s) avec succès';
+        if ($nbIgnores > 0) {
+            $message .= " ({$nbIgnores} déjà inscrit(s) ignoré(s))";
+        }
 
         return response()->json([
-            'success'     => true,
-            'message'     => 'Athlète inscrit avec succès',
-            'inscription' => $inscription->load(['athlete']),
+            'success'      => true,
+            'message'      => $message,
+            'inscriptions' => $inscriptions,
         ], 201);
     }
-    //valider une inscription
-    public function valider(Inscription $inscription)
+    //valider une inscription (pesée officielle)
+    public function valider(Inscription $inscription, Request $request)
     {
-        $inscription->update(['status' => Inscription::STATUS_VALIDE]);
+        $validated = $request->validate([
+            'poids_officiel' => 'nullable|numeric|min:0',
+        ]);
+
+        $inscription->update([
+            'status'         => Inscription::STATUS_VALIDE,
+            'poids_officiel' => $validated['poids_officiel'] ?? $inscription->poids_officiel,
+        ]);
 
         return response()->json([
             'success' => true,
             'message' => 'Inscription validée',
         ]);
     }
-    //annuler une inscription
-    public function annuler(Inscription $inscription)
+    //annuler une inscription (pesée officielle échouée)
+    public function annuler(Inscription $inscription, Request $request)
     {
-        $inscription->update(['status' => Inscription::STATUS_ECHOUE]);
+        $validated = $request->validate([
+            'poids_officiel' => 'nullable|numeric|min:0',
+        ]);
+
+        $inscription->update([
+            'status'         => Inscription::STATUS_ECHOUE,
+            'poids_officiel' => $validated['poids_officiel'] ?? $inscription->poids_officiel,
+        ]);
 
         return response()->json([
             'success' => true,
@@ -141,14 +229,31 @@ class InscriptionController extends Controller
         ]);
     }
 
-    // Désinscrire un athlète
-    public function destroy(Inscription $inscription)
+    // Désinscrire un athlète (uniquement par le club inscripteur, avant validation par la ligue)
+    public function destroy(Inscription $inscription, Request $request)
     {
+        $activeId = $request->attributes->get('organisateur_id');
+        $activeType = $request->attributes->get('organisateur_type');
+
+        if ($inscription->organisateur_id !== $activeId || $inscription->organisateur_type !== $activeType) {
+            return response()->json([
+                'success' => false,
+                'message' => "Vous n'êtes pas autorisé à retirer cette inscription.",
+            ], 403);
+        }
+
+        if ($inscription->status === Inscription::STATUS_VALIDE) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Impossible de retirer une inscription déjà validée par la ligue.',
+            ], 422);
+        }
+
         $inscription->delete();
 
         return response()->json([
             'success' => true,
-            'message' => 'Inscription annulée',
+            'message' => 'Inscription retirée',
         ]);
     }
 }

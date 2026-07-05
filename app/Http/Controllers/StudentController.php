@@ -6,7 +6,6 @@ use Carbon\Carbon;
 use App\Models\Club;
 use App\Models\Role;
 use App\Models\User;
-use App\Models\Saison;
 use App\Models\Licence;
 use App\Models\Student;
 use App\Models\ParentModel;
@@ -21,10 +20,12 @@ use App\Http\Requests\UpdatedStudentReq;
 use Illuminate\Support\Facades\Password;
 use App\Http\Requests\StoreStudentRequest;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use App\Http\Controllers\Concerns\ResolvesFederationSaison;
 
 class StudentController extends Controller
 {
     use AuthorizesRequests;
+    use ResolvesFederationSaison;
 
     public function index(Request $request)
     {
@@ -35,9 +36,13 @@ class StudentController extends Controller
         if ($isSuperAdmin) {
             $students = Student::with('clubs:id,name')->get();
         } else {
-            $students = Student::whereHas('clubs', function ($query) use ($activeId) {
-                $query->where('club_id', $activeId);
-            })->get();
+            // Exclut les élèves retirés du club (pivot club_students soft-supprimé)
+            $students = Student::query()
+                ->join('club_students', 'club_students.student_id', '=', 'students.id')
+                ->where('club_students.club_id', $activeId)
+                ->whereNull('club_students.deleted_at')
+                ->select('students.*')
+                ->get();
         }
 
         $formattedStudents = $students->map(function ($student) use ($isSuperAdmin) {
@@ -58,6 +63,69 @@ class StudentController extends Controller
             'students' => $formattedStudents,
         ]);
     }
+
+    /**
+     * Club(s) auquel/auxquels appartient l'élève (karateka) connecté.
+     */
+    public function monClub(Request $request)
+    {
+        $role = $request->attributes->get('role');
+
+        if ($role !== 'karateka') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Accès réservé aux élèves.'
+            ], 403);
+        }
+
+        $student = Student::where('user_id', auth()->id())->first();
+
+        if (!$student) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Profil élève introuvable.'
+            ], 404);
+        }
+
+        $clubs = $student->clubs()->get(['clubs.id', 'clubs.name', 'clubs.logo']);
+
+        return response()->json([
+            'success' => true,
+            'clubs'   => $clubs,
+        ]);
+    }
+
+    /**
+     * Parent(s) rattaché(s) à l'élève (karateka) connecté.
+     */
+    public function mesParents(Request $request)
+    {
+        $role = $request->attributes->get('role');
+
+        if ($role !== 'karateka') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Accès réservé aux élèves.'
+            ], 403);
+        }
+
+        $student = Student::where('user_id', auth()->id())->first();
+
+        if (!$student) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Profil élève introuvable.'
+            ], 404);
+        }
+
+        $parents = $student->parents()->with('user:id,fullname,email,phone')->get();
+
+        return response()->json([
+            'success' => true,
+            'parents' => $parents,
+        ]);
+    }
+
     public function studentsWithoutGrade(Request $request)
     {
         $activeId = $request->attributes->get('organisateur_id');
@@ -143,21 +211,22 @@ class StudentController extends Controller
     {
         $this->authorize('create', Student::class);
         $activeId = $request->attributes->get('organisateur_id'); // L'ID du club actuel
+        $activeType = $request->attributes->get('organisateur_type');
         $validated = $request->validated();
+        // Trouver la saison active actuelle dans la base de données
+        $saisonActive = $this->saisonActivePour($activeId, $activeType);
 
         try {
-            return DB::transaction(function () use ($validated, $activeId, $request) {
+            return DB::transaction(function () use ($validated, $activeId, $request, $saisonActive) {
                 $parentId = null;
                 $createdStudents = [];
 
-                // Trouver la saison active actuelle dans la base de données
-                $currentSeason = Saison::where('active', true)->first();
 
-                if (!$currentSeason) {
+                if (!$saisonActive) {
                     return response()->json(['success' => false, 'message' => 'Aucune saison sportive active n’a été configurée.'], 400);
                 }
 
-                $seasonId = $currentSeason->id;
+                $seasonId = $saisonActive->id;
 
                 // --- GESTION DU PARENT ---
                 if (!$validated['is_own_responsible']) {

@@ -27,12 +27,15 @@ class SessionController extends Controller
 
         $gradeId = $session?->course?->current_grade_id;
         if (!$activeId && $request->attributes->get('role') === 'super_admin') {
-            $activeId = $request->query('club_id') ?? $session?->course?->club_id;
+            $activeId = $request->query('club_id') ?? $session?->course?->organisateur_id;
         }
-        $students = Student::with(['club', 'currentGrade'])
-            ->where('club_id', $activeId)
+        $students = Student::with(['clubs', 'currentGrade'])
+            ->whereHas('clubs', function ($q) use ($activeId) {
+                $q->where('club_id', $activeId);
+            })
             ->whereHas('currentGrade', function ($q) use ($gradeId) {
-                $q->where('current_grade_id', $gradeId);
+                $q->where('current_grade_id', $gradeId)
+                    ->where('is_current', true);
             })
             ->latest()
             ->paginate(10);

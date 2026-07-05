@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Category;
+use App\Models\Competition;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 
@@ -23,5 +24,9 @@ class SubDiscipline extends Model
     public function organisateur()
     {
         return $this->morphTo();
+    }
+    public function competitions()
+    {
+        return $this->hasMany(Competition::class, 'sub_discipline_id');
     }
 }

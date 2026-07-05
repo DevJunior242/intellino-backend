@@ -59,17 +59,16 @@ class BracketService
     }
 
     /**
-     * Charge les combattants d'une config avec leur tête de série
-     * éventuelle et l'identité de leur club/ligue (pour l'anti-collision)
+     * Charge les combattants d'une config avec l'identité de leur
+     * club/ligue (pour l'anti-collision)
      */
     private function chargerCombattants(ConfigNotation $config): array
     {
         return OrdrePassage::where('config_notation_id', $config->id)
-            ->with('inscription:id,seed,organisateur_type,organisateur_id')
+            ->with('inscription:id,organisateur_type,organisateur_id')
             ->get()
             ->map(fn($o) => [
                 'inscription_id' => $o->inscription_id,
-                'seed'           => $o->inscription->seed,
                 'club_key'       => $o->inscription->organisateur_type . ':' . $o->inscription->organisateur_id,
             ])
             ->all();
@@ -94,15 +93,12 @@ class BracketService
     }
 
     /**
-     * Place les combattants dans les positions du tableau selon leur
-     * tête de série (les non-seedés se partagent les places restantes au
-     * hasard), puis tente de limiter les rencontres intra-club au 1er tour.
+     * Place les combattants au hasard dans les positions du tableau,
+     * puis tente de limiter les rencontres intra-club au 1er tour.
      */
     private function placerCombattants(array $combattants, int $taille): array
     {
-        $seeds  = collect($combattants)->filter(fn($c) => !is_null($c['seed']))->sortBy('seed')->values();
-        $autres = collect($combattants)->filter(fn($c) => is_null($c['seed']))->shuffle()->values();
-        $classes = $seeds->concat($autres)->values(); // rang 1..nb
+        $classes = collect($combattants)->shuffle()->values(); // rang 1..nb
 
         $ordreSeed = $this->genererOrdreSeed($taille);
         $slots = array_fill(0, $taille, null);
@@ -114,7 +110,7 @@ class BracketService
             $slots[$position] = [
                 'inscription_id' => $c['inscription_id'],
                 'club_key'       => $c['club_key'],
-                'verrouille'     => !is_null($c['seed']),
+                'verrouille'     => false,
             ];
         }
 
@@ -123,10 +119,9 @@ class BracketService
 
     /**
      * Parcourt les paires du 1er tour (0-1, 2-3, ...) et tente d'échanger
-     * un combattant non verrouillé (non-seedé / non-premier de poule) pour
-     * éviter deux combattants du même club/ligue. Best effort : si aucun
-     * échange ne résout la collision (ex: le club a plusieurs têtes de
-     * série), on la laisse telle quelle.
+     * un combattant non verrouillé (non-premier de poule) pour éviter deux
+     * combattants du même club/ligue. Best effort : si aucun échange ne
+     * résout la collision, on la laisse telle quelle.
      */
     private function resoudreCollisionsClub(array $slots): array
     {
@@ -295,8 +290,8 @@ class BracketService
         // 2. Répartition en 4/3 sans poule de 1 ou 2
         $taillesPoules = $this->repartirEnTroisQuatre($nb, $nbPoules);
 
-        // 3. Têtes de série en serpentin + non-seedés placés en limitant
-        // les collisions de club/ligue dans une même poule
+        // 3. Placement aléatoire en limitant les collisions de club/ligue
+        // dans une même poule
         $repartition = $this->repartirEnPoules($combattants, $taillesPoules);
 
         $ordreGlobalCombat = 1;
@@ -362,45 +357,19 @@ class BracketService
 
 
     /**
-     * Répartit les combattants dans les poules : les têtes de série d'abord,
-     * en serpentin (une par poule dans la mesure du possible), puis les
-     * non-seedés placés un par un dans la poule qui minimise les
-     * collisions de club/ligue (best effort, une poule pleine de membres
-     * du même club reste possible si les effectifs l'imposent).
+     * Répartit les combattants au hasard dans les poules, un par un dans
+     * la poule qui minimise les collisions de club/ligue (best effort,
+     * une poule pleine de membres du même club reste possible si les
+     * effectifs l'imposent).
      */
     private function repartirEnPoules(array $combattants, array $taillesPoules): array
     {
         $nbPoules = count($taillesPoules);
         $poules = array_fill(0, $nbPoules, []);
 
-        $seeds  = collect($combattants)->filter(fn($c) => !is_null($c['seed']))->sortBy('seed')->values();
-        $autres = collect($combattants)->filter(fn($c) => is_null($c['seed']))->shuffle()->values();
+        $ordre = collect($combattants)->shuffle()->values();
 
-        $indexPoule = 0;
-        $sens = 1; // serpentin : 1 = avant, -1 = retour
-
-        $avancer = function () use (&$indexPoule, &$sens, $nbPoules) {
-            $indexPoule += $sens;
-            if ($indexPoule >= $nbPoules) {
-                $indexPoule = $nbPoules - 1;
-                $sens = -1;
-            } elseif ($indexPoule < 0) {
-                $indexPoule = 0;
-                $sens = 1;
-            }
-        };
-
-        foreach ($seeds as $c) {
-            $tentatives = 0;
-            while (count($poules[$indexPoule]) >= $taillesPoules[$indexPoule] && $tentatives < $nbPoules) {
-                $avancer();
-                $tentatives++;
-            }
-            $poules[$indexPoule][] = $c;
-            $avancer();
-        }
-
-        foreach ($autres as $c) {
+        foreach ($ordre as $c) {
             $meilleurePoule = null;
             $meilleurScore  = null;
 
@@ -541,11 +510,17 @@ class BracketService
      */
     private function slotsDepuisQualifies(array $qualifies, $clubParInscription, int $taille): array
     {
+        $ordreSeed = $this->genererOrdreSeed($taille);
         $slots = array_fill(0, $taille, null);
+        $nb = count($qualifies);
 
-        foreach ($qualifies as $i => $q) {
+        foreach ($ordreSeed as $position => $rang) {
+            if ($rang > $nb) continue; // pas de qualifié à ce rang -> bye
+
+            $q = $qualifies[$rang - 1];
             $ins = $clubParInscription[$q['inscription_id']] ?? null;
-            $slots[$i] = [
+
+            $slots[$position] = [
                 'inscription_id' => $q['inscription_id'],
                 'club_key'       => $ins ? "{$ins->organisateur_type}:{$ins->organisateur_id}" : null,
                 'verrouille'     => ($q['role'] ?? null) === 'premier',
@@ -743,12 +718,33 @@ class BracketService
             }
         }
 
-        // Assigner les combattants au 1er round
+        // Assigner les combattants au 1er round (répartition seedée pour
+        // qu'aucune paire ne se retrouve avec deux byes empilés)
         $this->assignerCombattants(
             $combatsParRound[1],
-            array_map(fn($id) => ['inscription_id' => $id], $perdants),
+            $this->placerIdsAvecByes($perdants, $taille),
             $byes
         );
+    }
+
+    /**
+     * Répartit une simple liste d'inscription_id dans un tableau de $taille
+     * positions en utilisant l'algorithme de seeding standard, pour que les
+     * byes ne se retrouvent jamais deux par deux dans la même paire.
+     */
+    private function placerIdsAvecByes(array $ids, int $taille): array
+    {
+        $ordreSeed = $this->genererOrdreSeed($taille);
+        $slots = array_fill(0, $taille, null);
+        $nb = count($ids);
+
+        foreach ($ordreSeed as $position => $rang) {
+            if ($rang > $nb) continue; // pas d'id à ce rang -> bye
+
+            $slots[$position] = ['inscription_id' => $ids[$rang - 1]];
+        }
+
+        return $slots;
     }
 
     public function verifierEtLancerRepechage(ConfigNotation $config): void

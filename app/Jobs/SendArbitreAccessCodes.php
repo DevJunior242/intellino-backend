@@ -3,9 +3,10 @@
 namespace App\Jobs;
 
 use App\Models\ArbitreCompetition;
+use App\Notifications\ArbitrePinNotification;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Queue\InteractsWithQueue;
-use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Bus\Queueable;
 use Illuminate\Foundation\Events\Dispatchable;
 
 class SendArbitreAccessCodes
