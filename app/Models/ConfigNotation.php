@@ -88,13 +88,13 @@ class ConfigNotation extends Model
     //esKumite
     public function estKumite(): bool
     {
-        $discipline = $this->competition->discipline->nom ?? '';
-        return trim(strtolower($discipline)) === 'kumite';
+        $subdiscipline = $this->competition->subdiscipline->nom ?? '';
+        return trim(strtolower($subdiscipline)) === 'kumite';
     }
 
     public function estKata(): bool
     {
-        return optional($this->competition?->discipline)->nom === 'kata';
+        return optional($this->competition?->subdiscipline)->nom === 'kata';
     }
     // Niveau 1 — config complète (admin peut valider)
     public function estPrete(): array

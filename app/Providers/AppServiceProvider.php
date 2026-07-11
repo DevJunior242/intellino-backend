@@ -29,7 +29,7 @@ class AppServiceProvider extends ServiceProvider
         Relation::morphMap([
             'Club' => \App\Models\Club::class,
             'Ligue' => \App\Models\League::class,
-            // 'Federation' => \App\Models\Federation::class,
+            'Federation' => \App\Models\Federation::class,
         ]);
         //observers
         \App\Models\Course::observe(\App\Observers\CourseObserver::class);

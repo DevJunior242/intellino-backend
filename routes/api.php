@@ -461,7 +461,6 @@ Route::middleware(['auth:sanctum'])->group(function () {
         //dashboard league
         Route::get('/dashboard/league/stats', [DashBoardLeagueController::class, 'stats']);
         Route::get('/dashboard/league/alert', [DashBoardLeagueController::class, 'Alert']);
-        Route::get('/dashboard/league/exmenstates', [DashBoardLeagueController::class, 'exmenstates']);
         Route::get('/stage-payments/statistiques-mensuelles', [StagePaymentController::class, 'statistiquesMensuelles']);
 
         // --- Côté Fédération : gestion des types de licence ---
@@ -554,6 +553,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
             Route::get('/', [ExamenController::class, 'index']);
             Route::post('/', [ExamenController::class, 'store']);
             Route::get('/stats', [ExamenController::class, 'stats']);
+            Route::get('/vitality-stats', [ExamenController::class, 'exmenstates']);
             Route::get('/mes-examens', [ExamenController::class, 'mesExamens']);
 
             Route::get('/{examen}', [ExamenController::class, 'getExamenCandidats']);

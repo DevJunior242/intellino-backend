@@ -22,7 +22,7 @@ class ConfigNotationController extends Controller
         $activeType = $request->attributes->get('organisateur_type');
 
         if (!$activeId) {
-            return response()->json(['message' => 'Aucune organisation active'], 403);
+            return response()->json(['message' => 'Aucune organisation active'], 422);
         }
 
 
@@ -31,7 +31,7 @@ class ConfigNotationController extends Controller
                 ->where('organisateur_type', $activeType);
         })
             ->with([
-                'competition.discipline:id,nom',
+                'competition.subDiscipline:id,nom',
                 'competition.category:id,nom,sexe',
                 'competition.evenement:id,nom,date_debut,date_fin',
                 'competition.niveau:id,nom',
@@ -50,7 +50,7 @@ class ConfigNotationController extends Controller
                 'competition_id' => $config->competition_id,
 
                 // Infos de l'Épreuve (Competition)
-                'discipline'  => $config->competition->discipline->nom ?? '',
+                'subDiscipline'  => $config->competition->subDiscipline->nom ?? '',
                 'categorie'   => $config->competition->category->nom ?? '',
                 'sexe'        => $config->competition->category->sexe ?? '',
                 'niveau'      => $config->competition->niveau->nom ?? '',
@@ -84,10 +84,17 @@ class ConfigNotationController extends Controller
     public function store(Request $request)
     {
 
-        $competition = Competition::with('discipline')
+        $activeId = $request->attributes->get('organisateur_id');
+
+        $activeType = $request->attributes->get('organisateur_type');
+
+        if (!$activeId) {
+            return response()->json(['message' => 'Aucune organisation active'], 403);
+        }
+        $competition = Competition::with('subDiscipline')
             ->find($request->competition_id);
 
-        $estKumite = $competition?->discipline?->nom === 'Kumite';
+        $estKumite = $competition?->subDiscipline?->nom === 'Kumite';
         $request->validate([
             'competition_id'      => 'required|exists:competitions,id',
             'evenement_id'        => 'required',
@@ -126,7 +133,7 @@ class ConfigNotationController extends Controller
         ]);
 
         try {
-            return DB::transaction(function () use ($request) {
+            return DB::transaction(function () use ($request, $activeId, $activeType) {
 
                 $plateauId = $request->plateau_id;
 
@@ -153,6 +160,8 @@ class ConfigNotationController extends Controller
 
                 $config = ConfigNotation::create(
                     [
+                        'organisateur_id'    => $activeId,
+                        'organisateur_type'  => $activeType,
                         'competition_id'     => $request->competition_id,
                         'plateau_id'         => $plateauId,
                         'mode_saisie_id'     => $request->mode_saisie_id,

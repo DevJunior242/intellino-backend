@@ -6,6 +6,7 @@ use App\Models\League;
 use App\Models\Category;
 use App\Models\Evenement;
 use App\Models\Inscription;
+use App\Models\ConfigNotation;
 use App\Models\SubDiscipline;
 use App\Models\NiveauxCompetition;
 use Illuminate\Database\Eloquent\Model;
@@ -45,6 +46,11 @@ class Competition extends Model
     public function inscriptions()
     {
         return $this->hasMany(Inscription::class);
+    }
+
+    public function configNotations()
+    {
+        return $this->hasMany(ConfigNotation::class);
     }
 
     public function subDiscipline()

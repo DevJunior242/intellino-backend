@@ -2,18 +2,14 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Grade;
 use App\Models\Examen;
 use App\Models\Saison;
 use App\Models\Licence;
 use App\Models\Evenement;
 use App\Models\Affiliation;
 use App\Models\Competition;
-use App\Models\ExamenResult;
 use Illuminate\Http\Request;
-use App\Models\ExamenCandidat;
 use App\Models\AffiliationPayment;
-use Illuminate\Support\Facades\Log;
 use App\Http\Controllers\Controller;
 
 class DashBoardLeagueController extends Controller
@@ -169,133 +165,6 @@ class DashBoardLeagueController extends Controller
                     'message' => 'inscriptions ouvertes',
                 ]
             ]
-        ]);
-    }
-
-    public function exmenstates(Request $request)
-    {
-        $activeId = $request->attributes->get('organisateur_id');
-        $activeType = $request->attributes->get('organisateur_type');
-
-        // Récupération de la saison active de la Fédé
-        $currentSaison = $this->getSaisonActiveFederation($activeId);
-
-        if (!$currentSaison) {
-            return response()->json(['message' => 'Aucune saison active trouvée.'], 200);
-        }
-
-        $saisonId = $currentSaison->id;
-
-        // Grades décernés par cette ligue pendant cette saison
-        $gradesDecernees = ExamenResult::whereHas('examen', function ($q) use ($activeId, $activeType, $saisonId) {
-            $q->where('organisateur_id', $activeId)
-                ->where('organisateur_type', $activeType)
-                ->where('saison_id', $saisonId);
-        })
-            ->where('decision', 'Admis')
-            ->count();
-
-        $totalSessions = Examen::where('organisateur_id', $activeId)
-            ->where('organisateur_type', $activeType)
-            ->where('saison_id', $saisonId)
-            ->count();
-
-        $examAVenir = Examen::where('organisateur_id', $activeId)
-            ->where('organisateur_type', $activeType)
-            ->where('saison_id', $saisonId) // Filtré par la saison en cours
-            ->where('start_date', '>', now())
-            ->count();
-
-        // Calcul du Taux de Réussite Moyen
-        $statsCandidats = ExamenResult::whereHas('examen', function ($q) use ($activeId, $activeType, $saisonId) {
-            $q->where('organisateur_id', $activeId)
-                ->where('organisateur_type', $activeType)
-                ->where('saison_id', $saisonId);
-        })
-            ->selectRaw("
-                COUNT(*) as total,
-                SUM(CASE WHEN decision = 'Admis' THEN 1 ELSE 0 END) as Admis
-            ")
-            ->first();
-
-        $taux = 0;
-        if ($statsCandidats && $statsCandidats->total > 0) {
-            $taux = ($statsCandidats->Admis / $statsCandidats->total) * 100;
-        }
-
-        $nextExamen = Examen::where('organisateur_id', $activeId)
-            ->where('organisateur_type', $activeType)
-            ->where('saison_id', $saisonId)
-            ->where('start_date', '>=', now())
-            ->withCount(['candidates' => function ($query) {
-                $query->where('status', ExamenCandidat::STATUS_REGISTERED);
-            }])
-            ->orderBy('start_date', 'asc')
-            ->first();
-
-        // Trouver la saison fédérale précédente
-        $previousSaison = Saison::where('organisateur_id', $currentSaison->organisateur_id)
-            ->where('organisateur_type', 'Federation')
-            ->where('dateFin', '<', $currentSaison->dateDebut)
-            ->orderBy('dateFin', 'desc')
-            ->first();
-
-        // Compter les admis de la saison précédente pour cette ligue
-        $countPrevious = 0;
-        if ($previousSaison) {
-            $countPrevious = ExamenResult::whereHas('examen', function ($q) use ($activeId, $activeType, $previousSaison) {
-                $q->where('organisateur_id', $activeId)
-                    ->where('organisateur_type', $activeType)
-                    ->where('saison_id', $previousSaison->id);
-            })->where('decision', 'Admis')->count();
-        }
-
-        $progression = 0;
-        if ($countPrevious > 0) {
-            $progression = (($gradesDecernees - $countPrevious) / $countPrevious) * 100;
-        }
-
-        // Score de vitalité
-        $idsGradesNoirs = Grade::all()->filter->isNoire()->pluck('id');
-
-        $nouveauxDan = ExamenResult::whereHas('examen', function ($q) use ($activeId, $activeType, $saisonId) {
-            $q->where('organisateur_id', $activeId)
-                ->where('organisateur_type', $activeType)
-                ->where('saison_id', $saisonId);
-        })
-            ->whereIn('new_grade_id', $idsGradesNoirs)
-            ->where('decision', 'Admis')
-            ->count();
-
-        $objectifAnnuels = 0;
-        if ($previousSaison) {
-            $objectifAnnuels = ExamenResult::whereHas('examen', function ($q) use ($activeId, $activeType, $previousSaison) {
-                $q->where('organisateur_id', $activeId)
-                    ->where('organisateur_type', $activeType)
-                    ->where('saison_id', $previousSaison->id);
-            })
-                ->whereIn('new_grade_id', $idsGradesNoirs)
-                ->where('decision', 'Admis')
-                ->count();
-        }
-
-        $objectifAnnuels = $objectifAnnuels ?: 10;
-
-        $scoreQuantite = min(($nouveauxDan / $objectifAnnuels) * 100, 100);
-        $vitalityScore = ($scoreQuantite * 0.6) + ($taux * 0.4);
-
-        return response()->json([
-            'grades_decernes' => $gradesDecernees,
-            'sessions_count' => $totalSessions,
-            'sessions_a_venir' => $examAVenir,
-            'taux_reussite' => round($taux, 1),
-            'next_examen_lieu' => $nextExamen ? $nextExamen->lieu : '',
-            'next_exam_date' => $nextExamen ? $nextExamen->start_date : null,
-            'next_exam_candidates' => $nextExamen ? $nextExamen->candidates_count : 0,
-            'next_examen_grade' => $nextExamen ? $nextExamen->currentGrade?->name : 'Aucune',
-            'progression' => round($progression, 1),
-            'vitality_score' => round($vitalityScore),
-            'nouveaux_dan' => $nouveauxDan,
         ]);
     }
 }

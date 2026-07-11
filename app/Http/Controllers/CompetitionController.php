@@ -18,7 +18,7 @@ class CompetitionController extends Controller
         $activeId = $request->attributes->get('organisateur_id');
         $activeType = $request->attributes->get('organisateur_type');
         try {
-            $epreuves = Competition::with(['subDiscipline:id,nom', 'evenement', 'category:id,nom,sexe', 'niveau:id,nom'])
+            $epreuves = Competition::with(['subDiscipline:id,nom', 'evenement', 'category:id,nom,sexe,poids_min,poids_max'])
                 ->whereHas('evenement', function ($query) use ($activeId, $activeType) {
                     $query->where('organisateur_id', $activeId)
                         ->where('organisateur_type', $activeType);
