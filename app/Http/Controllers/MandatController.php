@@ -15,7 +15,10 @@ class MandatController extends Controller
 {
     public function transferMandate(Request $request)
     {
+        // Action irréversible (révoque immédiatement le mandat de l'admin courant) :
+        // on exige le mot de passe pour se prémunir d'une session/jeton volé.
         $request->validate([
+            'current_password' => ['required', 'current_password'],
             'email' => 'required|email',
             'mandate_end_at' => 'required|date|after:now',
         ]);

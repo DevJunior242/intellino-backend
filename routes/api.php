@@ -71,6 +71,7 @@ use App\Http\Controllers\SubscriptionController;
 use App\Http\Controllers\ActivationKeyController;
 use App\Http\Controllers\AddManuelClubController;
 use App\Http\Controllers\Auth\RegisterController;
+use App\Http\Controllers\Auth\EmailVerificationController;
 use App\Http\Controllers\LicenceleagueController;
 use App\Http\Controllers\PaymentMethodController;
 use App\Http\Controllers\ResetPasswordController;
@@ -88,26 +89,41 @@ use App\Http\Controllers\NiveauxCompetitionController;
 use App\Http\Controllers\FederationDashboardController;
 
 
-Route::post('/register', [RegisterController::class, 'register']);
-Route::post('/login', [LoginController::class, 'login']);
+// Endpoints d'authentification : brute-force / spam d'inscription / bombardement d'emails.
+Route::middleware('throttle:5,1')->group(function () {
+    Route::post('/register', [RegisterController::class, 'register']);
+    Route::post('/login', [LoginController::class, 'login']);
+    Route::post('/forgot-password', [ResetPasswordController::class, 'forgotPassword']);
+    Route::post('/reset-password', [ResetPasswordController::class, 'resetPassword']);
+});
 
-Route::post('/forgot-password', [ResetPasswordController::class, 'forgotPassword']);
 Route::get('/reset-password/{token}', [ResetPasswordController::class, 'sentToken'])
-    ->middleware('guest')
+    ->middleware(['guest', 'throttle:10,1'])
     ->name('password.reset');
 
-Route::post('/reset-password', [ResetPasswordController::class, 'resetPassword']);
-Route::get('configs/{config}/vue-publique', [SeanceController::class, 'vuePublique']);
-Route::get('configs/{config}/next-athlete', [SeanceController::class, 'nextAthlete']);
-//public
-Route::get('/public/configs/{config}/combat-en-cours', [VuePubController::class, 'combatEnCours']);
-Route::get('/public/configs/{config}/next-combat', [VuePubController::class, 'nextCombat']);
-//podium 
-Route::get('/podium/{config}', [PodiumController::class, 'obtenirPodium']);
-Route::get('/configs/{config}/bracket', [CombatController::class, 'bracket']);
+// Lien de confirmation d'email envoyé à l'inscription (URL signée, pas besoin d'auth).
+Route::get('/email/verify/{id}/{hash}', [EmailVerificationController::class, 'verify'])
+    ->middleware(['signed', 'throttle:10,1'])
+    ->name('verification.verify');
+
+// Vues publiques de compétition (rafraîchies via WebSocket, pas de polling) : limite large anti-flood.
+Route::middleware('throttle:60,1')->group(function () {
+    Route::get('configs/{config}/vue-publique', [SeanceController::class, 'vuePublique']);
+    Route::get('configs/{config}/next-athlete', [SeanceController::class, 'nextAthlete']);
+    //public
+    Route::get('/public/configs/{config}/combat-en-cours', [VuePubController::class, 'combatEnCours']);
+    Route::get('/public/configs/{config}/next-combat', [VuePubController::class, 'nextCombat']);
+    //podium
+    Route::get('/podium/{config}', [PodiumController::class, 'obtenirPodium']);
+    Route::get('/configs/{config}/bracket', [CombatController::class, 'bracket']);
+});
 
 Route::middleware(['auth:sanctum'])->group(function () {
     Route::get('/user', [LoginController::class, 'me']);
+
+    Route::post('/email/verification-notification', [EmailVerificationController::class, 'resend'])
+        ->middleware('throttle:6,1');
+
     //keys
     Route::apiResource('/activation-keys', ActivationKeyController::class);
 
@@ -239,11 +255,14 @@ Route::middleware(['auth:sanctum'])->group(function () {
 
         // --- Paiements de licences : côté Club ---
         Route::get('/licence-payments/mes-lots', [LicencePaymentController::class, 'mesLots']);
-        Route::post('/licence-payments/{payment}/declarer', [LicencePaymentController::class, 'declarer']);
+        Route::post('/licence-payments/{payment}/declarer', [LicencePaymentController::class, 'declarer'])
+            ->middleware(['throttle:15,1', 'verified']);
 
         // --- Paiements de licences : côté Fédération (index/statistiques/toggle consolidés plus bas) ---
-        Route::patch('/licence-payments/{payment}/confirmer', [LicencePaymentController::class, 'confirmer']);
-        Route::patch('/licence-payments/{payment}/rejeter', [LicencePaymentController::class, 'rejeter']);
+        Route::patch('/licence-payments/{payment}/confirmer', [LicencePaymentController::class, 'confirmer'])
+            ->middleware(['throttle:15,1', 'verified']);
+        Route::patch('/licence-payments/{payment}/rejeter', [LicencePaymentController::class, 'rejeter'])
+            ->middleware(['throttle:15,1', 'verified']);
         //LicenceleagueController
         Route::get('/licences', [LicenceleagueController::class, 'index']);
 
@@ -319,13 +338,16 @@ Route::middleware(['auth:sanctum'])->group(function () {
 
         // Côté Club
         Route::get('/stage-payments/mes-lots', [StagePaymentController::class, 'mesLotsClub']); // à créer
-        Route::post('/stage-payments/{payment}/declarer', [StagePaymentController::class, 'declarer']);
+        Route::post('/stage-payments/{payment}/declarer', [StagePaymentController::class, 'declarer'])
+            ->middleware(['throttle:15,1', 'verified']);
 
         // Côté organisateur (Ligue, Fédération, Club organisateur)
         Route::get('/stage-payments/a-verifier', [StagePaymentController::class, 'paiementsAVerifier']);
         Route::get('/stages/{stage}/paiements', [StagePaymentController::class, 'parStage']);
-        Route::patch('/stage-payments/{payment}/confirmer', [StagePaymentController::class, 'confirmer']);
-        Route::patch('/stage-payments/{payment}/rejeter', [StagePaymentController::class, 'rejeter']);
+        Route::patch('/stage-payments/{payment}/confirmer', [StagePaymentController::class, 'confirmer'])
+            ->middleware(['throttle:15,1', 'verified']);
+        Route::patch('/stage-payments/{payment}/rejeter', [StagePaymentController::class, 'rejeter'])
+            ->middleware(['throttle:15,1', 'verified']);
         Route::get('/stage-payments/statistiques', [StagePaymentController::class, 'statistiques']);
         //stages 
         Route::get('/stages/ma-ligue', [StageController::class, 'stagesDeMaLigue']);
@@ -382,14 +404,17 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::prefix('affiliation-payments')->group(function () {
             Route::get('mon-statut', [AffiliationPaymentController::class, 'monStatut']);
             Route::get('/', [AffiliationPaymentController::class, 'index']);
-            Route::post('{payment}/declarer', [AffiliationPaymentController::class, 'declarer']);
-            Route::post('{payment}/confirmer', [AffiliationPaymentController::class, 'confirmer']);
-            Route::post('{payment}/rejeter', [AffiliationPaymentController::class, 'rejeter']);
+            Route::middleware(['throttle:15,1', 'verified'])->group(function () {
+                Route::post('{payment}/declarer', [AffiliationPaymentController::class, 'declarer']);
+                Route::post('{payment}/confirmer', [AffiliationPaymentController::class, 'confirmer']);
+                Route::post('{payment}/rejeter', [AffiliationPaymentController::class, 'rejeter']);
+            });
         });
 
         //inscription 
 
-        Route::post('inscriptions',                               [InscriptionController::class, 'store']);
+        Route::post('inscriptions',                               [InscriptionController::class, 'store'])
+            ->middleware(['throttle:20,1', 'verified']);
         // NB: "inscriptions/{inscription}" collides with the StageRegistrationController
         // delete route above, which is registered first and would otherwise swallow this one.
         Route::delete('inscriptions/desinscrire/{inscription}',   [InscriptionController::class, 'destroy']);
@@ -398,15 +423,18 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::prefix('inscriptions')->group(function () {
             Route::apiResource('/inscriptions', InscriptionController::class);
         });
-        Route::post('inscriptions/annuler/{inscription}',         [InscriptionController::class, 'annuler']);
-        Route::post('inscriptions/valider/{inscription}',         [InscriptionController::class, 'valider']);
+        Route::post('inscriptions/annuler/{inscription}',         [InscriptionController::class, 'annuler'])
+            ->middleware(['throttle:20,1', 'verified']);
+        Route::post('inscriptions/valider/{inscription}',         [InscriptionController::class, 'valider'])
+            ->middleware(['throttle:20,1', 'verified']);
 
         Route::get('/inscriptions/competition/{competitionId}', [InscriptionController::class, 'getByCompetition']);
         Route::get('evenements/ouverts',                          [InscriptionController::class, 'getEvenementsOuverts']);
         Route::get('inscriptions/epreuve/{competition}',          [InscriptionController::class, 'parEpreuve']);
         Route::get('inscriptions/epreuve/{competition}/disponibles', [InscriptionController::class, 'studentsDisponibles']);
         //evenements
-        Route::prefix('evenements')->group(function () {
+        // throttle:20,1 : actions de création/changement d'état sujettes au double-clic (créer, ouvrir, clôturer, arbitrer)
+        Route::prefix('evenements')->middleware(['throttle:20,1', 'verified'])->group(function () {
             //ouvrir et cloturer evenement
             Route::post('/ouvrir/{evenement}', [EvenementController::class, 'ouvrir']);
             Route::post('/cloturer/{evenement}', [EvenementController::class, 'cloturer']);
@@ -417,7 +445,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
         });
         //competitions
 
-        Route::prefix('competitions')->group(function () {
+        Route::prefix('competitions')->middleware(['throttle:20,1', 'verified'])->group(function () {
             Route::get('/getActiveCompetition', [CompetitionController::class, 'getActiveCompetition']);
             Route::get('/getCompetitions', [CompetitionController::class, 'getCompetitions']);
             Route::post('/ouvrir/{competition}', [CompetitionController::class, 'ouvrir']);
@@ -438,7 +466,8 @@ Route::middleware(['auth:sanctum'])->group(function () {
         //subscriptions 
         Route::prefix('subscriptions')->group(function () {
             Route::get('/', [SubscriptionController::class, 'index']);
-            Route::post('/', [SubscriptionController::class, 'store']);
+            Route::post('/', [SubscriptionController::class, 'store'])
+                ->middleware(['throttle:15,1', 'verified']);
             Route::get('/show', [SubscriptionController::class, 'show']);
             Route::put('/{id}', [SubscriptionController::class, 'update']);
             Route::delete('/{id}', [SubscriptionController::class, 'destroy']);
@@ -602,7 +631,8 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::prefix('payments')->group(function () {
             Route::get('/', [StudentPaymentController::class, 'index']);
             Route::get('/stats', [StudentPaymentController::class, 'revenueStats']);
-            Route::post('/', [StudentPaymentController::class, 'store']);
+            Route::post('/', [StudentPaymentController::class, 'store'])
+                ->middleware(['throttle:15,1', 'verified']);
             Route::delete('/{id}', [StudentPaymentController::class, 'destroy']);
             Route::get('/{id}/downloadInvoice', [StudentPaymentController::class, 'downloadInvoice']);
             Route::get('/statistiques', [StudentPaymentController::class, 'stats']);
