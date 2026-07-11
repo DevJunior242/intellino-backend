@@ -16,7 +16,7 @@ class EnsureEmailVerified
             return response()->json([
                 'success' => false,
                 'message' => 'Merci de confirmer ton adresse email avant de continuer.',
-            ], 403);
+            ], 422);
         }
 
         return $next($request);
