@@ -15,6 +15,7 @@ class EnsureEmailVerified
         if (!$user || ($user instanceof MustVerifyEmail && !$user->hasVerifiedEmail())) {
             return response()->json([
                 'success' => false,
+                'code' => 'EMAIL_NOT_VERIFIED',
                 'message' => 'Merci de confirmer ton adresse email avant de continuer.',
             ], 422);
         }
