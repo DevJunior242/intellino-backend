@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Club;
+use App\Models\League;
 use App\Models\Student;
 use App\Models\Evenement;
 use App\Models\Competition;
@@ -45,9 +46,12 @@ class InscriptionController extends Controller
 
         $clubId = $activeId;
 
-        $leagueId = Club::where('id', $clubId)->value('league_id');
+        $league = Club::where('id', $clubId)->first(['league_id']);
+        $leagueId = $league?->league_id;
+        $federationId = $leagueId ? League::where('id', $leagueId)->value('federation_id') : null;
+
         $evenements = Evenement::where('status', Evenement::STATUT_EN_COURS)
-            ->where(function ($q) use ($clubId, $leagueId) {
+            ->where(function ($q) use ($clubId, $leagueId, $federationId) {
                 $q->where(function ($q2) use ($clubId) {
                     $q2->where('organisateur_type', 'Club')
                         ->where('organisateur_id', $clubId);
@@ -55,6 +59,10 @@ class InscriptionController extends Controller
                     ->orWhere(function ($q2) use ($leagueId) {
                         $q2->where('organisateur_type', 'Ligue')
                             ->where('organisateur_id', $leagueId);
+                    })
+                    ->orWhere(function ($q2) use ($federationId) {
+                        $q2->where('organisateur_type', 'Federation')
+                            ->where('organisateur_id', $federationId);
                     });
             })
             ->with([
