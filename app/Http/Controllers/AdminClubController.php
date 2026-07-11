@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Role;
 use App\Models\Attendance;
 use Illuminate\Http\Request;
+use App\Services\ClubAlertService;
 use Illuminate\Support\Facades\Log;
 
 class AdminClubController extends Controller
@@ -36,6 +37,17 @@ class AdminClubController extends Controller
             'message' => 'presence list',
             'presences' => $attendances,
             'chartData' => $chartData
+        ]);
+    }
+
+    public function alerts(Request $request, ClubAlertService $alertService)
+    {
+        $activeId = $request->attributes->get('organisateur_id');
+        $activeType = $request->attributes->get('organisateur_type');
+
+        return response()->json([
+            'success' => true,
+            'alerts' => $alertService->getAlerts($activeId, $activeType),
         ]);
     }
 

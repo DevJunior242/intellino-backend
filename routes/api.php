@@ -456,6 +456,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::get('/dashboard/stats', [DashboardController::class, 'stats']);
         Route::get('/dashboard/activity', [DashboardController::class, 'getDashboardActivity']);
         Route::get('/attendances/chart', [AdminClubController::class, 'presence']);
+        Route::get('/dashboard/club/alert', [AdminClubController::class, 'alerts']);
 
 
         //dashboard league
