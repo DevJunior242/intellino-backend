@@ -52,9 +52,8 @@ return [
     |
     */
 
-    'url' => env('APP_URL', 'http://178.105.189.230'),
-    // config/app.php
-    'frontend_url' => env('FRONTEND_URL', 'http://178.105.189.230:3000'),
+    'url' => env('APP_URL', 'http://localhost'),
+    'frontend_url' => env('FRONTEND_URL', 'http://localhost:5173'),
 
     /*
     |--------------------------------------------------------------------------
