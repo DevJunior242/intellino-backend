@@ -94,7 +94,8 @@ class ConfigNotation extends Model
 
     public function estKata(): bool
     {
-        return optional($this->competition?->subdiscipline)->nom === 'kata';
+        $subdiscipline = $this->competition?->subdiscipline?->nom ?? '';
+        return trim(strtolower($subdiscipline)) === 'kata';
     }
     // Niveau 1 — config complète (admin peut valider)
     public function estPrete(): array
