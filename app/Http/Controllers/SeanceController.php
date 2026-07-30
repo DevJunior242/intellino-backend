@@ -67,9 +67,11 @@ class SeanceController extends Controller
                 }
             }
 
-            // Si kumite et aucun format choisi, demander au client de sélectionner
-            // un format explicitement plutôt que de le choisir automatiquement.
-            if ($config->estKumite() && !$config->kumite_format_id) {
+            // Si kumite ou kata et aucun format choisi, demander au client de
+            // sélectionner un format explicitement plutôt que de le choisir
+            // automatiquement (le Kata utilise les mêmes formats poules/
+            // éliminatoire que le Kumite — voir BracketService).
+            if (($config->estKumite() || $config->estKata()) && !$config->kumite_format_id) {
                 $formats = \App\Models\KumiteFormat::all()
                     ->filter(fn($f) => $nbCombattants >= ($minimumsFormat[$f->code] ?? 2))
                     ->values();
@@ -83,7 +85,7 @@ class SeanceController extends Controller
             }
 
             DB::transaction(function () use ($config) {
-                if ($config->estKumite()) {
+                if ($config->estKumite() || $config->estKata()) {
                     app(BracketService::class)->generer($config);
                 }
 
