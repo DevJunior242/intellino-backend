@@ -229,7 +229,7 @@ class BracketService
 
         // Assigner les combattants au 1er round
         $combatsPremierRound = $combatsParRound[1];
-        $this->assignerCombattants($config, $combatsPremierRound, $ordres, $byes);
+        $this->assignerCombattants($combatsPremierRound, $ordres, $byes);
 
         return $combatsParRound;
     }
@@ -239,7 +239,6 @@ class BracketService
      * Gérer les byes (exemptions) pour les combattants sans adversaire
      */
     private function assignerCombattants(
-        ConfigNotation $config,
         array $combats,
         array $ordres,
         int $byes
@@ -257,8 +256,6 @@ class BracketService
                     'inscription_ao_id'  => $ao['inscription_id'],
                     'status'             => 0, // en attente
                 ]);
-
-                $this->creerPassagesKataSiBesoin($config, $combat);
             } elseif ($aka && !$ao) {
                 // Bye — aka passe directement au round suivant
                 $combat->update([
@@ -274,37 +271,6 @@ class BracketService
                 $this->propaguerVainqueur($combat, $aka['inscription_id']);
             }
         }
-    }
-
-    /**
-     * En Kata, chaque combat est un duel Aka/Ao noté par les juges : on crée
-     * les deux OrdrePassage (Aka d'abord, puis Ao — Art. 6.9 WKF Kata
-     * Competition Rules) reliés à ce combat, pour que KataNotationService
-     * puisse ensuite calculer le vote majoritaire des juges. Sans effet en
-     * Kumite ou sur un bye (pas d'adversaire à noter).
-     */
-    private function creerPassagesKataSiBesoin(ConfigNotation $config, Combat $combat): void
-    {
-        if (!$config->estKata()) return;
-        if (!$combat->inscription_aka_id || !$combat->inscription_ao_id) return;
-
-        $ordre = OrdrePassage::where('config_notation_id', $config->id)->max('ordre') ?? 0;
-
-        OrdrePassage::create([
-            'config_notation_id' => $config->id,
-            'inscription_id'     => $combat->inscription_aka_id,
-            'combat_id'          => $combat->id,
-            'ordre'              => ++$ordre,
-            'status'             => OrdrePassage::STATUS_NOT_STARTED,
-        ]);
-
-        OrdrePassage::create([
-            'config_notation_id' => $config->id,
-            'inscription_id'     => $combat->inscription_ao_id,
-            'combat_id'          => $combat->id,
-            'ordre'              => ++$ordre,
-            'status'             => OrdrePassage::STATUS_NOT_STARTED,
-        ]);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -369,7 +335,7 @@ class BracketService
                     $away = $list[$count - 1 - $i];
 
                     if ($home !== null && $away !== null) {
-                        $combat = Combat::create([
+                        Combat::create([
                             'id'                 => Str::uuid(),
                             'competition_id'     => $config->competition_id,
                             'config_notation_id' => $config->id,
@@ -380,8 +346,6 @@ class BracketService
                             'ordre'              => $ordreGlobalCombat++,
                             'status'             => 0,
                         ]);
-
-                        $this->creerPassagesKataSiBesoin($config, $combat);
                     }
                 }
 
@@ -757,7 +721,6 @@ class BracketService
         // Assigner les combattants au 1er round (répartition seedée pour
         // qu'aucune paire ne se retrouve avec deux byes empilés)
         $this->assignerCombattants(
-            $config,
             $combatsParRound[1],
             $this->placerIdsAvecByes($perdants, $taille),
             $byes

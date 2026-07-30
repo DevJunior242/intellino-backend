@@ -6,11 +6,9 @@ use App\Models\Poule;
 use App\Models\Competition;
 use App\Models\Inscription;
 use App\Models\CombatAction;
-use App\Models\OrdrePassage;
 use App\Models\ConfigNotation;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
-use App\Models\Combat;
 
 class Combat extends Model
 {
@@ -65,22 +63,6 @@ class Combat extends Model
     public function actions()
     {
         return $this->hasMany(CombatAction::class);
-    }
-
-    // Kata : les deux passages (Aka/Ao) notés par les juges pour ce combat
-    public function ordrePassages()
-    {
-        return $this->hasMany(OrdrePassage::class);
-    }
-
-    public function ordrePassageAka()
-    {
-        return $this->hasOne(OrdrePassage::class)->where('inscription_id', $this->inscription_aka_id);
-    }
-
-    public function ordrePassageAo()
-    {
-        return $this->hasOne(OrdrePassage::class)->where('inscription_id', $this->inscription_ao_id);
     }
 
     public function nextCombat()

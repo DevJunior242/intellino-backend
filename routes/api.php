@@ -325,7 +325,6 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::post('notes', [KataNotationController::class, 'store']);
         Route::post('notes/centralise', [KataNotationController::class, 'storeCentralise']);
         Route::get('inscriptions/{ordrePassage}/notes', [KataNotationController::class, 'notesInscription']);
-        Route::get('combats/{combat}/vote-kata', [KataNotationController::class, 'resultatCombatKata']);
 
 
         //niveaux competitions

@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Combat;
 use App\Models\OrdrePassage;
 use Illuminate\Http\Request;
 
@@ -109,13 +108,5 @@ class KataNotationController extends Controller
             'termine' => $resultat['termine'],
             'message' => $resultat['message'],
         ]);
-    }
-
-    // Vote Aka/Ao d'un combat Kata (écran d'arbitrage)
-    public function resultatCombatKata(Combat $combat)
-    {
-        $resultat = app(KataNotationService::class)->resultatCombat($combat);
-
-        return response()->json(array_merge(['success' => true], $resultat));
     }
 }
