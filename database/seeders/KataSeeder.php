@@ -1,0 +1,126 @@
+<?php
+
+namespace Database\Seeders;
+
+use App\Models\Kata;
+use Illuminate\Database\Seeder;
+
+class KataSeeder extends Seeder
+{
+    /**
+     * Liste officielle WKF Kata Competition Rules 2026, Appendix 1.
+     * Le niveau (débutant/intermédiaire/avancé) n'est pas fourni par le WKF —
+     * à classer manuellement selon le programme du club/de la ligue.
+     */
+    public function run(): void
+    {
+        $kata = [
+            'Anan',
+            'Anan Dai',
+            'Ananko',
+            'Aoyagi',
+            'Bassai',
+            'Bassai Dai',
+            'Bassai Sho',
+            'Chatanyara Kusanku',
+            'Chibana No Kushanku',
+            'Chinte',
+            'Chinto',
+            'Enpi',
+            'Fukyugata Ichi',
+            'Fukyugata Ni',
+            'Gankaku',
+            'Garyu',
+            'Gekisai (Geksai) 1',
+            'Gekisai (Geksai) 2',
+            'Gojushiho',
+            'Gojushiho Dai',
+            'Gojushiho Sho',
+            'Hakusho',
+            'Hangetsu',
+            'Haufa (Haffa)',
+            'Heian Shodan',
+            'Heian Nidan',
+            'Heian Sandan',
+            'Heian Yondan',
+            'Heian Godan',
+            'Heiku',
+            'Ishimine Bassai',
+            'Itosu Rohai Shodan',
+            'Itosu Rohai Nidan',
+            'Itosu Rohai Sandan',
+            'Jiin',
+            'Jion',
+            'Jitte',
+            'Juroku',
+            'Kanchin',
+            'Kanku Dai',
+            'Kanku Sho',
+            'Kanshu',
+            'Kishimono No Kushanku',
+            'Kousoukun',
+            'Kousoukun Dai',
+            'Kousoukun Sho',
+            'Kururunfa',
+            'Kusanku',
+            'Kyan No Chinto',
+            'Kyan No Wanshu',
+            'Matsukaze',
+            'Matsumura Bassai',
+            'Matsumura Rohai',
+            'Meikyo',
+            'Myojo',
+            'Naifanchin Shodan',
+            'Naifanchin Nidan',
+            'Naifanchin Sandan',
+            'Naihanchi',
+            'Nijushiho',
+            'Nipaipo',
+            'Niseishi',
+            'Ohan',
+            'Ohan Dai',
+            'Oyadomari No Passai',
+            'Pachu',
+            'Paiku',
+            'Papuren',
+            'Passai',
+            'Pinan Shodan',
+            'Pinan Nidan',
+            'Pinan Sandan',
+            'Pinan Yondan',
+            'Pinan Godan',
+            'Rohai',
+            'Saifa',
+            'Sanchin',
+            'Sansai',
+            'Sanseiru',
+            'Sanseru',
+            'Seichin',
+            'Seienchin (Seiyunchin)',
+            'Seipai',
+            'Seiryu',
+            'Seishan',
+            'Seisan (Sesan)',
+            'Shiho Kousoukun',
+            'Shinpa',
+            'Shinsei',
+            'Shisochin',
+            'Sochin',
+            'Suparinpei',
+            'Tekki Shodan',
+            'Tekki Nidan',
+            'Tekki Sandan',
+            'Tensho',
+            'Tomari Bassai',
+            'Unshu',
+            'Unsu',
+            'Useishi',
+            'Wankan',
+            'Wanshu',
+        ];
+
+        foreach ($kata as $nom) {
+            Kata::firstOrCreate(['nom' => $nom], ['actif' => true]);
+        }
+    }
+}

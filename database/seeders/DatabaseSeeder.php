@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Database\Seeders\GradeSeeder;
+use Database\Seeders\KataSeeder;
 use Database\Seeders\DisciplineSeeder;
 use Database\Seeders\JugeOptionSeeder;
 use Database\Seeders\ModeSaisieSeeder;
@@ -38,6 +39,7 @@ class DatabaseSeeder extends Seeder
             NiveauCompetitionSeeder::class,
             GradeSeeder::class,
             CountrySeeder::class,
+            KataSeeder::class,
 
         ]);
     }
