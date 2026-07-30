@@ -215,15 +215,16 @@ class StudentController extends Controller
         $validated = $request->validated();
         // Trouver la saison active actuelle dans la base de données
         $saisonActive = $this->saisonActivePour($activeId, $activeType);
+        $messageAucuneSaison = $this->messageAucuneSaisonActivePour($activeId, $activeType);
 
         try {
-            return DB::transaction(function () use ($validated, $activeId, $request, $saisonActive) {
+            return DB::transaction(function () use ($validated, $activeId, $request, $saisonActive, $messageAucuneSaison) {
                 $parentId = null;
                 $createdStudents = [];
 
 
                 if (!$saisonActive) {
-                    return response()->json(['success' => false, 'message' => 'Aucune saison sportive active n’a été configurée.'], 400);
+                    return response()->json(['success' => false, 'message' => $messageAucuneSaison], 400);
                 }
 
                 $seasonId = $saisonActive->id;
@@ -375,6 +376,7 @@ class StudentController extends Controller
             return response()->json(['success' => false, 'message' => 'Une erreur est survenue lors de l\'enregistrement de l\'élève'], 500);
         }
     }
+
     public function updateStudent(UpdatedStudentReq $request, Student $student)
     {
         $this->authorize('update', $student);

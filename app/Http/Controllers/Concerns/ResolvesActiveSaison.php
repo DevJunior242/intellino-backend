@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Concerns;
 use App\Models\Club;
 use App\Models\League;
 use App\Models\Saison;
+use App\Models\Federation;
 
 /**
  * Résout la saison active applicable à un organisateur (Club, Ligue ou Fédération).
@@ -17,13 +18,20 @@ use App\Models\Saison;
  */
 trait ResolvesActiveSaison
 {
-    private function saisonActivePour(?string $activeId, ?string $activeType): ?Saison
+    /**
+     * Organisation (Club, Ligue ou Fédération) dont il faut vérifier/gérer
+     * la saison active pour ce contexte : remonte récursivement la chaîne
+     * Club → Ligue → Fédération jusqu'à la première entité indépendante,
+     * ou jusqu'à la Fédération (qui gère toujours la sienne).
+     */
+    private function organisateurEffectifSaison(?string $activeId, ?string $activeType): ?array
     {
         if ($activeType === 'Federation') {
-            return Saison::where('active', true)
-                ->where('organisateur_id', $activeId)
-                ->where('organisateur_type', 'Federation')
-                ->first();
+            $federation = Federation::find($activeId);
+
+            return $federation
+                ? ['type' => 'Federation', 'id' => $federation->id, 'nom' => $federation->name]
+                : null;
         }
 
         if ($activeType === 'Ligue') {
@@ -35,16 +43,10 @@ trait ResolvesActiveSaison
 
             // Ligue indépendante : elle gère sa propre saison
             if (!$league->federation_id) {
-                return Saison::where('active', true)
-                    ->where('organisateur_id', $league->id)
-                    ->where('organisateur_type', 'Ligue')
-                    ->first();
+                return ['type' => 'Ligue', 'id' => $league->id, 'nom' => $league->name];
             }
 
-            return Saison::where('active', true)
-                ->where('organisateur_id', $league->federation_id)
-                ->where('organisateur_type', 'Federation')
-                ->first();
+            return $this->organisateurEffectifSaison($league->federation_id, 'Federation');
         }
 
         if ($activeType === 'Club') {
@@ -56,32 +58,50 @@ trait ResolvesActiveSaison
 
             // Club indépendant (aucune ligue) : il gère sa propre saison
             if (!$club->league_id) {
-                return Saison::where('active', true)
-                    ->where('organisateur_id', $club->id)
-                    ->where('organisateur_type', 'Club')
-                    ->first();
+                return ['type' => 'Club', 'id' => $club->id, 'nom' => $club->name];
             }
 
-            $league = League::find($club->league_id);
-
-            if (!$league) {
-                return null;
-            }
-
-            // Ligue de rattachement indépendante : hérite de sa saison à elle
-            if (!$league->federation_id) {
-                return Saison::where('active', true)
-                    ->where('organisateur_id', $league->id)
-                    ->where('organisateur_type', 'Ligue')
-                    ->first();
-            }
-
-            return Saison::where('active', true)
-                ->where('organisateur_id', $league->federation_id)
-                ->where('organisateur_type', 'Federation')
-                ->first();
+            return $this->organisateurEffectifSaison($club->league_id, 'Ligue');
         }
 
         return null;
+    }
+
+    private function saisonActivePour(?string $activeId, ?string $activeType): ?Saison
+    {
+        $organisateur = $this->organisateurEffectifSaison($activeId, $activeType);
+
+        if (!$organisateur) {
+            return null;
+        }
+
+        return Saison::where('active', true)
+            ->where('organisateur_id', $organisateur['id'])
+            ->where('organisateur_type', $organisateur['type'])
+            ->first();
+    }
+
+    /**
+     * Message à afficher quand saisonActivePour() ne trouve rien : précise
+     * QUI (quelle ligue/fédération) doit définir la saison quand ce n'est
+     * pas l'organisation courante, plutôt qu'un message générique qui
+     * laisserait croire à l'utilisateur que c'est à lui de le faire alors
+     * qu'il est rattaché à un parent qui gère sa propre saison.
+     */
+    private function messageAucuneSaisonActivePour(?string $activeId, ?string $activeType): string
+    {
+        $générique = "Aucune saison sportive active n'a été configurée.";
+
+        $organisateur = $this->organisateurEffectifSaison($activeId, $activeType);
+
+        if (!$organisateur || $organisateur['type'] === $activeType) {
+            return $générique;
+        }
+
+        $niveau = $organisateur['type'] === 'Ligue' ? 'ligue' : 'fédération';
+        $rattachement = $activeType === 'Club' ? 'club' : 'ligue';
+        $nom = $organisateur['nom'] ? " ({$organisateur['nom']})" : '';
+
+        return "{$générique} Votre {$rattachement} est rattaché(e) à une {$niveau}{$nom} : c'est à l'administrateur de cette {$niveau} de définir sa saison active avant que vous puissiez continuer.";
     }
 }
