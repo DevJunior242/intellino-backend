@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Club;
 use App\Models\Saison;
+use App\Models\League;
 use App\Models\Category;
 use Illuminate\Http\Request;
 
@@ -12,8 +14,30 @@ class SaisonController extends Controller
     {
         $activeId = $request->attributes->get('organisateur_id');
         $activeType = $request->attributes->get('organisateur_type');
-        //seule la fédération peut créer une saison
-        if ($activeType !== 'Federation') {
+
+        // La Fédération gère toujours sa propre saison. Un Club/une Ligue
+        // affilié(e) hérite de son parent (voir ResolvesActiveSaison) et ne
+        // peut donc pas en créer une lui/elle-même. Seul un Club ou une Ligue
+        // INDÉPENDANT(E) (sans parent) peut posséder sa propre saison.
+        if ($activeType === 'Club') {
+            $club = Club::find($activeId);
+
+            if (!$club || $club->league_id) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Seul un club indépendant (non rattaché à une ligue) peut créer sa propre saison.'
+                ], 403);
+            }
+        } elseif ($activeType === 'Ligue') {
+            $league = League::find($activeId);
+
+            if (!$league || $league->federation_id) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Seule une ligue indépendante (non rattachée à une fédération) peut créer sa propre saison.'
+                ], 403);
+            }
+        } elseif ($activeType !== 'Federation') {
             return response()->json([
                 'success' => false,
                 'message' => 'Vous n\'avez pas les droits pour créer une saison.'
@@ -28,6 +52,7 @@ class SaisonController extends Controller
 
         $ancienneSaison = Saison::where('active', true)
             ->where('organisateur_id', $activeId)
+            ->where('organisateur_type', $activeType)
             ->first();
         if ($ancienneSaison) {
             $ancienneSaison->update([

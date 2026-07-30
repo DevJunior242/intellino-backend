@@ -9,6 +9,7 @@ use App\Models\CombatAction;
 use App\Models\ConfigNotation;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use App\Models\Combat;
 
 class Combat extends Model
 {

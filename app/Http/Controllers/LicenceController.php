@@ -48,7 +48,10 @@ class LicenceController extends Controller
             ], 422);
         }
 
-        $saisonActive = Saison::where('active', true)->first();
+        $saisonActive = Saison::where('active', true)
+            ->where('organisateur_id', $league->federation_id)
+            ->where('organisateur_type', 'Federation')
+            ->first();
 
         if (!$saisonActive) {
             return response()->json(['message' => 'Aucune saison active trouvée'], 422);
@@ -111,7 +114,10 @@ class LicenceController extends Controller
 
         $federationId = $league->federation_id;
 
-        $saisonActive = Saison::where('active', true)->first();
+        $saisonActive = Saison::where('active', true)
+            ->where('organisateur_id', $federationId)
+            ->where('organisateur_type', 'Federation')
+            ->first();
 
         if (!$saisonActive) {
             return response()->json(['message' => 'Aucune saison active trouvée'], 422);

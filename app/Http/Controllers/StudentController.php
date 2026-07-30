@@ -20,12 +20,12 @@ use App\Http\Requests\UpdatedStudentReq;
 use Illuminate\Support\Facades\Password;
 use App\Http\Requests\StoreStudentRequest;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
-use App\Http\Controllers\Concerns\ResolvesFederationSaison;
+use App\Http\Controllers\Concerns\ResolvesActiveSaison;
 
 class StudentController extends Controller
 {
     use AuthorizesRequests;
-    use ResolvesFederationSaison;
+    use ResolvesActiveSaison;
 
     public function index(Request $request)
     {

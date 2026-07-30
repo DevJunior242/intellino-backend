@@ -18,6 +18,8 @@ return new class extends Migration
             $table->foreignUuid('next_grade_id')->constrained('grades')->onDelete('cascade');
 
             $table->tinyInteger('status')->default(0);
+            // Prix d'inscription par candidat. 0 = examen gratuit.
+            $table->decimal('price', 10, 2)->default(0.00);
 
             $table->text('cancel_reason')->nullable();
             $table->timestamp('cancelled_at')->nullable();

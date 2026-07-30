@@ -15,6 +15,8 @@ return new class extends Migration
             $table->uuid('id')->primary();
             $table->foreignUuid('examen_id')->constrained('examens')->onDelete('cascade');
             $table->foreignUuid('student_id')->constrained('students')->onDelete('cascade');
+            // Club qui inscrit/paie ce candidat (utilisé pour scoper les lots de paiement).
+            $table->foreignUuid('club_id')->nullable()->constrained('clubs')->nullOnDelete();
             $table->tinyInteger('status')->default(0);
             $table->timestamps();
             $table->unique(['examen_id', 'student_id'], 'examen_candidat_unique_idx');

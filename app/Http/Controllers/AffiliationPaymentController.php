@@ -9,11 +9,11 @@ use App\Models\Affiliation;
 use Illuminate\Http\Request;
 use App\Models\PaymentMethod;
 use App\Models\AffiliationPayment;
-use App\Http\Controllers\Concerns\ResolvesFederationSaison;
+use App\Http\Controllers\Concerns\ResolvesActiveSaison;
 
 class AffiliationPaymentController extends Controller
 {
-    use ResolvesFederationSaison;
+    use ResolvesActiveSaison;
 
     /**
      * Statut d'affiliation du club connecté pour la saison active de sa

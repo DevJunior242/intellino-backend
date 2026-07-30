@@ -139,7 +139,12 @@ class MandatController extends Controller
             $user->update(['current_league_id' => $leagueId]);
 
             // 3. Consomme la clé
-            $key->update(['is_used' => true, 'used_at' => now()]);
+            $key->update([
+                'is_used' => true,
+                'used_at' => now(),
+                'used_by_user_id' => $user->id,
+                'used_by_organisation_id' => $leagueId,
+            ]);
             // Rechargement complet de l'utilisateur avec ses relations à jour
             $user->load([
                 'leagues' => function ($query) {

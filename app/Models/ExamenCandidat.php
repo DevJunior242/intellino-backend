@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Club;
 use App\Models\Examen;
 use App\Models\Student;
 use Illuminate\Database\Eloquent\Model;
@@ -14,6 +15,7 @@ class ExamenCandidat extends Model
     protected $fillable = [
         'examen_id',
         'student_id',
+        'club_id',
         'status',
     ];
     public $incrementing = false;
@@ -30,5 +32,9 @@ class ExamenCandidat extends Model
     public function student()
     {
         return $this->belongsTo(Student::class);
+    }
+    public function club()
+    {
+        return $this->belongsTo(Club::class);
     }
 }

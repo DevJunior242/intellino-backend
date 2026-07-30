@@ -6,6 +6,7 @@ use App\Models\Club;
 use App\Models\User;
 use App\Models\Grade;
 use App\Models\ExamenResult;
+use App\Models\ExamenPayment;
 use App\Models\ExamenCandidat;
 use App\Models\ExamenEvaluation;
 use App\Models\GradeEnchainement;
@@ -36,6 +37,7 @@ class Examen extends Model
         'end_time',
         'replacement_start_time',
         'replacement_end_time',
+        'price',
 
     ];
 
@@ -70,6 +72,10 @@ class Examen extends Model
     public function candidates()
     {
         return $this->hasMany(ExamenCandidat::class);
+    }
+    public function payments()
+    {
+        return $this->hasMany(ExamenPayment::class);
     }
     public function evaluations()
     {

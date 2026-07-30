@@ -25,11 +25,15 @@ class Federation extends Model
         'email',
         'website',
         'country_id',
-        'invitation_code'
+        'invitation_code',
+        'status',
     ];
 
     public $incrementing = false;
     protected $keyType = 'string';
+
+    const STATUS_ACTIVE = 1;
+    const STATUS_INACTIVE = 0;
 
     public function country(): BelongsTo
     {

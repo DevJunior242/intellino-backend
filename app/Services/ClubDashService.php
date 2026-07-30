@@ -50,6 +50,11 @@ class ClubDashService
 
         return [
             'total_clubs' => Club::count(),
+            'total_leagues' => \App\Models\League::count(),
+            'total_federations' => \App\Models\Federation::count(),
+            'inactive_organizations' => Club::where('status', 0)->count()
+                + \App\Models\League::where('status', 0)->count()
+                + \App\Models\Federation::where('status', 0)->count(),
             'total_students' => Student::count(),
             'total_instructors' => $totalInstructors,
             'total_parents' => ParentModel::count(),

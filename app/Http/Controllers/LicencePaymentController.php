@@ -8,9 +8,12 @@ use Illuminate\Http\Request;
 use App\Models\PaymentMethod;
 use App\Models\LicencePayment;
 use Illuminate\Support\Facades\DB;
+use App\Http\Controllers\Concerns\ResolvesActiveSaison;
 
 class LicencePaymentController extends Controller
 {
+    use ResolvesActiveSaison;
+
     /**
      * Liste des lots de paiement du club connecté, tous statuts confondus,
      * pour la saison active. Utilisé pour afficher la section
@@ -28,7 +31,7 @@ class LicencePaymentController extends Controller
             ], 403);
         }
 
-        $saisonActive = \App\Models\Saison::where('active', true)->first();
+        $saisonActive = $this->saisonActivePour($activeId, $activeType);
 
         if (!$saisonActive) {
             return response()->json(['message' => 'Aucune saison active trouvée'], 422);
@@ -236,7 +239,10 @@ class LicencePaymentController extends Controller
             ], 403);
         }
 
-        $saisonActive = \App\Models\Saison::where('active', true)->first();
+        $saisonActive = Saison::where('active', true)
+            ->where('organisateur_id', $activeId)
+            ->where('organisateur_type', 'Federation')
+            ->first();
 
         if (!$saisonActive) {
             return response()->json(['message' => 'Aucune saison active trouvée'], 422);
@@ -274,7 +280,10 @@ class LicencePaymentController extends Controller
             ], 403);
         }
 
-        $saisonActive = \App\Models\Saison::where('active', true)->first();
+        $saisonActive = Saison::where('active', true)
+            ->where('organisateur_id', $activeId)
+            ->where('organisateur_type', 'Federation')
+            ->first();
 
         if (!$saisonActive) {
             return response()->json(['message' => 'Aucune saison active trouvée'], 422);

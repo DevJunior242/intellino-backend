@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Club;
 use App\Models\Role;
+use App\Models\Discipline;
 use App\Models\ActivationKey;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -101,8 +102,19 @@ class ClubController extends Controller
             }
 
             // 4. CREATION DU CLUB
+            // Discipline non choisie côté client : cette version ne gère que le Karaté.
+            $discipline = Discipline::where('name', 'Karaté')->first();
+
+            if (!$discipline) {
+               return response()->json([
+                  'success' => false,
+                  'message' => 'La discipline Karaté n\'est pas configurée. Contactez le support.',
+               ], 500);
+            }
+
             $club = Club::create([
                ...$request->validated(),
+               'discipline_id' => $discipline->id,
                'logo' => isset($path) ? $path : null,
             ]);
 
@@ -111,6 +123,7 @@ class ClubController extends Controller
                'is_used' => true,
                'used_at' => now(),
                'used_by_user_id' => $user->id,
+               'used_by_organisation_id' => $club->id,
             ]);
 
             // 6. LOGIQUE UTILISATEUR & ROLES (Ton code d'origine)

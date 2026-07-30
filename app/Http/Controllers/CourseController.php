@@ -12,9 +12,11 @@ use App\Models\SessionModel;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use App\Http\Requests\CourseRequest;
+use App\Http\Controllers\Concerns\ResolvesActiveSaison;
 
 class CourseController extends Controller
 {
+    use ResolvesActiveSaison;
     /**
      * Utilisateurs autorisés à diriger les cours d'un club :
      * les admins/instructeurs du club, ainsi que les élèves ceinture noire
@@ -76,7 +78,7 @@ class CourseController extends Controller
         $activeId = $request->attributes->get('organisateur_id');
         $activeType = $request->attributes->get('organisateur_type');
 
-        $saisonActive =  Saison::where('active', true)->first();
+        $saisonActive = $this->saisonActivePour($activeId, $activeType);
 
         if (!$saisonActive) {
             return response()->json([
@@ -84,7 +86,6 @@ class CourseController extends Controller
                 'message' => 'Vous devez définir une saison pour créer un cours',
             ], 422);
         }
-        $saisonActive =  Saison::where('active', true)->first();
 
         $sessions = SessionModel::with(['course.organisateur', 'course.grade'])
             ->whereHas('course', function ($query) use ($activeId, $saisonActive, $activeType) {
@@ -103,9 +104,9 @@ class CourseController extends Controller
     }
     public function storeFullCourse(CourseRequest $request)
     {
-        $saisonActive =  Saison::where('active', true)->first();
         $activeId = $request->attributes->get('organisateur_id');
         $activeType = $request->attributes->get('organisateur_type');
+        $saisonActive = $this->saisonActivePour($activeId, $activeType);
 
         if (!$saisonActive) {
             return response()->json([

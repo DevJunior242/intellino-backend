@@ -11,24 +11,19 @@ use App\Models\Competition;
 use Illuminate\Http\Request;
 use App\Models\AffiliationPayment;
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Concerns\ResolvesActiveSaison;
 
 class DashBoardLeagueController extends Controller
 {
+    use ResolvesActiveSaison;
+
     /**
-     * Helper pour centraliser la récupération de la saison active de la Fédération parente
+     * Saison active applicable à cette ligue : la sienne si elle est
+     * indépendante (pas de fédération), sinon celle de sa fédération.
      */
     private function getSaisonActiveFederation($leagueId)
     {
-        $league = \App\Models\League::find($leagueId);
-
-        if (!$league || !$league->federation_id) {
-            return null;
-        }
-
-        return Saison::where('active', true)
-            ->where('organisateur_id', $league->federation_id)
-            ->where('organisateur_type', 'Federation')
-            ->first();
+        return $this->saisonActivePour($leagueId, 'Ligue');
     }
 
     public function stats(Request $request)

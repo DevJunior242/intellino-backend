@@ -15,13 +15,13 @@ use App\Services\ArbitreVerificationService;
 use App\Http\Requests\UpdateEvenementRequest;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
-use App\Http\Controllers\Concerns\ResolvesFederationSaison;
+use App\Http\Controllers\Concerns\ResolvesActiveSaison;
 
 class EvenementController extends Controller
 {
 
     use AuthorizesRequests;
-    use ResolvesFederationSaison;
+    use ResolvesActiveSaison;
 
     public function index(Request $request)
     {

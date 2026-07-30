@@ -9,9 +9,11 @@ use App\Models\Saison;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Concerns\ResolvesActiveSaison;
 
 class StageController extends Controller
 {
+    use ResolvesActiveSaison;
 
     public function index(Request $request)
     {
@@ -26,7 +28,7 @@ class StageController extends Controller
             ], 403);
         }
 
-        $saisonActive = Saison::where('active', true)->first();
+        $saisonActive = $this->saisonActivePour($activeId, $activeType);
 
         if (!$saisonActive) {
             return response()->json(['message' => 'Aucune saison active trouvée'], 422);
@@ -100,17 +102,18 @@ class StageController extends Controller
         // 2. Récupération sécurisée des attributs du middleware
         $activeId = $request->attributes->get('organisateur_id');
         $activeType = $request->attributes->get('organisateur_type');
-        $saisonActive =  Saison::where('active', true)->first();
-
-        if (!$saisonActive) {
-            return response()->json(['message' => 'Aucune saison active trouvée'], 422);
-        }
 
         if (!$activeId || !$activeType) {
             return response()->json([
                 'success' => false,
                 'message' => 'Impossible d\'identifier l\'organisateur connecté.'
             ], 403);
+        }
+
+        $saisonActive = $this->saisonActivePour($activeId, $activeType);
+
+        if (!$saisonActive) {
+            return response()->json(['message' => 'Aucune saison active trouvée'], 422);
         }
 
         // 3. Sécurisation et isolation dans une transaction de base de données
@@ -234,7 +237,7 @@ class StageController extends Controller
             ], 422);
         }
 
-        $saisonActive = Saison::where('active', true)->first();
+        $saisonActive = $this->saisonActivePour($club->league_id, 'Ligue');
 
         if (!$saisonActive) {
             return response()->json(['message' => 'Aucune saison active trouvée'], 422);

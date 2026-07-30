@@ -59,6 +59,7 @@ class StoreExamenRequest extends FormRequest
                 'nullable',
                 Rule::in(['brouillon', 'en cours', 'terminé']),
             ],
+            'price' => ['nullable', 'numeric', 'min:0'],
 
 
 

@@ -32,6 +32,7 @@ use App\Http\Controllers\LicenceController;
 use App\Http\Controllers\SessionController;
 use App\Http\Controllers\StudentController;
 use App\Http\Controllers\CandidatController;
+use App\Http\Controllers\ExamenPaymentController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\AdminClubController;
 use App\Http\Controllers\DashboardController;
@@ -43,6 +44,7 @@ use App\Http\Controllers\DisciplineController;
 use App\Http\Controllers\EquipementController;
 use App\Http\Controllers\EvaluationController;
 use App\Http\Controllers\FederationController;
+use App\Http\Controllers\SuperAdminOrganizationController;
 use App\Http\Controllers\GovernanceController;
 use App\Http\Controllers\InstructorController;
 use App\Http\Controllers\InvitationController;
@@ -121,11 +123,19 @@ Route::middleware('throttle:60,1')->group(function () {
 Route::middleware(['auth:sanctum'])->group(function () {
     Route::get('/user', [LoginController::class, 'me']);
 
+    // Contrôle total du super admin sur les organisations (club/ligue/fédération)
+    Route::middleware('superadmin')->group(function () {
+        Route::get('/super-admin/organizations', [SuperAdminOrganizationController::class, 'overview']);
+        Route::patch('/super-admin/organizations/{type}/{id}/toggle-status', [SuperAdminOrganizationController::class, 'toggleStatus'])
+            ->middleware('throttle:20,1');
+
+        // Clés d'activation : n'importe quel utilisateur authentifié pouvait générer/lister
+        // des clés avant ce middleware — seule la route frontend était protégée.
+        Route::apiResource('/activation-keys', ActivationKeyController::class);
+    });
+
     Route::post('/email/verification-notification', [EmailVerificationController::class, 'resend'])
         ->middleware('throttle:6,1');
-
-    //keys
-    Route::apiResource('/activation-keys', ActivationKeyController::class);
 
     //countries
     Route::apiResource('/countries', CountryController::class);
@@ -585,6 +595,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
             Route::get('/stats', [ExamenController::class, 'stats']);
             Route::get('/vitality-stats', [ExamenController::class, 'exmenstates']);
             Route::get('/mes-examens', [ExamenController::class, 'mesExamens']);
+            Route::get('/disponibles-club', [ExamenController::class, 'examensDisponiblesClub']);
 
             Route::get('/{examen}', [ExamenController::class, 'getExamenCandidats']);
             Route::get('/{examen}/show', [ExamenController::class, 'show']);
@@ -611,10 +622,25 @@ Route::middleware(['auth:sanctum'])->group(function () {
             Route::get('/', [CandidatController::class, 'index']);
             Route::post('/', [CandidatController::class, 'store']);
             Route::post('/add/{examen}/{student}', [CandidatController::class, 'addCandidate']);
+            Route::post('/batch/{examen}', [CandidatController::class, 'storeBatch'])
+                ->middleware(['throttle:20,1', 'verified']);
             Route::get('/{id}', [CandidatController::class, 'show']);
             Route::put('/{id}', [CandidatController::class, 'update']);
             Route::delete('/remove/{examen}/{examenCandidat}', [CandidatController::class, 'destroy']);
         });
+
+        //examen-payments : inscription payante aux examens (club/ligue/fédération)
+        Route::get('/examen-payments/mes-lots', [ExamenPaymentController::class, 'mesLotsClub']);
+        Route::post('/examen-payments/{payment}/declarer', [ExamenPaymentController::class, 'declarer'])
+            ->middleware(['throttle:15,1', 'verified']);
+        Route::get('/examen-payments/a-verifier', [ExamenPaymentController::class, 'paiementsAVerifier']);
+        Route::get('/examens/{examen}/paiements', [ExamenPaymentController::class, 'parExamen']);
+        Route::patch('/examen-payments/{payment}/confirmer', [ExamenPaymentController::class, 'confirmer'])
+            ->middleware(['throttle:15,1', 'verified']);
+        Route::patch('/examen-payments/{payment}/rejeter', [ExamenPaymentController::class, 'rejeter'])
+            ->middleware(['throttle:15,1', 'verified']);
+        Route::get('/examen-payments/statistiques', [ExamenPaymentController::class, 'statistiques']);
+        Route::get('/examen-payments/statistiques-mensuelles', [ExamenPaymentController::class, 'statistiquesMensuelles']);
         Route::prefix('evaluation')->group(function () {
             Route::get('/{examen}', [EvaluationController::class, 'index']);
             Route::post('/examen/{examen}/candidat/{candidat}', [EvaluationController::class, 'store']);

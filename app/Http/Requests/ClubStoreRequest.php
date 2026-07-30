@@ -23,7 +23,6 @@ class ClubStoreRequest extends FormRequest
     {
         return [
             'country_id' => ['bail', 'required', 'exists:countries,id'],
-            'discipline_id' => ['bail', 'required', 'exists:disciplines,id'],
             'city' => ['bail', 'regex:/^[\pL\s\d\-\.,\#\/\(\)\']+$/u', 'max:50'],
             'name' => ['bail', 'required', 'regex:/^[\pL\s\d\-]+$/u', 'max:50'],
             'logo' => ['bail', 'nullable', 'image', 'mimes:jpeg,png,jpg,gif,svg', 'max:2048'],
@@ -37,8 +36,6 @@ class ClubStoreRequest extends FormRequest
         return [
             'country_id.required' => 'Le pays est requis',
             'country_id.exists' => 'Le pays n\'existe pas',
-            'discipline_id.required' => 'Le discipline est requis',
-            'discipline_id.exists' => 'Le discipline n\'existe pas',
             'name.required' => 'Le nom est requis',
             'name.max' => 'Le nom est trop long',
             'city.required' => 'La ville est requise',

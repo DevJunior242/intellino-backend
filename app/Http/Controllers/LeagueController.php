@@ -98,6 +98,7 @@ class LeagueController extends Controller
                     'is_used' => true,
                     'used_at' => now(),
                     'used_by_user_id' => $user->id,
+                    'used_by_organisation_id' => $league->id,
                 ]);
 
                 $user->current_league_id = $league->id;

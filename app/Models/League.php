@@ -24,10 +24,14 @@ class League extends Model
         'region',
         'invitation_code',
         'federation_id',
+        'status',
     ];
 
     protected $keyType = 'string';
     public $incrementing = false;
+
+    const STATUS_ACTIVE = 1;
+    const STATUS_INACTIVE = 0;
     public function users()
     {
         return $this->belongsToMany(User::class, 'league_users')

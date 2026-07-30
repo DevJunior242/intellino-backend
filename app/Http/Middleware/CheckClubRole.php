@@ -111,6 +111,14 @@ class CheckClubRole
             ], 403);
         }
 
+        // Organisation désactivée par le super admin : accès bloqué pour tous ses membres
+        if ((int) $activeOrg->status === 0) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Cette structure a été désactivée par l\'administration. Contactez le support.'
+            ], 403);
+        }
+
         // Extraire proprement le rôle via le pivot valide
         $roleId = $activeOrg->pivot->role_id;
         $userRole = Role::where('id', $roleId)->value('name');

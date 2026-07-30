@@ -9,11 +9,11 @@ use App\Models\Evenement;
 use App\Models\SessionModel;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
-use App\Http\Controllers\Concerns\ResolvesFederationSaison;
+use App\Http\Controllers\Concerns\ResolvesActiveSaison;
 
 class ProgrammeController extends Controller
 {
-    use ResolvesFederationSaison;
+    use ResolvesActiveSaison;
 
     /**
      * Programme d'activités de la saison pour une Ligue ou une Fédération :

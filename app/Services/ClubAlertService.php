@@ -3,15 +3,17 @@
 namespace App\Services;
 
 use Carbon\Carbon;
-use App\Models\Saison;
 use App\Models\Examen;
 use App\Models\Student;
 use App\Models\Attendance;
 use App\Models\ClubStudent;
 use App\Models\StudentPayment;
+use App\Http\Controllers\Concerns\ResolvesActiveSaison;
 
 class ClubAlertService
 {
+    use ResolvesActiveSaison;
+
     public function getAlerts($activeId, $activeType)
     {
         return [
@@ -48,7 +50,7 @@ class ClubAlertService
 
     private function evolutionEffectif($activeId)
     {
-        $saisonActive = Saison::where('active', true)->first();
+        $saisonActive = $this->saisonActivePour($activeId, 'Club');
 
         $query = ClubStudent::where('club_id', $activeId)
             ->when($saisonActive, fn($q) => $q->where('saison_id', $saisonActive->id));

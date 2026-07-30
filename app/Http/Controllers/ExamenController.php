@@ -3,8 +3,10 @@
 namespace App\Http\Controllers;
 
 use Carbon\Carbon;
+use App\Models\Club;
 use App\Models\User;
 use App\Models\Grade;
+use App\Models\League;
 use App\Models\Examen;
 use App\Models\Saison;
 use App\Models\Student;
@@ -24,12 +26,12 @@ use Illuminate\Database\QueryException;
 use App\Http\Requests\StoreExamenRequest;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
-use App\Http\Controllers\Concerns\ResolvesFederationSaison;
+use App\Http\Controllers\Concerns\ResolvesActiveSaison;
 
 class ExamenController extends Controller
 {
     use AuthorizesRequests;
-    use ResolvesFederationSaison;
+    use ResolvesActiveSaison;
 
     public function index(Request $request)
     {
@@ -479,6 +481,71 @@ class ExamenController extends Controller
             'success'      => true,
             'candidatures' => $candidatures,
             'resultats'    => $resultats,
+        ]);
+    }
+
+    /**
+     * Examens auxquels le club connecté peut inscrire ses élèves :
+     * ses propres examens, ceux de sa ligue, et ceux de sa fédération (via sa ligue).
+     * Miroir de StageController::stagesDeMaLigue(), mais sur les 3 niveaux.
+     */
+    public function examensDisponiblesClub(Request $request)
+    {
+        $activeId   = $request->attributes->get('organisateur_id');
+        $activeType = $request->attributes->get('organisateur_type');
+
+        if (!$activeId || $activeType !== 'Club') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Seul un club peut consulter les examens disponibles.'
+            ], 403);
+        }
+
+        $club = Club::with('league')->find($activeId);
+
+        if (!$club) {
+            return response()->json(['message' => 'Club introuvable.'], 404);
+        }
+
+        $organisateurIds = [
+            ['type' => 'Club', 'id' => $club->id],
+        ];
+
+        if ($club->league_id) {
+            $organisateurIds[] = ['type' => 'Ligue', 'id' => $club->league_id];
+
+            if ($club->league?->federation_id) {
+                $organisateurIds[] = ['type' => 'Federation', 'id' => $club->league->federation_id];
+            }
+        }
+
+        $filters = $request->validate([
+            'search' => 'nullable|string|max:255',
+        ]);
+
+        $query = Examen::query()
+            ->where('status', Examen::STATUS_SCHEDULED)
+            ->where(function ($q) use ($organisateurIds) {
+                foreach ($organisateurIds as $org) {
+                    $q->orWhere(function ($sub) use ($org) {
+                        $sub->where('organisateur_type', $org['type'])
+                            ->where('organisateur_id', $org['id']);
+                    });
+                }
+            })
+            ->with(['currentGrade:id,name', 'nextGrade:id,name']);
+
+        if (!empty($filters['search'])) {
+            $query->whereHas('nextGrade', function ($q) use ($filters) {
+                $q->where('name', 'like', '%' . $filters['search'] . '%');
+            });
+        }
+
+        $examens = $query->latest('start_date')->paginate(8);
+
+        return response()->json([
+            'success' => true,
+            'data'    => $examens,
         ]);
     }
 

@@ -14,10 +14,12 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Database\QueryException;
 use App\Http\Requests\StoreAttendanceRequest;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use App\Http\Controllers\Concerns\ResolvesActiveSaison;
 
 class AttendanceController extends Controller
 {
     use AuthorizesRequests;
+    use ResolvesActiveSaison;
 
     public function index(Request $request)
     {
@@ -106,9 +108,10 @@ class AttendanceController extends Controller
         // Récupération sécurisée des données
         // $this->authorize('create', Attendance::class);
         $activeId = $request->attributes->get('organisateur_id');
+        $activeType = $request->attributes->get('organisateur_type');
         $validatedData = $request->validated();
         $attendances = $validatedData['attendances'];
-        $saisonActive =  Saison::where('active', true)->first();
+        $saisonActive = $this->saisonActivePour($activeId, $activeType);
         if (!$saisonActive) {
             return response()->json([
                 'success' => false,
@@ -157,8 +160,17 @@ class AttendanceController extends Controller
 
     public function getStudentAttendance(Request $request)
     {
-        $saisonActive =  Saison::where('active', true)->firsts();
         $activeId = $request->attributes->get('organisateur_id');
+        $activeType = $request->attributes->get('organisateur_type');
+        $saisonActive = $this->saisonActivePour($activeId, $activeType);
+
+        if (!$saisonActive) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Aucune saison active trouvée',
+            ], 422);
+        }
+
         $attendances = Attendance::with(['session.course:id,name', 'student:id,fullname'])
             ->where('club_id', $activeId)
             ->where('saison_id', $saisonActive->id)

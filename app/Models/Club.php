@@ -30,12 +30,16 @@ class Club extends Model
         'city',
         'region',
         'address',
+        'status',
 
     ];
 
     protected $keyType = 'string';
 
     public $incrementing = false;
+
+    const STATUS_ACTIVE = 1;
+    const STATUS_INACTIVE = 0;
 
     public function subscriptions()
     {
