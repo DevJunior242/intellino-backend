@@ -544,7 +544,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::get('/students/without-grade', [StudentController::class, 'studentsWithoutGrade']);
         Route::get('/students/latest', [StudentController::class, 'latestStudent']);
         Route::get('/parents-users', [StudentController::class, 'getParent']);
-        Route::post('/parent-eleven/store-multiple ', [StudentController::class, 'store']);
+        Route::post('/parent-eleven/store-multiple', [StudentController::class, 'store']);
         Route::post('/student/parent', [StudentController::class, 'studentParent']);
         Route::post('/student/{student}', [StudentController::class, 'updateStudent']);
         Route::delete('/student/{student}', [StudentController::class, 'destroy']);
