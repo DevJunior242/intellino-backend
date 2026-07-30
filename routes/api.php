@@ -7,7 +7,7 @@ use App\Http\Controllers\PdfController;
 use App\Http\Controllers\ClubController;
 use App\Http\Controllers\JuryController;
 use App\Http\Controllers\LikeController;
-use App\Http\Controllers\NoteController;
+use App\Http\Controllers\KataNotationController;
 use App\Http\Controllers\PlanController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\UserController;
@@ -322,9 +322,10 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::delete('ordre-passages/inscription/{inscriptionId}', [OrdrePassageController::class, 'retirer']);
         Route::get('ordre-passages/{configId}', [OrdrePassageController::class, 'index']);
         //notes
-        Route::post('notes', [NoteController::class, 'store']);
-        Route::post('notes/centralise', [NoteController::class, 'storeCentralise']);
-        Route::get('inscriptions/{ordrePassage}/notes', [NoteController::class, 'notesInscription']);
+        Route::post('notes', [KataNotationController::class, 'store']);
+        Route::post('notes/centralise', [KataNotationController::class, 'storeCentralise']);
+        Route::get('inscriptions/{ordrePassage}/notes', [KataNotationController::class, 'notesInscription']);
+        Route::get('combats/{combat}/vote-kata', [KataNotationController::class, 'resultatCombatKata']);
 
 
         //niveaux competitions

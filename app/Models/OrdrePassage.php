@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Note;
+use App\Models\Combat;
 use App\Models\Inscription;
 use App\Models\ConfigNotation;
 use Illuminate\Database\Eloquent\Model;
@@ -17,6 +18,7 @@ class OrdrePassage extends Model
         'status',
         'score_final',
         'inscription_id',
+        'combat_id',
     ];
     protected $keyType = 'string';
     public $incrementing = false;
@@ -36,6 +38,11 @@ class OrdrePassage extends Model
     public function notes()
     {
         return $this->hasMany(Note::class);
+    }
+
+    public function combat()
+    {
+        return $this->belongsTo(Combat::class);
     }
 
     public function getStatusLabelAttribute()
