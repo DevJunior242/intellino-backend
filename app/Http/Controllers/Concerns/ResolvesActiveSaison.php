@@ -99,9 +99,9 @@ trait ResolvesActiveSaison
         }
 
         $niveau = $organisateur['type'] === 'Ligue' ? 'ligue' : 'fédération';
-        $rattachement = $activeType === 'Club' ? 'club' : 'ligue';
+        $rattachement = $activeType === 'Club' ? 'club est rattaché' : 'ligue est rattachée';
         $nom = $organisateur['nom'] ? " ({$organisateur['nom']})" : '';
 
-        return "{$générique} Votre {$rattachement} est rattaché(e) à une {$niveau}{$nom} : c'est à l'administrateur de cette {$niveau} de définir sa saison active avant que vous puissiez continuer.";
+        return "{$générique} Votre {$rattachement} à une {$niveau}{$nom} : c'est à l'administrateur de cette {$niveau} de définir sa saison active avant que vous puissiez continuer.";
     }
 }
