@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Rules\NoteKata;
 use App\Models\OrdrePassage;
 use Illuminate\Http\Request;
 
@@ -17,7 +18,7 @@ class KataNotationController extends Controller
     {
         $validated = $request->validate([
             'ordre_passage_id' => 'required|exists:ordre_passages,id',
-            'valeur'           => 'required|numeric|min:0|max:10',
+            'valeur'           => ['required', 'numeric', new NoteKata()],
         ]);
 
         $service = app(KataNotationService::class);
@@ -54,7 +55,7 @@ class KataNotationController extends Controller
         $validated = $request->validate([
             'inscription_id' => 'required|exists:inscriptions,id',
             'numero_juge'    => 'required|integer|min:1',
-            'valeur'         => 'required|numeric|min:0|max:10',
+            'valeur'         => ['required', 'numeric', new NoteKata()],
             'config_id'      => 'required|exists:config_notations,id',
         ]);
 
