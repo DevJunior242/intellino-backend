@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Kata;
 use App\Models\Inscription;
 use App\Models\Competition;
 use App\Models\OrdrePassage;
+use App\Models\ConfigNotation;
 use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
 
@@ -19,6 +21,7 @@ class OrdrePassageController extends Controller
                 'inscription.athlete:id,fullname',
                 'inscription.organisateur:id,name',
                 'inscription.competition.category:id,nom,sexe',
+                'kata:id,nom',
             ]
         )
             ->withCount('inscription')
@@ -116,18 +119,40 @@ class OrdrePassageController extends Controller
     // Assigner
     public function assigner(Request $request)
     {
+        $request->validate([
+            'config_notation_id' => 'required|exists:config_notations,id',
+            'inscription_id'     => 'required|exists:inscriptions,id',
+            'kata_id'            => 'nullable|exists:katas,id',
+        ]);
+
         $configId = $request->config_notation_id;
         $inscriptionId = $request->inscription_id;
+
+        // Kata WKF Art. 5.1 : seul un kata du catalogue officiel actif peut être choisi.
+        if ($request->filled('kata_id')) {
+            $config = ConfigNotation::findOrFail($configId);
+
+            if ($config->estKata() && !Kata::where('id', $request->kata_id)->where('actif', true)->exists()) {
+                return response()->json(['message' => 'Kata invalide ou inactif.'], 422);
+            }
+        }
+
         // On calcule le prochain numéro d'ordre pour ce tatami
         $dernierOrdre = OrdrePassage::where('config_notation_id', $configId)->max('ordre') ?? 0;
 
+        $donnees = [
+            'config_notation_id' => $configId,
+            'ordre' => $dernierOrdre + 1,
+            'status' => OrdrePassage::STATUS_NOT_STARTED,
+        ];
+
+        if ($request->filled('kata_id')) {
+            $donnees['kata_id'] = $request->kata_id;
+        }
+
         return OrdrePassage::updateOrCreate(
             ['inscription_id' => $inscriptionId],
-            [
-                'config_notation_id' => $configId,
-                'ordre' => $dernierOrdre + 1,
-                'status' => OrdrePassage::STATUS_NOT_STARTED,
-            ]
+            $donnees
         );
     }
 

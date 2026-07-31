@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Kata;
 use App\Models\Note;
 use App\Models\Inscription;
 use App\Models\ConfigNotation;
@@ -17,6 +18,7 @@ class OrdrePassage extends Model
         'status',
         'score_final',
         'inscription_id',
+        'kata_id',
     ];
     protected $keyType = 'string';
     public $incrementing = false;
@@ -36,6 +38,11 @@ class OrdrePassage extends Model
     public function notes()
     {
         return $this->hasMany(Note::class);
+    }
+
+    public function kata()
+    {
+        return $this->belongsTo(Kata::class);
     }
 
     public function getStatusLabelAttribute()
