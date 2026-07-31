@@ -352,7 +352,8 @@ class SeanceController extends Controller
                 'inscription.competition',
                 'inscription.competition.category:id,nom,sexe',
                 'inscription.organisateur:id,name',
-                'notes'
+                'notes',
+                'kata:id,nom',
             ])
             ->first();
     }
@@ -369,6 +370,7 @@ class SeanceController extends Controller
                 'inscription.competition',
                 'inscription.competition.category:id,nom,sexe',
                 'inscription.organisateur:id,name',
+                'kata:id,nom',
             ])
             ->first();
     }
@@ -440,7 +442,8 @@ class SeanceController extends Controller
                 'inscription.competition.category:id,nom,sexe',
                 'inscription.competition.evenement:id,nom,lieu',
                 'inscription',
-                'notes'
+                'notes',
+                'kata:id,nom',
             ])
             ->first();
 
