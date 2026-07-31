@@ -23,7 +23,11 @@ class LoginRequest extends FormRequest
     {
         return [
             'email' => ['required', 'string', 'email', 'max:255'],
-            'password' => ['required', 'string', 'min:8'],
+            // Pas de règle de longueur/complexité ici : la connexion doit
+            // laisser Auth::attempt() juger (et renvoyer "Identifiants
+            // invalides"), pas rejeter la requête avant même d'essayer. Ces
+            // règles n'ont leur place qu'à l'inscription (RegisterRequest).
+            'password' => ['required', 'string'],
             // 'captcha_token' => ['required', new \App\Rules\Turnstile],
         ];
     }
@@ -35,7 +39,6 @@ class LoginRequest extends FormRequest
             'email.email' => 'L\'email est invalide',
             'email.max' => 'L\'email est trop long',
             'password.required' => 'Le mot de passe est requis',
-            'password.min' => 'Le mot de passe doit contenir au moins 6 caractères',
         ];
     }
 }
