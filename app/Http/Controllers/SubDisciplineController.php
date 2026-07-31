@@ -91,6 +91,28 @@ class SubDisciplineController extends Controller
                     "categories.{$index}.poids_max" => "La catégorie « {$catData['nom']} » : le poids max doit être supérieur au poids min.",
                 ]);
             }
+
+            // WKF Kata Competition Rules, Art. 8.1.2 : l'âge sénior diffère
+            // selon la discipline — 18 ans pour le Kumite, 16 ans pour le Kata.
+            $estSenior = str_contains(strtolower($catData['nom']), 'senior')
+                || str_contains(strtolower($catData['nom']), 'sénior');
+
+            if ($estSenior) {
+                $estKata = collect($catData['disciplines'])
+                    ->contains(fn($nom) => str_contains(strtolower($nom), 'kata'));
+
+                if ($estKumite && $catData['age_min'] < 18) {
+                    throw ValidationException::withMessages([
+                        "categories.{$index}.age_min" => "La catégorie « {$catData['nom']} » (Sénior Kumite) : l'âge minimum doit être de 18 ans.",
+                    ]);
+                }
+
+                if ($estKata && $catData['age_min'] < 16) {
+                    throw ValidationException::withMessages([
+                        "categories.{$index}.age_min" => "La catégorie « {$catData['nom']} » (Sénior Kata) : l'âge minimum doit être de 16 ans.",
+                    ]);
+                }
+            }
         }
 
         try {
