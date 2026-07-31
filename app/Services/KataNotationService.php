@@ -18,7 +18,7 @@ class KataNotationService
      * Rotation active de l'arbitre connecté sur ce tatami, ou null s'il
      * n'est pas assigné/actif dessus.
      */
-    public function trouverRotationActive(string $configNotationId, int $userId): ?RotationArbitre
+    public function trouverRotationActive(string $configNotationId, string $userId): ?RotationArbitre
     {
         return RotationArbitre::where('config_notation_id', $configNotationId)
             ->whereHas('arbitreCompetition', fn($q) => $q->where('user_id', $userId))
