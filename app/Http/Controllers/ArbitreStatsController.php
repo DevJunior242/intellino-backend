@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Note;
+use App\Models\Combat;
 use App\Models\OrdrePassage;
 use Illuminate\Http\Request;
 use App\Models\RotationArbitre;
@@ -122,6 +123,33 @@ class ArbitreStatsController extends Controller
             ];
         }
 
+        // ── Décisions du superviseur spécifiques au duel Kata (Art. 5.11 /
+        // 3.5 WKF) ── Approximation : rattachées aux configs où cet arbitre
+        // a été superviseur à un moment donné — ni Combat ni OrdrePassage
+        // ne trace précisément qui a cliqué Hantei/disqualifié.
+        $configsSuperviseur = RotationArbitre::whereIn('arbitre_competition_id', $arbitreCompIds)
+            ->where('est_superviseur', true)
+            ->pluck('config_notation_id');
+
+        $nbHanteiTranches = Combat::whereIn('config_notation_id', $configsSuperviseur)
+            ->where('type_victoire', 'hantei')
+            ->count();
+
+        $nbDisqualificationsBunkai = OrdrePassage::whereIn('config_notation_id', $configsSuperviseur)
+            ->where('disqualifie_bunkai', true)
+            ->count();
+
+        // ── Section Kumite (à ajouter plus tard) ───────────────────────────
+        // Ce dashboard ne compte aujourd'hui que l'activité Kata (via
+        // Note/OrdrePassage) — le Kumite se score via CombatAction/Combat
+        // directement, sans passer par Note. Un arbitre qui n'a jamais jugé
+        // de Kata verra donc tout à zéro ici même s'il a beaucoup arbitré de
+        // Kumite. Prévoir un bloc `kumite` symétrique (combats arbitrés,
+        // hansoku/hantei tranchés en tant que superviseur, etc.) une fois le
+        // besoin confirmé — même schéma RotationArbitre/ArbitreCompetition,
+        // juste une source d'activité différente (CombatAction/Combat au
+        // lieu de Note/OrdrePassage).
+
         // ── Première compétition (ancienneté) ─────────────────────────────
 
         $premiereComp = ArbitreCompetition::where('user_id', $user->id)
@@ -154,6 +182,12 @@ class ArbitreStatsController extends Controller
                 'roles' => [
                     'juge'        => $nbJuge,
                     'superviseur' => $nbSuperviseur,
+                ],
+                // Décisions de superviseur propres au duel Kata — vide/zéro
+                // pour un arbitre qui n'a fait que du Kumite jusqu'ici.
+                'kata_duel' => [
+                    'hantei_tranches'          => $nbHanteiTranches,
+                    'disqualifications_bunkai' => $nbDisqualificationsBunkai,
                 ],
                 'par_annee'         => $parAnnee,
                 'derniere_comp'     => $derniereComp,

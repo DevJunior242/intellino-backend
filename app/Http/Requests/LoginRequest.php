@@ -23,10 +23,6 @@ class LoginRequest extends FormRequest
     {
         return [
             'email' => ['required', 'string', 'email', 'max:255'],
-            // Pas de règle de longueur/complexité ici : la connexion doit
-            // laisser Auth::attempt() juger (et renvoyer "Identifiants
-            // invalides"), pas rejeter la requête avant même d'essayer. Ces
-            // règles n'ont leur place qu'à l'inscription (RegisterRequest).
             'password' => ['required', 'string'],
             // 'captcha_token' => ['required', new \App\Rules\Turnstile],
         ];
