@@ -26,6 +26,9 @@ class OrdrePassage extends Model
     const STATUS_NOT_STARTED = 0;
     const STATUS_STARTED = 1;
     const STATUS_FINISHED = 2;
+    // Athlète absent à l'appel ou qui abandonne : disqualifié de la
+    // catégorie (WKF Kata Competition Rules, Art. 6.4).
+    const STATUS_KIKEN = 3;
 
     public function inscription()
     {
@@ -51,6 +54,7 @@ class OrdrePassage extends Model
             self::STATUS_NOT_STARTED => 'En attente',
             self::STATUS_STARTED => 'En cours',
             self::STATUS_FINISHED => 'Terminé',
+            self::STATUS_KIKEN => 'Absent (Kiken)',
             default => 'Inconnu',
         };
     }

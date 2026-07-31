@@ -221,6 +221,43 @@ class SeanceController extends Controller
         ]);
     }
 
+    // Athlète absent à l'appel ou qui abandonne : disqualifié (KIKEN) de la
+    // catégorie, sans affecter sa participation à une autre catégorie
+    // (WKF Kata Competition Rules, Art. 6.4). N'importe quelles notes déjà
+    // saisies pour ce passage restent en base mais sont ignorées (pas de score).
+    public function declarerKiken(ConfigNotation $config)
+    {
+        $passageActuel = OrdrePassage::where('config_notation_id', $config->id)
+            ->where('status', OrdrePassage::STATUS_STARTED)
+            ->first();
+
+        if (!$passageActuel) {
+            return response()->json(['message' => "Aucun athlète en cours sur ce tatami."], 422);
+        }
+
+        $passageActuel->update([
+            'status'      => OrdrePassage::STATUS_KIKEN,
+            'score_final' => null,
+        ]);
+
+        $suivant = OrdrePassage::where('config_notation_id', $config->id)
+            ->where('status', OrdrePassage::STATUS_NOT_STARTED)
+            ->orderBy('ordre')
+            ->first();
+
+        if ($suivant) {
+            $suivant->update(['status' => OrdrePassage::STATUS_STARTED]);
+        }
+
+        broadcast(new TatamiUpdated($config->id));
+
+        return response()->json([
+            'success' => true,
+            'suivant' => $suivant,
+            'etat'    => $this->rotationService->etat($config),
+        ]);
+    }
+
 
     // État actuel pour l'affichage admin / tablettes
     public function etat(ConfigNotation $config)

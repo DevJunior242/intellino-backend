@@ -289,6 +289,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
             Route::post('configs/{config}/valider',          [SeanceController::class, 'valider']);
             Route::post('configs/{config}/lancer',            [SeanceController::class, 'lancerSeance']);
             Route::post('configs/{config}/athlete-suivant',  [SeanceController::class, 'athleteSuivant']);
+            Route::post('configs/{config}/kiken',             [SeanceController::class, 'declarerKiken']);
             Route::get('configs/{config}/etat',              [SeanceController::class, 'etat']);
             Route::get('configs/{config}/pret', [SeanceController::class, 'estPret']);
             Route::get('competition/{config}/en-cours', [SeanceController::class, 'enCours']);
