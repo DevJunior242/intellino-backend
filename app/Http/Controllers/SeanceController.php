@@ -19,6 +19,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Cache;
+use App\Services\KataNotationService;
 use App\Services\RotationArbitreService;
 use Illuminate\Support\Facades\Notification;
 use App\Notifications\SendArbitreAccessCodesNotif;
@@ -26,7 +27,8 @@ use App\Notifications\SendArbitreAccessCodesNotif;
 class SeanceController extends Controller
 {
     public function __construct(
-        private RotationArbitreService $rotationService
+        private RotationArbitreService $rotationService,
+        private KataNotationService $kataNotationService
     ) {}
 
     // Appelé quand admin valide la config
@@ -195,7 +197,7 @@ class SeanceController extends Controller
         if ($passageActuel) {
             $valeursNotes = $passageActuel->notes->pluck('valeur')->map(fn($v) => (float)$v)->toArray();
 
-            $scoreFinal = $this->calculerScore($valeursNotes, $config->getNbJuges());
+            $scoreFinal = $this->kataNotationService->calculerScore($valeursNotes, $config->getNbJuges());
             $passageActuel->update(['status' => OrdrePassage::STATUS_FINISHED, 'score_final' => $scoreFinal]);
         }
         // Faire tourner les arbitres
@@ -427,11 +429,12 @@ class SeanceController extends Controller
 
             if ($notesData->count() === $config->getNbJuges()) {
                 $valeurs  = $notesData->pluck('valeur')->toArray();
-                $score    = $this->calculerScore($valeurs, $config->getNbJuges());
+                $score    = $this->kataNotationService->calculerScore($valeurs, $config->getNbJuges());
             }
         }
 
-        // Classement provisoire
+        // Classement provisoire (Art. 5.11 — à score retenu égal, départage
+        // sur la somme brute des notes puis la note individuelle la plus haute)
         $classement = OrdrePassage::where('config_notation_id', $config->id)
             ->where('status', OrdrePassage::STATUS_FINISHED)
             ->with([
@@ -447,14 +450,21 @@ class SeanceController extends Controller
                     ->toArray();
 
                 return [
-                    'athlete' => $passage->inscription?->athlete?->fullname ?? '—',
-                    'organisateur'    => $passage->inscription?->organisateur?->name ?? '—',
-                    'score'   => $this->calculerScore($valeurs, $config->getNbJuges()),
+                    'athlete'      => $passage->inscription?->athlete?->fullname ?? '—',
+                    'organisateur' => $passage->inscription?->organisateur?->name ?? '—',
+                    'score'        => $this->kataNotationService->calculerScore($valeurs, $config->getNbJuges()),
+                    'valeurs'      => $valeurs,
                 ];
             })
             ->filter(fn($item) => $item['score'] !== null)
-            ->sortByDesc('score')
-            ->values();
+            ->sort(function ($a, $b) {
+                if ($a['score'] !== $b['score']) {
+                    return $b['score'] <=> $a['score'];
+                }
+                return $this->kataNotationService->departagerEgalite($a['valeurs'], $b['valeurs']);
+            })
+            ->values()
+            ->map(fn($item) => collect($item)->except('valeurs')->all());
 
 
         return response()->json([
@@ -469,21 +479,5 @@ class SeanceController extends Controller
             'score'      => $score ?? null,
             'classement' => $classement,
         ]);
-    }
-
-
-    private function calculerScore(array $valeurs, int $nbJugesAttendus): ?float
-    {
-        // On ne calcule que si TOUS les juges ont noté
-        if (count($valeurs) < $nbJugesAttendus) return null;
-
-        sort($valeurs);
-
-
-        $nbAEnlever = ($nbJugesAttendus === 7) ? 2 : 1;
-
-        $retenues = array_slice($valeurs, $nbAEnlever, count($valeurs) - ($nbAEnlever * 2));
-
-        return (float) array_sum($retenues);
     }
 }

@@ -127,4 +127,30 @@ class KataNotationService
 
         return (float) array_sum($retenues);
     }
+
+    /**
+     * Départage entre deux athlètes à score retenu égal. WKF Art. 5.11 prévoit
+     * (pour un système à duels) : points de victoire → confrontation directe →
+     * somme des votes → classement mondial → kata supplémentaire. Rien de tout
+     * ça ne s'applique à une notation séquentielle sans duel ni classement
+     * mondial : on compare donc la somme de TOUTES les notes (y compris les
+     * extrêmes écartées du score retenu), puis la note individuelle la plus
+     * haute reçue. Une égalité persistante au-delà signifie qu'un kata
+     * supplémentaire est nécessaire (Art. 5.11.5) — l'app ne peut pas trancher
+     * seule dans ce cas et renvoie 0 (égalité).
+     */
+    public function departagerEgalite(array $valeursA, array $valeursB): int
+    {
+        $sommeA = array_sum($valeursA);
+        $sommeB = array_sum($valeursB);
+
+        if ($sommeA !== $sommeB) {
+            return $sommeB <=> $sommeA;
+        }
+
+        $maxA = empty($valeursA) ? 0 : max($valeursA);
+        $maxB = empty($valeursB) ? 0 : max($valeursB);
+
+        return $maxB <=> $maxA;
+    }
 }
