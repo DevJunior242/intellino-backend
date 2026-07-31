@@ -28,7 +28,7 @@ class Inscription extends Model
     protected $fillable = [
         'competition_id',
         'athlete_id',
-        'kata',
+        'kata_id',
         'poids_declare',
         'poids_officiel',
         'status',
@@ -107,5 +107,10 @@ class Inscription extends Model
     public function estEquipe(): bool
     {
         return $this->kataTeam()->exists();
+    }
+
+    public function kata()
+    {
+        return $this->belongsTo(Kata::class, 'kata_id');
     }
 }

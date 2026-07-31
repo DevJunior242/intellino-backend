@@ -129,11 +129,17 @@ class OrdrePassageController extends Controller
         $configId = $request->config_notation_id;
         $inscriptionId = $request->inscription_id;
 
+        // Le kata choisi à l'inscription (Inscription::kata_id) sert de
+        // valeur par défaut ici — l'admin peut la remplacer explicitement
+        // au moment d'assigner le tatami.
+        $kataId = $request->input('kata_id')
+            ?: Inscription::find($inscriptionId)?->kata_id;
+
         // Kata WKF Art. 5.1 : seul un kata du catalogue officiel actif peut être choisi.
-        if ($request->filled('kata_id')) {
+        if ($kataId) {
             $config = ConfigNotation::findOrFail($configId);
 
-            if ($config->estKata() && !Kata::where('id', $request->kata_id)->where('actif', true)->exists()) {
+            if ($config->estKata() && !Kata::where('id', $kataId)->where('actif', true)->exists()) {
                 return response()->json(['message' => 'Kata invalide ou inactif.'], 422);
             }
         }
@@ -147,8 +153,8 @@ class OrdrePassageController extends Controller
             'status' => OrdrePassage::STATUS_NOT_STARTED,
         ];
 
-        if ($request->filled('kata_id')) {
-            $donnees['kata_id'] = $request->kata_id;
+        if ($kataId) {
+            $donnees['kata_id'] = $kataId;
         }
 
         return OrdrePassage::updateOrCreate(

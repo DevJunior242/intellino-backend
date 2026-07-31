@@ -30,7 +30,8 @@ class InscriptionController extends Controller
                 'athlete:id,fullname,sex',
                 'organisateur',
                 'competition.category:id,nom,sexe,poids_min,poids_max',
-                'competition.subDiscipline:id,nom'
+                'competition.subDiscipline:id,nom',
+                'kata:id,nom'
             ])
             ->orderBy('organisateur_id')
             ->get();
@@ -86,7 +87,7 @@ class InscriptionController extends Controller
         $inscriptions = Inscription::where('competition_id', $competition->id)
             ->where('organisateur_id', $activeId)
             ->where('organisateur_type', $activeType)
-            ->with(['athlete'])
+            ->with(['athlete', 'kata:id,nom'])
             ->get();
 
         return response()->json([
@@ -181,13 +182,13 @@ class InscriptionController extends Controller
                     'organisateur_type' => $activeType,
                     'athlete_id'        => $i['athlete_id'],
                     'poids_declare'     => $i['poids_declare'] ?? null,
-                    'kata'              => $i['kata'] ?? null,
+                    'kata_id'           => $i['kata_id'] ?? null,
                     'ordre_passage'     => ++$ordre,
                 ]);
                 $ids[] = $inscription->id;
             }
 
-            return Inscription::whereIn('id', $ids)->with('athlete')->get();
+            return Inscription::whereIn('id', $ids)->with(['athlete', 'kata:id,nom'])->get();
         });
 
         $nbIgnores = count($dejaInscrits);

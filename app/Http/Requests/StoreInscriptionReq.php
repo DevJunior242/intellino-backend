@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use Illuminate\Validation\Rule;
 use Illuminate\Foundation\Http\FormRequest;
 
 class StoreInscriptionReq extends FormRequest
@@ -26,7 +27,10 @@ class StoreInscriptionReq extends FormRequest
             'inscriptions'                  => 'required|array|min:1',
             'inscriptions.*.athlete_id'      => 'required|distinct|exists:students,id',
             'inscriptions.*.poids_declare'   => 'nullable|numeric|min:0',
-            'inscriptions.*.kata'            => 'nullable|string|max:255',
+            'inscriptions.*.kata_id'         => [
+                'nullable',
+                Rule::exists('katas', 'id')->where('actif', true),
+            ],
         ];
     }
 
@@ -42,7 +46,7 @@ class StoreInscriptionReq extends FormRequest
             'inscriptions.*.athlete_id.distinct' => 'Un athlète ne peut être sélectionné qu\'une fois.',
             'inscriptions.*.poids_declare.numeric' => 'Le champ poids_declare doit être un nombre.',
             'inscriptions.*.poids_declare.min' => 'Le champ poids_declare doit être supérieur à 0.',
-            'inscriptions.*.kata.max' => 'Le champ kata doit être de 255 caractères maximum.',
+            'inscriptions.*.kata_id.exists' => 'Le kata sélectionné est invalide.',
         ];
     }
 

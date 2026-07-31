@@ -9,7 +9,7 @@ class KataController extends Model
 {
     public function index()
     {
-        $katas = Kata::select('id', 'nom', 'niveau')->get();
+        $katas = Kata::select('id', 'nom', 'niveau')->where('actif', true)->orderBy('nom')->get();
         return response()->json($katas);
     }
 }
