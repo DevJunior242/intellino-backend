@@ -77,6 +77,13 @@ class SeanceController extends Controller
             if (($config->estKumite() || $config->estKata()) && !$config->kumite_format_id) {
                 $formats = \App\Models\KumiteFormat::all()
                     ->filter(fn($f) => $nbCombattants >= ($minimumsFormat[$f->code] ?? 2))
+                    // Le Kata WKF ne connaît que 2 formats (Art. 3.3.1 a/b) :
+                    // élimination directe, ou poules puis élimination. Un
+                    // format "poules" seul (classement sans duel final) n'a
+                    // pas d'existence en Kata — un vainqueur s'y décide
+                    // toujours par un dernier duel, jamais par le classement
+                    // de poule brut.
+                    ->when($config->estKata(), fn($c) => $c->filter(fn($f) => $f->code !== 'poules'))
                     ->values();
 
                 return response()->json([
