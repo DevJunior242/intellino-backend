@@ -97,6 +97,12 @@ class ConfigNotation extends Model
         $subdiscipline = $this->competition?->subdiscipline?->nom ?? '';
         return trim(strtolower($subdiscipline)) === 'kata';
     }
+
+    // Kata par équipe (Art. 3.5 WKF) : 3-4 athlètes, Bunkai en finale.
+    public function estKataEquipe(): bool
+    {
+        return $this->estKata() && (bool) ($this->competition?->est_equipe ?? false);
+    }
     // Niveau 1 — config complète (admin peut valider)
     public function estPrete(): array
     {

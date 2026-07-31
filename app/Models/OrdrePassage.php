@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Models\Kata;
 use App\Models\Note;
+use App\Models\Combat;
 use App\Models\Inscription;
 use App\Models\ConfigNotation;
 use Illuminate\Database\Eloquent\Model;
@@ -19,6 +20,12 @@ class OrdrePassage extends Model
         'score_final',
         'inscription_id',
         'kata_id',
+        'combat_id',
+        'phase',
+        'disqualifie_bunkai',
+    ];
+    protected $casts = [
+        'disqualifie_bunkai' => 'boolean',
     ];
     protected $keyType = 'string';
     public $incrementing = false;
@@ -46,6 +53,11 @@ class OrdrePassage extends Model
     public function kata()
     {
         return $this->belongsTo(Kata::class);
+    }
+
+    public function combat()
+    {
+        return $this->belongsTo(Combat::class);
     }
 
     public function getStatusLabelAttribute()

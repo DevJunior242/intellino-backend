@@ -3,8 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Rules\NoteKata;
+use App\Models\Combat;
 use App\Models\OrdrePassage;
 use Illuminate\Http\Request;
+use App\Events\TatamiUpdated;
 
 use App\Models\ConfigNotation;
 use App\Models\RotationArbitre;
@@ -13,6 +15,15 @@ use App\Http\Controllers\Controller;
 
 class KataNotationController extends Controller
 {
+    private function estSuperviseur(string $configId): bool
+    {
+        return RotationArbitre::where('config_notation_id', $configId)
+            ->whereHas('arbitreCompetition', fn ($q) => $q->where('user_id', auth()->id()))
+            ->where('est_superviseur', true)
+            ->where('actif', true)
+            ->exists();
+    }
+
 
     public function store(Request $request)
     {
@@ -109,5 +120,73 @@ class KataNotationController extends Controller
             'termine' => $resultat['termine'],
             'message' => $resultat['message'],
         ]);
+    }
+
+    // Tranche manuelle d'une égalité de votes (Combat::STATUS_HANTEI) — superviseur uniquement
+    public function forcerHantei(Request $request, ConfigNotation $config)
+    {
+        $validated = $request->validate([
+            'combat_id'      => 'required|exists:combats,id',
+            'vainqueur_cote' => 'required|in:aka,ao',
+        ]);
+
+        if (!$this->estSuperviseur($config->id)) {
+            return response()->json(['message' => 'Seul le superviseur peut trancher un Hantei'], 403);
+        }
+
+        $combat = Combat::where('id', $validated['combat_id'])
+            ->where('config_notation_id', $config->id)
+            ->firstOrFail();
+
+        if ($combat->status !== Combat::STATUS_HANTEI) {
+            return response()->json(['message' => 'Ce combat n\'est pas en attente d\'un Hantei'], 422);
+        }
+
+        $combat = app(KataNotationService::class)->forcerHantei($combat, $validated['vainqueur_cote']);
+
+        broadcast(new TatamiUpdated($config->id));
+
+        return response()->json(['success' => true, 'combat' => $combat]);
+    }
+
+    // Disqualification pour faute pendant le Bunkai (Kata par équipe) — superviseur uniquement
+    public function declarerDisqualificationBunkai(ConfigNotation $config)
+    {
+        $passage = OrdrePassage::where('config_notation_id', $config->id)
+            ->where('status', OrdrePassage::STATUS_STARTED)
+            ->first();
+
+        if (!$passage) {
+            return response()->json(['message' => 'Aucun athlète en cours sur ce tatami'], 422);
+        }
+
+        if ($passage->phase !== 'bunkai') {
+            return response()->json(['message' => 'Cette disqualification ne s\'applique qu\'à la phase Bunkai'], 422);
+        }
+
+        if (!$this->estSuperviseur($config->id)) {
+            return response()->json(['message' => 'Seul le superviseur peut disqualifier pour faute au Bunkai'], 403);
+        }
+
+        $passage->update([
+            'status'             => OrdrePassage::STATUS_KIKEN,
+            'disqualifie_bunkai' => true,
+            'score_final'        => null,
+        ]);
+
+        app(KataNotationService::class)->resoudreDuelSiComplet($passage);
+
+        $suivant = OrdrePassage::where('config_notation_id', $config->id)
+            ->where('status', OrdrePassage::STATUS_NOT_STARTED)
+            ->orderBy('ordre')
+            ->first();
+
+        if ($suivant) {
+            $suivant->update(['status' => OrdrePassage::STATUS_STARTED]);
+        }
+
+        broadcast(new TatamiUpdated($config->id));
+
+        return response()->json(['success' => true, 'suivant' => $suivant]);
     }
 }

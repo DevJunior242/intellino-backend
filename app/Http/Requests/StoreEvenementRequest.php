@@ -34,6 +34,7 @@ class StoreEvenementRequest extends FormRequest
             'epreuves.*.category_id' => 'required|uuid|exists:categories,id',
             'epreuves.*.sub_discipline_id' => 'required|uuid|exists:sub_disciplines,id',
             'epreuves.*.niveau_id' => 'required|uuid|exists:niveaux_competitions,id',
+            'epreuves.*.est_equipe' => 'nullable|boolean',
             'epreuves.*.heure_debut_prevu' => [
                 'required',
                 'date',

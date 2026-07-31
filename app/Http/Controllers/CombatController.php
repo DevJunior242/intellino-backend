@@ -27,9 +27,11 @@ class CombatController extends Controller
                 'inscriptionAka.athlete',
                 'inscriptionAka.organisateur:id,name',
                 'inscriptionAka.competition.category',
+                'inscriptionAka.kataTeam:id,inscription_id,nom',
                 'inscriptionAo.athlete',
                 'inscriptionAo.organisateur:id,name',
                 'inscriptionAo.competition.category',
+                'inscriptionAo.kataTeam:id,inscription_id,nom',
                 'configNotation',
                 'actions',
             ])
@@ -46,7 +48,9 @@ class CombatController extends Controller
             ->where('status', 0) // en attente
             ->with([
                 'inscriptionAka.athlete',
+                'inscriptionAka.kataTeam:id,inscription_id,nom',
                 'inscriptionAo.athlete',
+                'inscriptionAo.kataTeam:id,inscription_id,nom',
             ])
             ->orderBy('ordre')
             ->first();
@@ -277,7 +281,9 @@ class CombatController extends Controller
         $combats = Combat::where('config_notation_id', $config->id)
             ->with([
                 'inscriptionAka.athlete',
+                'inscriptionAka.kataTeam:id,inscription_id,nom',
                 'inscriptionAo.athlete',
+                'inscriptionAo.kataTeam:id,inscription_id,nom',
             ])
             ->orderBy('ordre')
             ->get()

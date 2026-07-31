@@ -6,6 +6,7 @@ use App\Models\Poule;
 use App\Models\Competition;
 use App\Models\Inscription;
 use App\Models\CombatAction;
+use App\Models\OrdrePassage;
 use App\Models\ConfigNotation;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -35,6 +36,11 @@ class Combat extends Model
         'type_victoire',
         'type',
         'valeur',
+        'score_kata_aka',
+        'score_kata_ao',
+        'votes_aka',
+        'votes_ao',
+        'debut_prestation_at',
     ];
     //constantes de statut
     const STATUS_EN_ATTENTE = 0;
@@ -63,6 +69,25 @@ class Combat extends Model
     public function actions()
     {
         return $this->hasMany(CombatAction::class);
+    }
+
+    // Kata : les passages (Aka/Ao) notés par les juges pour ce combat — un
+    // par camp normalement, deux (Kata puis Bunkai) pour une finale d'équipe.
+    public function ordrePassages()
+    {
+        return $this->hasMany(OrdrePassage::class, 'combat_id');
+    }
+
+    public function ordrePassageAka()
+    {
+        return $this->hasMany(OrdrePassage::class, 'combat_id')
+            ->where('inscription_id', $this->inscription_aka_id);
+    }
+
+    public function ordrePassageAo()
+    {
+        return $this->hasMany(OrdrePassage::class, 'combat_id')
+            ->where('inscription_id', $this->inscription_ao_id);
     }
 
     public function nextCombat()

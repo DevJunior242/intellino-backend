@@ -391,35 +391,22 @@ class BracketService
         return $poules;
     }
 
+    /**
+     * Nombre de groupes selon l'effectif — table officielle WKF (Art. 3.7.9).
+     * Au-delà de 32 (non prévu par la table), on garde ~4 combattants/poule.
+     */
     private function calculerNbPoules(int $nb): int
     {
-        // Cas < 6 : 1 poule max
-        if ($nb <= 5) return 1;
-
-        // Test des puissances de 2 : 8, 16, 32 qualifiés
-        $puissances2 = [32, 16, 8, 4];
-
-        foreach ($puissances2 as $qualifies) {
-            $nbPoules = $qualifies / 2; // 2 qualifiés/poule
-
-            // Peut-on répartir $nb athlètes en $nbPoules poules de 3 ou 4 ?
-            $min = $nbPoules * 3;
-            $max = $nbPoules * 4;
-
-            if ($nb >= $min && $nb <= $max) {
-                return $nbPoules; // Zéro bye possible 
-            }
-        }
-
-        // Si aucune puissance de 2 ne marche -> on prend le plus proche
-        // Et on minimise les bye entre 3 et 4 par poule
-        $poules4 = (int) ceil($nb / 4);
-        $poules3 = (int) ceil($nb / 3);
-
-        $bye4 = $this->calculerBye($poules4 * 2);
-        $bye3 = $this->calculerBye($poules3 * 2);
-
-        return $bye4 <= $bye3 ? $poules4 : $poules3;
+        return match (true) {
+            $nb <= 5  => 1,
+            $nb <= 8  => 2,
+            $nb <= 11 => 3,
+            $nb <= 16 => 4,
+            $nb <= 17 => 5,
+            $nb <= 23 => 6,
+            $nb <= 32 => 8,
+            default   => (int) ceil($nb / 4),
+        };
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -432,64 +419,91 @@ class BracketService
     }
 
     /**
+     * Règle de qualification officielle WKF (Art. 3.7.9) selon le nombre de
+     * groupes : qui qualifie d'office (1er, +2e), et combien de places
+     * supplémentaires ("meilleurs suivants" toutes poules confondues) sont
+     * à pourvoir, prises au rang indiqué (rang_candidat, 1-indexé).
+     */
+    private const REGLES_QUALIFICATION = [
+        8 => ['second_auto' => false, 'extra' => 0, 'rang_candidat' => 2], // 24-32 : seuls les 1ers qualifient
+        6 => ['second_auto' => false, 'extra' => 2, 'rang_candidat' => 2], // 18-23 : 1er + 2 meilleurs 2e
+        5 => ['second_auto' => false, 'extra' => 3, 'rang_candidat' => 2], // 17    : 1er + 3 meilleurs 2e
+        4 => ['second_auto' => true,  'extra' => 0, 'rang_candidat' => 3], // 12-16 : 1er + 2e
+        3 => ['second_auto' => true,  'extra' => 2, 'rang_candidat' => 3], // 9-11  : 1er + 2e + 2 meilleurs 3e
+        2 => ['second_auto' => true,  'extra' => 0, 'rang_candidat' => 3], // 6-8   : 1er + 2e, direct demi-finale
+        1 => ['second_auto' => true,  'extra' => 0, 'rang_candidat' => 3], // 3-5   : 1er + 2e en finale directe
+    ];
+
+    /**
      * Appelé quand toutes les poules sont terminées
      * Génère le bracket éliminatoire avec les qualifiés
      */
     public function lancerPhaseEliminatoire(ConfigNotation $config): void
     {
         $poules = Poule::where('config_notation_id', $config->id)->get();
+        $nbPoules = $poules->count();
+        $regle = self::REGLES_QUALIFICATION[$nbPoules] ?? ['second_auto' => true, 'extra' => 0, 'rang_candidat' => 3];
+
+        $classements = $poules->map(fn ($poule) => \DB::table('poule_inscriptions')
+            ->where('poule_id', $poule->id)
+            ->orderByDesc('points_victoire')
+            ->orderByDesc('total_points_marques')
+            ->orderBy('total_points_encaisses')
+            ->get());
 
         $qualifies = [];
-        $thirdCandidates = [];
+        $candidats = [];
+        $rangIndexCandidat = $regle['rang_candidat'] - 1; // 1-indexé -> index tableau
 
-        // Récupère 1er et 2ème de chaque poule, et garde les 3èmes en candidat
-        foreach ($poules as $poule) {
-            // Récupération ordonnée avec les critères de classement
-            $rows = \DB::table('poule_inscriptions')
-                ->where('poule_id', $poule->id)
-                ->orderByDesc('points_victoire')
-                ->orderByDesc('total_points_marques')
-                ->orderBy('total_points_encaisses')
-                ->get();
-
+        foreach ($classements as $rows) {
             if (isset($rows[0])) $qualifies[] = ['inscription_id' => $rows[0]->inscription_id, 'role' => 'premier'];
-            if (isset($rows[1])) $qualifies[] = ['inscription_id' => $rows[1]->inscription_id, 'role' => 'second'];
 
-            // Garder le 3ème si présent pour sélection possible
-            if (isset($rows[2])) {
-                $thirdCandidates[] = [
-                    'inscription_id' => $rows[2]->inscription_id,
-                    'points_victoire' => $rows[2]->points_victoire,
-                    'total_points_marques' => $rows[2]->total_points_marques,
-                    'total_points_encaisses' => $rows[2]->total_points_encaisses,
-                ];
+            if ($regle['second_auto']) {
+                if (isset($rows[1])) $qualifies[] = ['inscription_id' => $rows[1]->inscription_id, 'role' => 'second'];
+            } elseif (isset($rows[1])) {
+                // Les 2e ne qualifient pas d'office ici : candidats aux places
+                // supplémentaires (ex. "2 meilleurs 2e" pour 6 groupes).
+                $candidats[] = $rows[1];
+            }
+
+            if ($regle['extra'] > 0 && isset($rows[$rangIndexCandidat])) {
+                $candidats[] = $rows[$rangIndexCandidat];
             }
         }
 
-        // Déterminer la taille cible du bracket (puissance de 2)
-        $baseQualifies = count($qualifies);
-        $tailleCible = $this->prochainesPuissanceDeDeux($baseQualifies);
-        $additionalNeeded = $tailleCible - $baseQualifies;
-
-        // Si besoin, sélectionner les meilleurs 3èmes selon les critères
-        if ($additionalNeeded > 0 && count($thirdCandidates) > 0) {
-            usort($thirdCandidates, function ($a, $b) {
-                if ($a['points_victoire'] !== $b['points_victoire']) return $b['points_victoire'] <=> $a['points_victoire'];
-                if ($a['total_points_marques'] !== $b['total_points_marques']) return $b['total_points_marques'] <=> $a['total_points_marques'];
-                return $a['total_points_encaisses'] <=> $b['total_points_encaisses'];
+        if ($regle['extra'] > 0 && count($candidats) > 0) {
+            usort($candidats, function ($a, $b) {
+                if ($a->points_victoire !== $b->points_victoire) return $b->points_victoire <=> $a->points_victoire;
+                if ($a->total_points_marques !== $b->total_points_marques) return $b->total_points_marques <=> $a->total_points_marques;
+                return $a->total_points_encaisses <=> $b->total_points_encaisses;
             });
 
-            $selectedThirds = array_slice($thirdCandidates, 0, $additionalNeeded);
-            foreach ($selectedThirds as $t) {
-                $qualifies[] = ['inscription_id' => $t['inscription_id'], 'role' => 'troisieme'];
+            foreach (array_slice($candidats, 0, $regle['extra']) as $c) {
+                $qualifies[] = ['inscription_id' => $c->inscription_id, 'role' => 'repechage_poule'];
             }
-
-            // Recompute cible si on a toujours un nombre non puissance de deux
-            $baseQualifies = count($qualifies);
-            $tailleCible = $this->prochainesPuissanceDeDeux($baseQualifies);
         }
 
-        $qualifiesTriés = $this->seederBracket($qualifies, $poules->count());
+        // 1 seule poule (3-5 athlètes) : pas de tableau à proprement parler —
+        // juste une Finale 1er/2e (couverte par le flux générique ci-dessous)
+        // et un unique combat Bronze isolé 3e/4e si un 4e athlète existe.
+        if ($nbPoules === 1) {
+            $rows = $classements->first();
+            if (isset($rows[2], $rows[3])) {
+                Combat::create([
+                    'id'                 => Str::uuid(),
+                    'config_notation_id' => $config->id,
+                    'inscription_aka_id' => $rows[2]->inscription_id,
+                    'inscription_ao_id'  => $rows[3]->inscription_id,
+                    'etape'              => 'Bronze_poule',
+                    'status'             => 0,
+                    'ordre'              => 1000,
+                    'score_final_aka'    => 0,
+                    'score_final_ao'     => 0,
+                ]);
+            }
+        }
+
+        $qualifiesTriés = $this->seederBracket($qualifies);
         $taille = $this->prochainesPuissanceDeDeux(count($qualifies));
         $byes   = $taille - count($qualifiesTriés);
 
@@ -531,29 +545,25 @@ class BracketService
     }
     // ─────────────────────────────────────────────────────────────────────────
 
-    private function seederBracket(array $qualifies, int $nbPoules): array
+    /**
+     * Place les 1ers de poule (têtes de série protégées) d'un côté du
+     * tableau et tout le reste (2e qualifiés d'office, ou repêchés via les
+     * meilleurs suivants) de l'autre, pour éviter qu'un 1er de poule
+     * n'affronte un autre 1er avant la finale. Basé sur le rôle plutôt que
+     * la position dans le tableau — reste correct même quand le nombre de
+     * qualifiés par poule varie (repêchage des meilleurs 2e/3e).
+     */
+    private function seederBracket(array $qualifies): array
     {
-        // Séparer 1ers et 2èmes de chaque poule
-        $premiers = [];
-        $seconds  = [];
+        $premiers = array_values(array_filter($qualifies, fn ($q) => $q['role'] === 'premier'));
+        $autres   = array_values(array_filter($qualifies, fn ($q) => $q['role'] !== 'premier'));
 
-        for ($i = 0; $i < $nbPoules; $i++) {
-            if (isset($qualifies[$i * 2])) {
-                $premiers[] = $qualifies[$i * 2];     // 1er de chaque poule
-            }
-            if (isset($qualifies[$i * 2 + 1])) {
-                $seconds[] = $qualifies[$i * 2 + 1];  // 2ème de chaque poule
-            }
-        }
-
-        // Placement WKF : 1ers d'un côté, 2èmes de l'autre
-        // Pour éviter que 1er poule A affronte 1er poule B avant la finale
         $seeded = [];
-        $nb = max(count($premiers), count($seconds));
+        $nb = max(count($premiers), count($autres));
 
         for ($i = 0; $i < $nb; $i++) {
             if (isset($premiers[$i])) $seeded[] = $premiers[$i];
-            if (isset($seconds[$nb - 1 - $i])) $seeded[] = $seconds[$nb - 1 - $i];
+            if (isset($autres[$nb - 1 - $i])) $seeded[] = $autres[$nb - 1 - $i];
         }
 
         return $seeded;
@@ -583,10 +593,16 @@ class BracketService
         $combatSuivant = Combat::find($combat->next_combat_id);
         if (!$combatSuivant) return;
 
-        // Placer le vainqueur à la bonne position
-        if ($combatSuivant->source_aka_combat_id === $combat->id) {
+        // Comparaison en string : un combat tout juste créé via
+        // Combat::create(['id' => Str::uuid(), ...]) porte un id encore typé
+        // Ramsey\Uuid (objet) tant qu'il n'a pas été rechargé depuis la BDD,
+        // alors que source_aka_combat_id/source_ao_combat_id (relus depuis la
+        // BDD) sont de simples chaînes — une comparaison stricte échouait donc
+        // toujours pour un bye (propagé depuis l'instance en mémoire), tout en
+        // fonctionnant par accident pour les combats rechargés via Combat::find().
+        if ((string) $combatSuivant->source_aka_combat_id === (string) $combat->id) {
             $combatSuivant->update(['inscription_aka_id' => $vainqueurId]);
-        } elseif ($combatSuivant->source_ao_combat_id === $combat->id) {
+        } elseif ((string) $combatSuivant->source_ao_combat_id === (string) $combat->id) {
             $combatSuivant->update(['inscription_ao_id' => $vainqueurId]);
         }
 
@@ -676,7 +692,7 @@ class BracketService
         $ordre = Combat::where('config_notation_id', $config->id)
             ->max('ordre') + 100;
 
-        $rounds = log($taille, 2);
+        $rounds = (int) log($taille, 2);
 
         for ($round = 1; $round <= $rounds; $round++) {
             $nbCombats   = $taille / pow(2, $round);
@@ -807,12 +823,6 @@ class BracketService
         }
 
         return $tailles; // Ex: 15 -> [4,4,4,3] | 14 -> [4,4,3,3]
-    }
-
-    private function calculerBye(int $qualifies): int
-    {
-        $puissance = $this->prochainesPuissanceDeDeux($qualifies);
-        return $puissance - $qualifies;
     }
 
     private function prochainesPuissanceDeDeux(int $n): int

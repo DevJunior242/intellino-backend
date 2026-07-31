@@ -69,9 +69,12 @@ class SeanceController extends Controller
                 }
             }
 
-            // Si kumite et aucun format choisi, demander au client de sélectionner
-            // un format explicitement plutôt que de le choisir automatiquement.
-            if ($config->estKumite() && !$config->kumite_format_id) {
+            // Si kumite ou kata et aucun format choisi, demander au client de
+            // sélectionner un format explicitement plutôt que de le choisir
+            // automatiquement (le Kata utilise les mêmes formats poules/
+            // éliminatoire que le Kumite — poules round-robin puis élimination,
+            // ou élimination directe + repêchage — WKF Art. 3.3.1 a/b).
+            if (($config->estKumite() || $config->estKata()) && !$config->kumite_format_id) {
                 $formats = \App\Models\KumiteFormat::all()
                     ->filter(fn($f) => $nbCombattants >= ($minimumsFormat[$f->code] ?? 2))
                     ->values();
@@ -79,14 +82,18 @@ class SeanceController extends Controller
                 return response()->json([
                     'success' => false,
                     'error'   => 'missing_kumite_format',
-                    'message' => 'Veuillez choisir un format kumite avant de valider la séance',
+                    'message' => 'Veuillez choisir un format avant de valider la séance',
                     'formats' => $formats,
                 ], 422);
             }
 
             DB::transaction(function () use ($config) {
-                if ($config->estKumite()) {
+                if ($config->estKumite() || $config->estKata()) {
                     app(BracketService::class)->generer($config);
+                }
+
+                if ($config->estKata()) {
+                    $this->kataNotationService->creerPassagesInitiales($config);
                 }
 
                 if (!$config->relationLoaded('competition')) {
@@ -199,6 +206,10 @@ class SeanceController extends Controller
 
             $scoreFinal = $this->kataNotationService->calculerScore($valeursNotes, $config->getNbJuges());
             $passageActuel->update(['status' => OrdrePassage::STATUS_FINISHED, 'score_final' => $scoreFinal]);
+
+            if ($config->estKata()) {
+                $this->kataNotationService->resoudreDuelSiComplet($passageActuel);
+            }
         }
         // Faire tourner les arbitres
         //$this->rotationService->tourner($config);
@@ -239,6 +250,10 @@ class SeanceController extends Controller
             'status'      => OrdrePassage::STATUS_KIKEN,
             'score_final' => null,
         ]);
+
+        if ($config->estKata()) {
+            $this->kataNotationService->resoudreDuelSiComplet($passageActuel);
+        }
 
         $suivant = OrdrePassage::where('config_notation_id', $config->id)
             ->where('status', OrdrePassage::STATUS_NOT_STARTED)
@@ -354,6 +369,10 @@ class SeanceController extends Controller
                 'inscription.organisateur:id,name',
                 'notes',
                 'kata:id,nom',
+                'combat.inscriptionAka.athlete:id,fullname',
+                'combat.inscriptionAka.kataTeam:id,inscription_id,nom',
+                'combat.inscriptionAo.athlete:id,fullname',
+                'combat.inscriptionAo.kataTeam:id,inscription_id,nom',
             ])
             ->first();
     }
@@ -371,6 +390,10 @@ class SeanceController extends Controller
                 'inscription.competition.category:id,nom,sexe',
                 'inscription.organisateur:id,name',
                 'kata:id,nom',
+                'combat.inscriptionAka.athlete:id,fullname',
+                'combat.inscriptionAka.kataTeam:id,inscription_id,nom',
+                'combat.inscriptionAo.athlete:id,fullname',
+                'combat.inscriptionAo.kataTeam:id,inscription_id,nom',
             ])
             ->first();
     }
@@ -444,6 +467,10 @@ class SeanceController extends Controller
                 'inscription',
                 'notes',
                 'kata:id,nom',
+                'combat.inscriptionAka.athlete:id,fullname',
+                'combat.inscriptionAka.kataTeam:id,inscription_id,nom',
+                'combat.inscriptionAo.athlete:id,fullname',
+                'combat.inscriptionAo.kataTeam:id,inscription_id,nom',
             ])
             ->first();
 

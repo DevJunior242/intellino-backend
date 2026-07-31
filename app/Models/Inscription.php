@@ -7,6 +7,7 @@ use App\Models\Kata;
 use App\Models\Note;
 use App\Models\Poule;
 use App\Models\Student;
+use App\Models\KataTeam;
 use App\Models\Category;
 use App\Models\Competition;
 use App\Models\SubDiscipline;
@@ -93,5 +94,18 @@ class Inscription extends Model
     public function organisateur()
     {
         return $this->morphTo();
+    }
+
+    // Kata par équipe (Art. 3.5 WKF) : l'équipe est portée par cette
+    // inscription (athlete_id = capitaine désigné), son identité réelle
+    // vient de KataTeam.
+    public function kataTeam()
+    {
+        return $this->hasOne(KataTeam::class, 'inscription_id');
+    }
+
+    public function estEquipe(): bool
+    {
+        return $this->kataTeam()->exists();
     }
 }

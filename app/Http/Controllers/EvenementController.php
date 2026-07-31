@@ -146,6 +146,7 @@ class EvenementController extends Controller
                         'category_id'         => $item['category_id'],
                         'sub_discipline_id' => $item['sub_discipline_id'],
                         'niveau_id'           => $item['niveau_id'],
+                        'est_equipe'          => $item['est_equipe'] ?? false,
                         'heure_debut_prevu'   => $item['heure_debut_prevu'],
                         'heure_fin_prevue'    => $item['heure_fin_prevue'],
                         'status'              => Competition::STATUT_ATTENTE,
@@ -243,6 +244,7 @@ class EvenementController extends Controller
                         'category_id'         => $item['category_id'],
                         'sub_discipline_id' => $item['sub_discipline_id'],
                         'niveau_id'           => $item['niveau_id'],
+                        'est_equipe'          => $item['est_equipe'] ?? false,
                         'heure_debut_prevu'   => $item['heure_debut_prevu'],
                         'heure_fin_prevue'    => $item['heure_fin_prevue'],
                     ];

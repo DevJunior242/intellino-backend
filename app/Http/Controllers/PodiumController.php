@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Combat;
 use App\Models\Inscription;
 use Illuminate\Http\Request;
 use App\Models\ConfigNotation;
@@ -11,6 +12,10 @@ class PodiumController extends Controller
 {
     public function obtenirPodium(ConfigNotation $config)
     {
+        if ($config->estKata()) {
+            return response()->json($this->obtenirPodiumKata($config));
+        }
+
         // 1. Récupérer tous les athlètes de toutes les poules de cette compétition
         $athletes = DB::table('poule_inscriptions')
             ->join('poules', 'poule_inscriptions.poule_id', '=', 'poules.id')
@@ -86,5 +91,83 @@ class PodiumController extends Controller
         ];
 
         return response()->json($podium);
+    }
+
+    private function obtenirPodiumKata(ConfigNotation $config): array
+    {
+        $finale = Combat::where('config_notation_id', $config->id)
+            ->where('etape', 'Finale')
+            ->with([
+                'inscriptionAka.athlete:id,fullname',
+                'inscriptionAka.kataTeam:id,inscription_id,nom',
+                'inscriptionAo.athlete:id,fullname',
+                'inscriptionAo.kataTeam:id,inscription_id,nom',
+            ])
+            ->first();
+
+        $bronzes = Combat::where('config_notation_id', $config->id)
+            ->where('etape', 'LIKE', 'Bronze_%')
+            ->with([
+                'inscriptionAka.athlete:id,fullname',
+                'inscriptionAka.kataTeam:id,inscription_id,nom',
+                'inscriptionAo.athlete:id,fullname',
+                'inscriptionAo.kataTeam:id,inscription_id,nom',
+            ])
+            ->orderBy('etape')
+            ->get();
+
+        $mapper = function (?Combat $combat, ?string $vainqueurId) {
+            if (!$combat || !$vainqueurId) {
+                return null;
+            }
+
+            $inscription = $vainqueurId === $combat->inscription_aka_id
+                ? $combat->inscriptionAka
+                : $combat->inscriptionAo;
+
+            if (!$inscription) {
+                return null;
+            }
+
+            return [
+                'inscription_id'         => $inscription->id,
+                // Le capitaine d'équipe garde un athlete_id (contrainte NOT
+                // NULL de la table), donc kataTeam prime sur athlete ici —
+                // sinon une équipe s'affiche sous le nom de son capitaine.
+                'athlete_nom'            => $inscription->kataTeam?->nom ?? $inscription->athlete?->fullname ?? '—',
+                'club_nom'               => $inscription?->organisateur?->name ?? '—',
+                'nom_poule'              => $combat->etape,
+                'points_victoire'        => null,
+                'total_points_marques'   => null,
+                'total_points_encaisses' => null,
+            ];
+        };
+
+        $perdant = function (?Combat $combat) use ($mapper) {
+            if (!$combat || !$combat->vainqueur_id) {
+                return null;
+            }
+
+            $perdantId = $combat->vainqueur_id === $combat->inscription_aka_id
+                ? $combat->inscription_ao_id
+                : $combat->inscription_aka_id;
+
+            return $mapper($combat, $perdantId);
+        };
+
+        $or     = $finale ? $mapper($finale, $finale->vainqueur_id) : null;
+        $argent = $finale ? $perdant($finale) : null;
+        $bronze1 = $bronzes->get(0) ? $mapper($bronzes->get(0), $bronzes->get(0)->vainqueur_id) : null;
+        $bronze2 = $bronzes->get(1) ? $mapper($bronzes->get(1), $bronzes->get(1)->vainqueur_id) : null;
+
+        $complet = collect([$or, $argent, $bronze1, $bronze2])->filter()->values();
+
+        return [
+            'or'       => $or,
+            'argent'   => $argent,
+            'bronze_1' => $bronze1,
+            'bronze_2' => $bronze2,
+            'complet'  => $complet,
+        ];
     }
 }

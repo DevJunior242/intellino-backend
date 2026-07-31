@@ -8,6 +8,7 @@ use App\Http\Controllers\ClubController;
 use App\Http\Controllers\JuryController;
 use App\Http\Controllers\LikeController;
 use App\Http\Controllers\KataNotationController;
+use App\Http\Controllers\KataTeamController;
 use App\Http\Controllers\PlanController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\UserController;
@@ -290,6 +291,8 @@ Route::middleware(['auth:sanctum'])->group(function () {
             Route::post('configs/{config}/lancer',            [SeanceController::class, 'lancerSeance']);
             Route::post('configs/{config}/athlete-suivant',  [SeanceController::class, 'athleteSuivant']);
             Route::post('configs/{config}/kiken',             [SeanceController::class, 'declarerKiken']);
+            Route::post('configs/{config}/hantei',            [KataNotationController::class, 'forcerHantei']);
+            Route::post('configs/{config}/disqualification-bunkai', [KataNotationController::class, 'declarerDisqualificationBunkai']);
             Route::get('configs/{config}/etat',              [SeanceController::class, 'etat']);
             Route::get('configs/{config}/pret', [SeanceController::class, 'estPret']);
             Route::get('competition/{config}/en-cours', [SeanceController::class, 'enCours']);
@@ -326,6 +329,10 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::post('notes', [KataNotationController::class, 'store']);
         Route::post('notes/centralise', [KataNotationController::class, 'storeCentralise']);
         Route::get('inscriptions/{ordrePassage}/notes', [KataNotationController::class, 'notesInscription']);
+
+        // Kata par équipe (Art. 3.5 WKF)
+        Route::post('kata-teams', [KataTeamController::class, 'store'])
+            ->middleware(['throttle:20,1', 'verified']);
 
 
         //niveaux competitions

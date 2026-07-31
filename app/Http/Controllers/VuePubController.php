@@ -17,10 +17,12 @@ class VuePubController extends Controller
             ->with([
                 'inscriptionAka.athlete',
                 'inscriptionAka.organisateur:id,name',
+                'inscriptionAka.kataTeam:id,inscription_id,nom',
 
                 'inscriptionAka.competition.category',
                 'inscriptionAo.athlete',
                 'inscriptionAo.organisateur:id,name',
+                'inscriptionAo.kataTeam:id,inscription_id,nom',
                 'inscriptionAo.competition.category',
                 'configNotation',
                 'actions',
@@ -38,7 +40,9 @@ class VuePubController extends Controller
             ->where('status', 0) // en attente
             ->with([
                 'inscriptionAka.athlete',
+                'inscriptionAka.kataTeam:id,inscription_id,nom',
                 'inscriptionAo.athlete',
+                'inscriptionAo.kataTeam:id,inscription_id,nom',
             ])
             ->orderBy('ordre')
             ->first();
