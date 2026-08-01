@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Note;
 use App\Models\Poule;
 use App\Models\Combat;
+use App\Models\Inscription;
 use App\Events\NoteAjoutee;
 use App\Models\OrdrePassage;
 use App\Models\ConfigNotation;
@@ -162,7 +163,7 @@ class KataNotationService
             ->whereNotNull('inscription_ao_id')
             ->orderBy('ordre')
             ->get()
-            ->each(fn (Combat $combat) => $this->creerPassagesPourCombat($combat));
+            ->each(fn(Combat $combat) => $this->creerPassagesPourCombat($combat));
     }
 
     /**
@@ -186,11 +187,16 @@ class KataNotationService
             : [null];
 
         foreach ([$combat->inscription_aka_id, $combat->inscription_ao_id] as $inscriptionId) {
+            // Le kata choisi à l'inscription (Inscription::kata_id), affiché
+            // aux juges/écran public — mêmes règles que OrdrePassageController::assigner().
+            $kataId = Inscription::find($inscriptionId)?->kata_id;
+
             foreach ($phases as $phase) {
                 OrdrePassage::create([
                     'config_notation_id' => $combat->config_notation_id,
                     'combat_id'          => $combat->id,
                     'inscription_id'     => $inscriptionId,
+                    'kata_id'            => $kataId,
                     'phase'              => $phase,
                     'ordre'              => ++$ordre,
                     'status'             => OrdrePassage::STATUS_NOT_STARTED,
@@ -281,7 +287,7 @@ class KataNotationService
 
         $tousTermines = OrdrePassage::where('combat_id', $combat->id)
             ->get()
-            ->every(fn ($op) => in_array($op->status, [OrdrePassage::STATUS_FINISHED, OrdrePassage::STATUS_KIKEN]));
+            ->every(fn($op) => in_array($op->status, [OrdrePassage::STATUS_FINISHED, OrdrePassage::STATUS_KIKEN]));
 
         if (!$tousTermines) return null;
 
@@ -343,7 +349,7 @@ class KataNotationService
                 ->whereNotNull('inscription_ao_id')
                 ->where('status', '!=', Combat::STATUS_TERMINE)
                 ->get()
-                ->each(fn (Combat $c) => $this->creerPassagesPourCombat($c));
+                ->each(fn(Combat $c) => $this->creerPassagesPourCombat($c));
         }
 
         if ($combat->next_combat_id) {
@@ -423,6 +429,6 @@ class KataNotationService
             ->whereNotNull('inscription_ao_id')
             ->where('status', '!=', Combat::STATUS_TERMINE)
             ->get()
-            ->each(fn (Combat $c) => $this->creerPassagesPourCombat($c));
+            ->each(fn(Combat $c) => $this->creerPassagesPourCombat($c));
     }
 }
