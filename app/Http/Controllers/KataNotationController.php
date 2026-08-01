@@ -116,7 +116,6 @@ class KataNotationController extends Controller
             'data'    => $resultat['notes'],
             'total'   => $resultat['total'],
             'attendu' => $resultat['attendu'],
-            'score'   => $resultat['score'],
             'termine' => $resultat['termine'],
             'message' => $resultat['message'],
         ]);
@@ -171,7 +170,6 @@ class KataNotationController extends Controller
         $passage->update([
             'status'             => OrdrePassage::STATUS_KIKEN,
             'disqualifie_bunkai' => true,
-            'score_final'        => null,
         ]);
 
         app(KataNotationService::class)->resoudreDuelSiComplet($passage);

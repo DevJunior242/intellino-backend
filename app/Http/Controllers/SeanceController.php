@@ -209,10 +209,7 @@ class SeanceController extends Controller
             ->first();
 
         if ($passageActuel) {
-            $valeursNotes = $passageActuel->notes->pluck('valeur')->map(fn($v) => (float)$v)->toArray();
-
-            $scoreFinal = $this->kataNotationService->calculerScore($valeursNotes, $config->getNbJuges());
-            $passageActuel->update(['status' => OrdrePassage::STATUS_FINISHED, 'score_final' => $scoreFinal]);
+            $passageActuel->update(['status' => OrdrePassage::STATUS_FINISHED]);
 
             if ($config->estKata()) {
                 $this->kataNotationService->resoudreDuelSiComplet($passageActuel);
@@ -254,8 +251,7 @@ class SeanceController extends Controller
         }
 
         $passageActuel->update([
-            'status'      => OrdrePassage::STATUS_KIKEN,
-            'score_final' => null,
+            'status' => OrdrePassage::STATUS_KIKEN,
         ]);
 
         if ($config->estKata()) {
@@ -482,10 +478,9 @@ class SeanceController extends Controller
             ->first();
 
         $notes = [];
-        $score = null;
 
         if ($enCours) {
-            $notesData = Note::where('ordre_passage_id', $enCours->id)
+            $notes = Note::where('ordre_passage_id', $enCours->id)
                 ->with([
                     'rotationArbitre.arbitreCompetition.user:id,fullname',
                     'ordrePassage.inscription.athlete:id,fullname'
@@ -498,48 +493,11 @@ class SeanceController extends Controller
                 ])
                 ->sortBy('poste')
                 ->values();
-
-            $notes = $notesData;
-
-            if ($notesData->count() === $config->getNbJuges()) {
-                $valeurs  = $notesData->pluck('valeur')->toArray();
-                $score    = $this->kataNotationService->calculerScore($valeurs, $config->getNbJuges());
-            }
         }
 
-        // Classement provisoire (Art. 5.11 — à score retenu égal, départage
-        // sur la somme brute des notes puis la note individuelle la plus haute)
-        $classement = OrdrePassage::where('config_notation_id', $config->id)
-            ->where('status', OrdrePassage::STATUS_FINISHED)
-            ->with([
-                'inscription.athlete:id,fullname',
-                'inscription.organisateur:id,name',
-                'notes'
-            ])
-            ->get()
-            ->map(function ($passage) use ($config) {
-                $valeurs = $passage->notes
-                    ->pluck('valeur')
-                    ->map(fn($v) => (float) $v)
-                    ->toArray();
-
-                return [
-                    'athlete'      => $passage->inscription?->athlete?->fullname ?? '—',
-                    'organisateur' => $passage->inscription?->organisateur?->name ?? '—',
-                    'score'        => $this->kataNotationService->calculerScore($valeurs, $config->getNbJuges()),
-                    'valeurs'      => $valeurs,
-                ];
-            })
-            ->filter(fn($item) => $item['score'] !== null)
-            ->sort(function ($a, $b) {
-                if ($a['score'] !== $b['score']) {
-                    return $b['score'] <=> $a['score'];
-                }
-                return $this->kataNotationService->departagerEgalite($a['valeurs'], $b['valeurs']);
-            })
-            ->values()
-            ->map(fn($item) => collect($item)->except('valeurs')->all());
-
+        // Pas de "classement" ni de score agrégé ici : c'est le vote
+        // majoritaire du duel qui décide (Art. 5.4.2/5.5.1), déjà reflété par
+        // le bracket (BracketViewer) et le podium — pas un score de passage.
 
         return response()->json([
             'success'    => true,
@@ -550,8 +508,6 @@ class SeanceController extends Controller
             ],
             'enCours'    => $enCours,
             'notes'      => $notes,
-            'score'      => $score ?? null,
-            'classement' => $classement,
         ]);
     }
 }

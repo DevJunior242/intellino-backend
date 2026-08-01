@@ -95,42 +95,17 @@ class KataNotationService
         $config = $ordrePassage->configNotation()->with('nbJugesOption')->first();
         $nbJugesAttendus = $config->nbJugesOption ? (int) $config->nbJugesOption->valeur : 5;
 
-        $score = $this->calculerScore(
-            $dataNotes->pluck('valeur')->toArray(),
-            $nbJugesAttendus
-        );
-
-        $athleteNom = $ordrePassage->inscription?->athlete?->fullname ?? "Athlète inconnu";
+        $termine = $dataNotes->count() >= $nbJugesAttendus;
 
         return [
-            'notes'            => $dataNotes,
-            'total'            => $dataNotes->count(),
-            'attendu'          => $nbJugesAttendus,
-            'score'            => $score,
-            'termine'          => !is_null($score),
-            'message'          => is_null($score)
-                ? "En attente des notes ({$dataNotes->count()}/{$nbJugesAttendus})"
-                : "L'athlète {$athleteNom} a obtenu {$score} points",
+            'notes'   => $dataNotes,
+            'total'   => $dataNotes->count(),
+            'attendu' => $nbJugesAttendus,
+            'termine' => $termine,
+            'message' => $termine
+                ? "Notation terminée"
+                : "En attente des notes ({$dataNotes->count()}/{$nbJugesAttendus})",
         ];
-    }
-
-    /**
-     * Score retenu d'un passage : on écarte la note la plus haute et la
-     * plus basse données par les juges (2 de chaque côté à 7 juges) et on
-     * additionne les notes restantes (WKF Kata Competition Rules, Art. 5.4).
-     */
-    public function calculerScore(array $valeurs, int $nbJugesAttendus): ?float
-    {
-        // On ne calcule que si TOUS les juges ont noté
-        if (count($valeurs) < $nbJugesAttendus) return null;
-
-        sort($valeurs);
-
-        $nbAEnlever = ($nbJugesAttendus === 7) ? 2 : 1;
-
-        $retenues = array_slice($valeurs, $nbAEnlever, count($valeurs) - ($nbAEnlever * 2));
-
-        return (float) array_sum($retenues);
     }
 
     /**

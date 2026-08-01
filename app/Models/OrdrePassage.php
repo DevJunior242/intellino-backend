@@ -17,7 +17,6 @@ class OrdrePassage extends Model
         'config_notation_id',
         'ordre',
         'status',
-        'score_final',
         'inscription_id',
         'kata_id',
         'combat_id',
