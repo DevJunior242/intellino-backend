@@ -109,32 +109,6 @@ class KataNotationService
         ];
     }
 
-    /**
-     * Départage entre deux athlètes à score retenu égal. WKF Art. 5.11 prévoit
-     * (pour un système à duels) : points de victoire → confrontation directe →
-     * somme des votes → classement mondial → kata supplémentaire. Rien de tout
-     * ça ne s'applique à une notation séquentielle sans duel ni classement
-     * mondial : on compare donc la somme de TOUTES les notes (y compris les
-     * extrêmes écartées du score retenu), puis la note individuelle la plus
-     * haute reçue. Une égalité persistante au-delà signifie qu'un kata
-     * supplémentaire est nécessaire (Art. 5.11.5) — l'app ne peut pas trancher
-     * seule dans ce cas et renvoie 0 (égalité).
-     */
-    public function departagerEgalite(array $valeursA, array $valeursB): int
-    {
-        $sommeA = array_sum($valeursA);
-        $sommeB = array_sum($valeursB);
-
-        if ($sommeA !== $sommeB) {
-            return $sommeB <=> $sommeA;
-        }
-
-        $maxA = empty($valeursA) ? 0 : max($valeursA);
-        $maxB = empty($valeursB) ? 0 : max($valeursB);
-
-        return $maxB <=> $maxA;
-    }
-
     // ─────────────────────────────────────────────────────────────────────
     // DUEL AKA/AO (WKF Art. 3.1.2, 5.4.2, 5.5.1) — un combat Kata est un
     // duel tranché au vote majoritaire des juges, à chaque tour du tableau
@@ -211,14 +185,20 @@ class KataNotationService
     }
 
     /**
-     * Vainqueur d'un combat au vote majoritaire : chaque juge compare la
-     * somme de ses propres notes pour Aka et pour Ao (sur toutes les
-     * prestations de ce camp — une pour un duel normal, kata+bunkai pour une
-     * finale d'équipe) et vote pour le mieux noté. Égalité de votes → repli
-     * sur departagerEgalite() ; égalité persistante → vainqueur_id null,
-     * décision Hantei manuelle requise (Art. 5.11 adapté, pas de duel WKF
-     * pur ne prévoit ce cas mais un panel à effectif impair ne devrait
-     * normalement jamais y arriver, sauf juge manquant).
+     * Vainqueur d'un combat au vote majoritaire (Art. 5.4.2/5.5.1/5.10.1) :
+     * chaque juge compare la somme de ses propres notes pour Aka et pour Ao
+     * (sur toutes les prestations de ce camp — une pour un duel normal,
+     * kata+bunkai pour une finale d'équipe) et vote pour le mieux noté.
+     *
+     * En cas d'égalité des votes, l'Annexe 4 du règlement (tableau des
+     * critères de départage) ne prévoit AUCUNE procédure pour un duel en
+     * élimination directe — contrairement au classement de poule (Art.
+     * 5.11/5.12 : confrontation directe, kata supplémentaire, etc.), qui ne
+     * concerne que le classement d'un groupe entier, pas un duel isolé. On
+     * ne peut donc pas fabriquer un critère de départage supplémentaire ici.
+     * C'est l'Art. 10 (« Issues not specifically covered by the rules ») qui
+     * s'applique : la décision revient au Chief Referee — le superviseur du
+     * tatami dans l'app — via trancherEgaliteJuges().
      */
     public function determinerVainqueurDuel(Combat $combat): array
     {
@@ -236,15 +216,11 @@ class KataNotationService
             elseif ($totalAo > $totalAka) $votesAo++;
         }
 
-        if ($votesAka === $votesAo) {
-            $cmp = $this->departagerEgalite(array_values($notesAka), array_values($notesAo));
-            if ($cmp === 0) {
-                return ['vainqueur_id' => null, 'votes_aka' => $votesAka, 'votes_ao' => $votesAo];
-            }
-            $vainqueurId = $cmp < 0 ? $combat->inscription_aka_id : $combat->inscription_ao_id;
-        } else {
-            $vainqueurId = $votesAka > $votesAo ? $combat->inscription_aka_id : $combat->inscription_ao_id;
-        }
+        $vainqueurId = match (true) {
+            $votesAka > $votesAo => $combat->inscription_aka_id,
+            $votesAo > $votesAka => $combat->inscription_ao_id,
+            default              => null, // égalité — Art. 10, décision du superviseur
+        };
 
         return ['vainqueur_id' => $vainqueurId, 'votes_aka' => $votesAka, 'votes_ao' => $votesAo];
     }
@@ -278,11 +254,18 @@ class KataNotationService
         if (!$combat || $combat->status === Combat::STATUS_TERMINE) return null;
 
         if ($passage->status === OrdrePassage::STATUS_KIKEN) {
-            $vainqueurId = $passage->inscription_id === $combat->inscription_aka_id
-                ? $combat->inscription_ao_id
-                : $combat->inscription_aka_id;
+            $vainqueurEstAka = $passage->inscription_id !== $combat->inscription_aka_id;
+            $vainqueurId = $vainqueurEstAka ? $combat->inscription_aka_id : $combat->inscription_ao_id;
 
-            return $this->cloreCombat($combat, $vainqueurId, 'kiken', 0, 0);
+            // Art. 5.11 : "In the case of Kiken, the winning Athlete/Team
+            // will be awarded 4 votes for the bout."
+            return $this->cloreCombat(
+                $combat,
+                $vainqueurId,
+                'kiken',
+                $vainqueurEstAka ? 4 : 0,
+                $vainqueurEstAka ? 0 : 4
+            );
         }
 
         $tousTermines = OrdrePassage::where('combat_id', $combat->id)
@@ -307,7 +290,12 @@ class KataNotationService
 
     /**
      * Décision manuelle du superviseur quand le vote des juges est à
-     * égalité (Combat::STATUS_HANTEI).
+     * égalité (Combat::STATUS_HANTEI). Ce n'est pas une procédure Hantei
+     * officielle du Kata (l'Annexe 4 du règlement ne prévoit aucun critère
+     * de départage pour un duel en élimination directe) — le nom/statut
+     * partagé vient du Kumite, où "Hantei" est bien une règle officielle.
+     * Pour le Kata c'est l'Art. 10 qui s'applique : décision du Chief
+     * Referee (le superviseur du tatami) faute de règle spécifique.
      */
     public function forcerHantei(Combat $combat, string $vainqueurCote): Combat
     {
@@ -364,13 +352,20 @@ class KataNotationService
 
     /**
      * Met à jour le classement de poule après un duel Kata de phase de
-     * groupe : points_victoire = nb de bouts gagnés (Art. 3.7.5 WKF —
-     * classement au nombre de victoires, pas au score), et on réutilise
-     * total_points_marques/encaisses (colonnes partagées avec le Kumite)
-     * pour stocker les votes des juges reçus/donnés — le départage à
-     * égalité de victoires (Art. 5.11 : confrontation directe -> somme des
-     * votes) retombe alors sur exactement la même requête de classement que
-     * le Kumite (points_victoire desc, marques desc, encaissés asc).
+     * groupe : points_victoire = 3 par victoire, 0 pour la défaite, aucune
+     * égalité possible (Art. 5.5.2 : "the Athlete/Team earns 3 Victory
+     * points and the loser zero victory points. No draws are allowed.").
+     * On réutilise total_points_marques/encaisses (colonnes partagées avec
+     * le Kumite) pour stocker les votes des juges reçus/donnés.
+     *
+     * Classement/départage de poule (Art. 5.11 individuel / 5.12 équipes) :
+     * 1) points_victoire, 2) confrontation directe, 3) somme des votes
+     * reçus sur toutes les poules, 4) classement mondial (individuel
+     * seulement), 5) kata supplémentaire. Actuellement seuls les critères 1
+     * et 3 sont reflétés par le tri (points_victoire desc, marques desc,
+     * encaissés asc) — la confrontation directe (2) et le kata
+     * supplémentaire (5) ne sont pas encore implémentés ; à faire en
+     * complément si des égalités de poule surviennent en pratique.
      * Une fois toutes les poules du tatami terminées, lance la phase
      * éliminatoire si le format choisi est poules_eliminatoire.
      */
@@ -384,7 +379,7 @@ class KataNotationService
             ->where('poule_id', $combat->poule_id)
             ->where('inscription_id', $combat->inscription_aka_id)
             ->update([
-                'points_victoire'        => DB::raw('points_victoire + ' . ($akaGagne ? 1 : 0)),
+                'points_victoire'        => DB::raw('points_victoire + ' . ($akaGagne ? 3 : 0)),
                 'total_points_marques'   => DB::raw("total_points_marques + {$votesAka}"),
                 'total_points_encaisses' => DB::raw("total_points_encaisses + {$votesAo}"),
             ]);
@@ -393,7 +388,7 @@ class KataNotationService
             ->where('poule_id', $combat->poule_id)
             ->where('inscription_id', $combat->inscription_ao_id)
             ->update([
-                'points_victoire'        => DB::raw('points_victoire + ' . ($akaGagne ? 0 : 1)),
+                'points_victoire'        => DB::raw('points_victoire + ' . ($akaGagne ? 0 : 3)),
                 'total_points_marques'   => DB::raw("total_points_marques + {$votesAo}"),
                 'total_points_encaisses' => DB::raw("total_points_encaisses + {$votesAka}"),
             ]);

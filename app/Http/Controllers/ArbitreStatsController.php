@@ -123,10 +123,12 @@ class ArbitreStatsController extends Controller
             ];
         }
 
-        // ── Décisions du superviseur spécifiques au duel Kata (Art. 5.11 /
-        // 3.5 WKF) ── Approximation : rattachées aux configs où cet arbitre
-        // a été superviseur à un moment donné — ni Combat ni OrdrePassage
-        // ne trace précisément qui a cliqué Hantei/disqualifié.
+        // ── Décisions du superviseur spécifiques au duel Kata ── Égalités
+        // de votes tranchées (Art. 10 — cas non couvert par le règlement,
+        // pas de procédure Hantei officielle en Kata) et disqualifications
+        // Bunkai (Art. 3.5/5.8). Approximation : rattachées aux configs où
+        // cet arbitre a été superviseur à un moment donné — ni Combat ni
+        // OrdrePassage ne trace précisément qui a cliqué.
         $configsSuperviseur = RotationArbitre::whereIn('arbitre_competition_id', $arbitreCompIds)
             ->where('est_superviseur', true)
             ->pluck('config_notation_id');
