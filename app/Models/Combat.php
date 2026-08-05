@@ -41,6 +41,7 @@ class Combat extends Model
         'votes_aka',
         'votes_ao',
         'debut_prestation_at',
+        'is_bye',
     ];
     //constantes de statut
     const STATUS_EN_ATTENTE = 0;

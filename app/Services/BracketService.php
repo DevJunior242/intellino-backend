@@ -257,12 +257,12 @@ class BracketService
                     'status'             => 0, // en attente
                 ]);
             } elseif ($aka && !$ao) {
-                // Bye — aka passe directement au round suivant
+                // Bye — aka passe directement au round suivant, combat déjà décidé
                 $combat->update([
                     'inscription_aka_id' => $aka['inscription_id'],
                     'vainqueur_id'       => $aka['inscription_id'],
                     'inscription_ao_id'  => null,
-                    'status'             => 1,
+                    'status'             => Combat::STATUS_TERMINE,
                     'type_victoire'      => 'kiken',
                     'is_bye'       => true,
                 ]);

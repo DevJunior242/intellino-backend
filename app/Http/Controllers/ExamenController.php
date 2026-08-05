@@ -665,9 +665,12 @@ class ExamenController extends Controller
                 ->count();
         }
 
-        $objectifAnnuels = $objectifAnnuels ?: 10;
-
-        $scoreQuantite = min(($nouveauxDan / $objectifAnnuels) * 100, 100);
+        // Pas de saison précédente ou 0 Dan décernés alors : aucune base de
+        // comparaison réelle, donc pas de faux objectif inventé — le score
+        // quantité reflète juste s'il y a eu du nouveau ce trimestre ou non.
+        $scoreQuantite = $objectifAnnuels > 0
+            ? min(($nouveauxDan / $objectifAnnuels) * 100, 100)
+            : ($nouveauxDan > 0 ? 100 : 0);
         $vitalityScore = ($scoreQuantite * 0.6) + ($taux * 0.4);
 
         return response()->json([
