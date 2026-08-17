@@ -31,33 +31,61 @@ class StudentController extends Controller
     /**
      * Élèves visibles par l'organisateur connecté : un Club ne voit que le
      * sien, une Ligue/Fédération voit tous les clubs de son ressort
-     * (hiérarchie club -> ligue -> fédération). $clubId (optionnel) restreint
-     * encore à un club précis dans ce ressort, sans jamais l'élargir au-delà
-     * (ex: ClubExamModal choisissant un club précis parmi ceux d'une ligue).
+     * (hiérarchie club -> ligue -> fédération) PLUS les athlètes
+     * indépendants (sans club) qu'elle a elle-même inscrits — même logique
+     * que InscriptionController::studentsDisponibles() pour les épreuves.
+     * $clubId (optionnel) restreint encore à un club précis dans ce ressort
+     * (et exclut alors les indépendants, non rattachés à ce club précis).
      */
-    private function studentsVisiblesPar(string $activeId, string $activeType, ?string $clubId = null)
+    private function studentsVisiblesPar(string $activeId, string $activeType, ?string $clubId = null, ?string $q = null)
     {
-        $query = Student::query()
+        $appliquerRecherche = fn ($query) => $q
+            ? $query->where('students.fullname', 'LIKE', '%' . $q . '%')
+            : $query;
+
+        $viaClub = Student::query()
             ->join('club_students', 'club_students.student_id', '=', 'students.id')
             ->whereNull('club_students.deleted_at')
             ->select('students.*');
 
         if ($activeType === 'Club') {
-            $query->where('club_students.club_id', $activeId);
+            $viaClub->where('club_students.club_id', $activeId);
         } elseif ($activeType === 'Ligue') {
-            $query->join('clubs', 'clubs.id', '=', 'club_students.club_id')
+            $viaClub->join('clubs', 'clubs.id', '=', 'club_students.club_id')
                 ->where('clubs.league_id', $activeId);
         } elseif ($activeType === 'Federation') {
             $liguesIds = League::where('federation_id', $activeId)->pluck('id');
-            $query->join('clubs', 'clubs.id', '=', 'club_students.club_id')
+            $viaClub->join('clubs', 'clubs.id', '=', 'club_students.club_id')
                 ->whereIn('clubs.league_id', $liguesIds);
         }
 
         if ($clubId && $activeType !== 'Club') {
-            $query->where('club_students.club_id', $clubId);
+            $viaClub->where('club_students.club_id', $clubId);
         }
 
-        return $query->distinct();
+        $students = $appliquerRecherche($viaClub)->distinct()->get();
+
+        if ($activeType !== 'Club' && !$clubId) {
+            $organisateurs = [[$activeType, $activeId]];
+            if ($activeType === 'Federation') {
+                foreach (League::where('federation_id', $activeId)->pluck('id') as $ligueId) {
+                    $organisateurs[] = ['Ligue', $ligueId];
+                }
+            }
+
+            $independants = Student::query()->where(function ($query) use ($organisateurs) {
+                foreach ($organisateurs as [$type, $id]) {
+                    $query->orWhere(function ($q2) use ($type, $id) {
+                        $q2->where('organisateur_type', $type)->where('organisateur_id', $id);
+                    });
+                }
+            });
+
+            $independants = $appliquerRecherche($independants)->get();
+            $students = $students->concat($independants);
+        }
+
+        return $students->unique('id')->sortBy('fullname')->values();
     }
 
     public function index(Request $request)
@@ -70,7 +98,7 @@ class StudentController extends Controller
         if ($isSuperAdmin) {
             $students = Student::with('clubs:id,name')->get();
         } else {
-            $students = $this->studentsVisiblesPar($activeId, $activeType, $request->input('club_id'))->get();
+            $students = $this->studentsVisiblesPar($activeId, $activeType, $request->input('club_id'));
         }
 
         $formattedStudents = $students->map(function ($student) use ($isSuperAdmin) {
@@ -107,18 +135,22 @@ class StudentController extends Controller
         }
 
         $perPage = min((int) $request->input('per_page', 15), 50);
+        $page = max((int) $request->input('page', 1), 1);
 
-        $students = $this->studentsVisiblesPar($activeId, $activeType, $request->input('club_id'))
-            ->when($request->filled('q'), function ($q) use ($request) {
-                $q->where('students.fullname', 'LIKE', '%' . $request->input('q') . '%');
-            })
-            ->orderBy('students.fullname')
-            ->paginate($perPage);
+        $students = $this->studentsVisiblesPar(
+            $activeId,
+            $activeType,
+            $request->input('club_id'),
+            $request->input('q') ?: null,
+        );
+
+        $total = $students->count();
+        $items = $students->slice(($page - 1) * $perPage, $perPage)->values();
 
         return response()->json([
             'success' => true,
-            'students' => $students->items(),
-            'has_more' => $students->hasMorePages(),
+            'students' => $items,
+            'has_more' => $page * $perPage < $total,
         ]);
     }
 
