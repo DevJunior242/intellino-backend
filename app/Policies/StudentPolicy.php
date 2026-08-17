@@ -49,6 +49,15 @@ class StudentPolicy
             return true;
         }
 
+        // Une Ligue/Fédération peut inscrire un athlète manuellement (sans
+        // club, ou avec un club de son ressort) — CheckClubRole a déjà
+        // vérifié le rôle admin/mandat pour cette organisation avant que la
+        // requête n'arrive ici, donc pas de re-vérification supplémentaire.
+        $activeType = request()->attributes->get('organisateur_type');
+        if (in_array($activeType, ['Ligue', 'Federation'], true)) {
+            return true;
+        }
+
         $clubId = request()->attributes->get('club_id');
 
         if (!$clubId) {

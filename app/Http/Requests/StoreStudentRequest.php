@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use Illuminate\Validation\Rule;
 use Illuminate\Foundation\Http\FormRequest;
 
 class StoreStudentRequest extends FormRequest
@@ -22,7 +23,15 @@ class StoreStudentRequest extends FormRequest
     public function rules()
     {
         return [
-            'club_id' => ['required', 'exists:clubs,id'],
+            // Un Club s'inscrit toujours lui-même (club_id obligatoire). Une
+            // Ligue/Fédération qui inscrit un athlète manuellement peut soit
+            // choisir un club réel de son ressort, soit laisser vide pour un
+            // athlète sans club — voir StudentController::store().
+            'club_id' => [
+                Rule::requiredIf(fn () => $this->attributes->get('organisateur_type') === 'Club'),
+                'nullable',
+                'exists:clubs,id',
+            ],
             'is_own_responsible' => ['required', 'boolean'],
 
             // Validation du Parent (si applicable)

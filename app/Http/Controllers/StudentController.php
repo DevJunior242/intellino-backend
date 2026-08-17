@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Carbon\Carbon;
 use App\Models\Club;
+use App\Models\League;
 use App\Models\Role;
 use App\Models\User;
 use App\Models\Licence;
@@ -218,7 +219,7 @@ class StudentController extends Controller
         $messageAucuneSaison = $this->messageAucuneSaisonActivePour($activeId, $activeType);
 
         try {
-            return DB::transaction(function () use ($validated, $activeId, $request, $saisonActive, $messageAucuneSaison) {
+            return DB::transaction(function () use ($validated, $activeId, $activeType, $request, $saisonActive, $messageAucuneSaison) {
                 $parentId = null;
                 $createdStudents = [];
 
@@ -229,6 +230,17 @@ class StudentController extends Controller
 
                 $seasonId = $saisonActive->id;
 
+                // Un Club s'auto-affecte toujours comme club de l'élève/parent.
+                // Une Ligue/Fédération qui inscrit un athlète manuellement
+                // peut choisir un club réel de son ressort (club_id fourni)
+                // ou laisser vide (athlète indépendant, sans club) —
+                // $clubIdPourLiaison reste alors null : utiliser $activeId
+                // dans ce cas planterait, ce serait l'ID de la Ligue/
+                // Fédération elle-même, pas un club réel.
+                $clubIdPourLiaison = $activeType === 'Club'
+                    ? $activeId
+                    : ($validated['club_id'] ?? null);
+
                 // --- GESTION DU PARENT ---
                 if (!$validated['is_own_responsible']) {
                     $parentUser = User::updateOrCreate(
@@ -238,12 +250,14 @@ class StudentController extends Controller
                             'fullname' => $validated['parent_fullname'],
                             'phone'    => $validated['parent_phone'] ?? null,
                             'password' => Hash::make(Str::random(16)),
-                            'current_club_id' => $activeId,
+                            'current_club_id' => $clubIdPourLiaison,
                         ]
                     );
 
-                    $parentRole = cache()->rememberForever('role_parent', fn() => Role::where('name', 'parent')->first());
-                    $parentUser->clubs()->syncWithoutDetaching([$activeId => ['role_id' => $parentRole->id]]);
+                    if ($clubIdPourLiaison) {
+                        $parentRole = cache()->rememberForever('role_parent', fn() => Role::where('name', 'parent')->first());
+                        $parentUser->clubs()->syncWithoutDetaching([$clubIdPourLiaison => ['role_id' => $parentRole->id]]);
+                    }
 
                     $parentProfile = ParentModel::firstOrCreate(['user_id' => $parentUser->id]);
                     $parentId = $parentProfile->id;
@@ -268,7 +282,7 @@ class StudentController extends Controller
                                 'email'    => $studentData['email'],
                                 'phone'    => $studentData['phone'] ?? null,
                                 'password' => Hash::make(Str::random(32)), // Il changera son mot de passe par mail
-                                'current_club_id' => $activeId,
+                                'current_club_id' => $clubIdPourLiaison,
                             ]);
                         } else {
                             // SCÉNARIO B : L'élève existe déjà (Réinscription ou Transfert)
@@ -276,7 +290,7 @@ class StudentController extends Controller
                             $studentUser->update([
                                 'fullname' => $studentData['fullname'],
                                 'phone'    => $studentData['phone'] ?? $studentUser->phone,
-                                'current_club_id' => $activeId,
+                                'current_club_id' => $clubIdPourLiaison,
                             ]);
                         }
 
@@ -332,16 +346,40 @@ class StudentController extends Controller
                     }
 
                     // --- 4. LIAISON HISTORIQUE CLUB-ÉLÈVE AVEC LE SAISON_ID ---
-                    // Grâce à syncWithoutDetaching ou un check, on lie l'élève au club pour la saison actuelle
-                    $student->clubs()->syncWithoutDetaching([
-                        $activeId => [
-                            'saison_id' => $seasonId,
-                            'is_active' => true
-                        ]
-                    ]);
-                    // On récupère la fédération du club actif
-                    $club = Club::with('league')->find($activeId);
-                    $federationId = $club->league?->federation_id;
+                    // Un Club s'auto-affecte toujours comme club de l'élève.
+                    // Une Ligue/Fédération qui inscrit un athlète manuellement
+                    // peut choisir un club réel de son ressort (club_id
+                    // fourni) ou laisser l'élève sans club (athlète
+                    // indépendant) — $clubIdPourLiaison reste alors null et
+                    // aucune ligne club_students n'est créée (utiliser
+                    // $activeId ici planterait : ce serait l'ID de la Ligue/
+                    // Fédération elle-même, pas un club réel).
+                    $clubIdPourLiaison = $activeType === 'Club'
+                        ? $activeId
+                        : ($validated['club_id'] ?? null);
+
+                    if ($clubIdPourLiaison) {
+                        $student->clubs()->syncWithoutDetaching([
+                            $clubIdPourLiaison => [
+                                'saison_id' => $seasonId,
+                                'is_active' => true
+                            ]
+                        ]);
+                    }
+
+                    // On récupère la fédération : via le club si l'élève en
+                    // a un, sinon directement depuis le contexte de
+                    // l'organisateur connecté (Ligue/Fédération).
+                    if ($clubIdPourLiaison) {
+                        $club = Club::with('league')->find($clubIdPourLiaison);
+                        $federationId = $club?->league?->federation_id;
+                    } elseif ($activeType === 'Federation') {
+                        $federationId = $activeId;
+                    } elseif ($activeType === 'Ligue') {
+                        $federationId = League::find($activeId)?->federation_id;
+                    } else {
+                        $federationId = null;
+                    }
 
                     // Licence::firstOrCreate(
                     //     [
