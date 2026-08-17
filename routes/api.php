@@ -41,6 +41,7 @@ use App\Http\Controllers\EvenementController;
 use App\Http\Controllers\ProgrammeController;
 use App\Http\Controllers\AttendanceController;
 use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\Auth\TwoFactorAuthController;
 use App\Http\Controllers\DisciplineController;
 use App\Http\Controllers\EquipementController;
 use App\Http\Controllers\EvaluationController;
@@ -104,6 +105,11 @@ Route::get('/reset-password/{token}', [ResetPasswordController::class, 'sentToke
     ->middleware(['guest', 'throttle:10,1'])
     ->name('password.reset');
 
+// Étape 2 du login quand la 2FA est active (voir LoginController::login) :
+// l'utilisateur n'est pas encore authentifié, juste porteur du jeton
+// temporaire reçu à l'étape 1, donc route publique elle aussi.
+Route::middleware('throttle:5,1')->post('/2fa/challenge', [TwoFactorAuthController::class, 'challenge']);
+
 // Lien de confirmation d'email envoyé à l'inscription (URL signée, pas besoin d'auth).
 Route::get('/email/verify/{id}/{hash}', [EmailVerificationController::class, 'verify'])
     ->middleware(['signed', 'throttle:10,1'])
@@ -137,6 +143,11 @@ Route::middleware(['auth:sanctum'])->group(function () {
 
     Route::post('/email/verification-notification', [EmailVerificationController::class, 'resend'])
         ->middleware('throttle:6,1');
+
+    Route::post('/2fa/enable', [TwoFactorAuthController::class, 'enable']);
+    Route::post('/2fa/confirm', [TwoFactorAuthController::class, 'confirm']);
+    Route::post('/2fa/disable', [TwoFactorAuthController::class, 'disable']);
+    Route::post('/2fa/recovery-codes/regenerate', [TwoFactorAuthController::class, 'regenerateRecoveryCodes']);
 
     //countries
     Route::apiResource('/countries', CountryController::class);

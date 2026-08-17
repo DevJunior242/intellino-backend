@@ -54,6 +54,8 @@ class User extends Authenticatable implements MustVerifyEmail
     protected $hidden = [
         'password',
         'remember_token',
+        'two_factor_secret',
+        'two_factor_recovery_codes',
     ];
 
     /**
@@ -66,7 +68,23 @@ class User extends Authenticatable implements MustVerifyEmail
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            // Chiffrés au repos (clé APP_KEY) : la valeur en base n'est jamais
+            // lisible telle quelle, mais reste utilisable normalement via
+            // l'attribut ($user->two_factor_secret) grâce au cast.
+            'two_factor_secret' => 'encrypted',
+            'two_factor_recovery_codes' => 'encrypted:array',
+            'two_factor_confirmed_at' => 'datetime',
         ];
+    }
+
+    /**
+     * La 2FA n'est active que si un secret a été confirmé par un code valide
+     * (voir TwoFactorAuthController::confirm) — un secret généré par enable()
+     * mais jamais confirmé ne doit pas bloquer la connexion.
+     */
+    public function hasEnabledTwoFactor(): bool
+    {
+        return $this->two_factor_secret !== null && $this->two_factor_confirmed_at !== null;
     }
 
 
