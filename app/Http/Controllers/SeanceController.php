@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Note;
+use App\Models\Combat;
 use App\Models\Competition;
 use App\Models\Inscription;
 use App\Models\OrdrePassage;
@@ -147,6 +148,22 @@ class SeanceController extends Controller
             ], 422);
         }
     }
+    // Kata seulement : un OrdrePassage qui démarre appartient à un Combat
+    // (duel) qui reste sinon à EN_ATTENTE(0) pendant toute sa notation —
+    // combatEnCours() (écran public/superviseur) ne cherche que
+    // [EN_COURS, HANTEI, TERMINE], donc un combat qui ne passe jamais par
+    // EN_COURS(1) est invisible pendant qu'il se déroule et cette requête
+    // retombe sur le dernier combat déjà terminé (ex : la demi-finale
+    // précédente affichée à la place de la finale en cours).
+    private function marquerCombatEnCours(?OrdrePassage $passage): void
+    {
+        if (!$passage || !$passage->combat_id) return;
+
+        Combat::where('id', $passage->combat_id)
+            ->where('status', Combat::STATUS_EN_ATTENTE)
+            ->update(['status' => Combat::STATUS_EN_COURS]);
+    }
+
     public function lancerSeance(ConfigNotation $config)
     {
         // Mode tablettes — vérifier que tous les arbitres actifs sont connectés
@@ -182,6 +199,7 @@ class SeanceController extends Controller
                 ], 422);
             }
             $premier->update(['status' => OrdrePassage::STATUS_STARTED]);
+            $this->marquerCombatEnCours($premier);
             //passer de config a inscription pourr recuperer athlete
             $premier->load(['inscription.athlete']);
             $monAthle = $premier->inscription->athlete->fullname ?? "Aucun athlète";
@@ -226,6 +244,7 @@ class SeanceController extends Controller
 
         if ($suivant) {
             $suivant->update(['status' => OrdrePassage::STATUS_STARTED]);
+            $this->marquerCombatEnCours($suivant);
         }
         broadcast(new TatamiUpdated($config->id));
 
@@ -265,6 +284,7 @@ class SeanceController extends Controller
 
         if ($suivant) {
             $suivant->update(['status' => OrdrePassage::STATUS_STARTED]);
+            $this->marquerCombatEnCours($suivant);
         }
 
         broadcast(new TatamiUpdated($config->id));
