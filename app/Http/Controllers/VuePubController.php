@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Combat;
 use Illuminate\Http\Request;
 use App\Models\ConfigNotation;
+use App\Services\KataNotationService;
 
 class VuePubController extends Controller
 {
@@ -29,8 +30,16 @@ class VuePubController extends Controller
             ])
             ->first();
 
+        // Détail des notes des deux camps par juge (Kata uniquement) — pour
+        // l'écran public, une seule grille AKA/AO au lieu de les afficher
+        // séparément puis un total sans lien visible entre les deux.
+        $votesJuges = ($combat && $combat->configNotation->estKata())
+            ? app(KataNotationService::class)->detailVotesJuges($combat)
+            : [];
+
         return response()->json([
-            'combat' => $combat
+            'combat'      => $combat,
+            'votes_juges' => $votesJuges,
         ]);
     }
 

@@ -241,6 +241,51 @@ class KataNotationService
     }
 
     /**
+     * Détail par juge des notes des deux camps et du vote qui en résulte
+     * (Art. 5.4.2 : chaque juge compare ses deux propres notes), pour
+     * l'affichage public façon feuille de match WKF — les deux notes d'un
+     * même juge côte à côte plutôt qu'un camp puis l'autre séparément.
+     * Un juge sans note des deux côtés a un vote null (en attente).
+     */
+    public function detailVotesJuges(Combat $combat): array
+    {
+        $notesAka = $this->totalNotesParJuge($combat->ordrePassageAka);
+        $notesAo  = $this->totalNotesParJuge($combat->ordrePassageAo);
+
+        $jugeIds = array_unique(array_merge(array_keys($notesAka), array_keys($notesAo)));
+
+        $rotations = RotationArbitre::whereIn('id', $jugeIds)
+            ->with('arbitreCompetition.user:id,fullname')
+            ->get()
+            ->keyBy('id');
+
+        $lignes = array_map(function ($jugeId) use ($notesAka, $notesAo, $rotations) {
+            $rotation = $rotations->get($jugeId);
+            $noteAka  = $notesAka[$jugeId] ?? null;
+            $noteAo   = $notesAo[$jugeId] ?? null;
+
+            $vote = null;
+            if ($noteAka !== null && $noteAo !== null) {
+                if ($noteAka > $noteAo) $vote = 'aka';
+                elseif ($noteAo > $noteAka) $vote = 'ao';
+                // sinon note identique des deux côtés pour ce juge → pas de vote
+            }
+
+            return [
+                'poste'    => $rotation?->poste,
+                'juge'     => $rotation?->arbitreCompetition?->user?->fullname ?? "Inconnu",
+                'note_aka' => $noteAka,
+                'note_ao'  => $noteAo,
+                'vote'     => $vote,
+            ];
+        }, $jugeIds);
+
+        usort($lignes, fn($a, $b) => ($a['poste'] ?? 999) <=> ($b['poste'] ?? 999));
+
+        return $lignes;
+    }
+
+    /**
      * À appeler après qu'un passage devienne Terminé ou Kiken. Un Kiken fait
      * gagner l'adversaire immédiatement, sans attendre sa propre prestation
      * (même logique que les byes Kumite). Sinon, résout le combat dès que
