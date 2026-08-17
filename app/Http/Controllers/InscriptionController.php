@@ -43,13 +43,27 @@ class InscriptionController extends Controller
     public function getEvenementsOuverts(Request $request)
     {
 
-        $activeId = $request->attributes->get('organisateur_id');
+        $activeId   = $request->attributes->get('organisateur_id');
+        $activeType = $request->attributes->get('organisateur_type');
 
-        $clubId = $activeId;
+        // Un organisateur voit les événements de sa propre structure ainsi
+        // que ceux organisés au-dessus de lui dans la hiérarchie (un club
+        // voit aussi les événements de sa ligue et de sa fédération ; une
+        // ligue voit aussi ceux de sa fédération). $activeId n'est un club
+        // que si l'appelant est effectivement un Club — sinon Club::where()
+        // ne matcherait jamais rien, ce qui plantait la recherche pour une
+        // Ligue/Fédération inscrivant directement ses athlètes.
+        $clubId = $activeType === 'Club' ? $activeId : null;
+        $leagueId = $activeType === 'Ligue' ? $activeId : null;
+        $federationId = $activeType === 'Federation' ? $activeId : null;
 
-        $league = Club::where('id', $clubId)->first(['league_id']);
-        $leagueId = $league?->league_id;
-        $federationId = $leagueId ? League::where('id', $leagueId)->value('federation_id') : null;
+        if ($activeType === 'Club') {
+            $club = Club::where('id', $clubId)->first(['league_id']);
+            $leagueId = $club?->league_id;
+            $federationId = $leagueId ? League::where('id', $leagueId)->value('federation_id') : null;
+        } elseif ($activeType === 'Ligue') {
+            $federationId = League::where('id', $activeId)->value('federation_id');
+        }
 
         $evenements = Evenement::where('status', Evenement::STATUT_EN_COURS)
             ->where(function ($q) use ($clubId, $leagueId, $federationId) {
@@ -104,10 +118,10 @@ class InscriptionController extends Controller
         $activeId   = $request->attributes->get('organisateur_id');
         $activeType = $request->attributes->get('organisateur_type');
 
-        if (!$activeId || $activeType !== 'Club') {
+        if (!$activeId || !$activeType) {
             return response()->json([
                 'success' => false,
-                'message' => 'Impossible d\'identifier le club connecté.'
+                'message' => 'Impossible d\'identifier l\'organisateur connecté.'
             ], 403);
         }
 
@@ -117,10 +131,32 @@ class InscriptionController extends Controller
         $dejaInscrits = Inscription::where('competition_id', $competition->id)
             ->pluck('athlete_id');
 
-        $students = Student::query()
+        $query = Student::query()
             ->join('club_students', 'club_students.student_id', '=', 'students.id')
-            ->where('club_students.club_id', $activeId)
-            ->whereNull('club_students.deleted_at') // Exclure si l'élève a été retiré du club
+            ->whereNull('club_students.deleted_at'); // Exclure si l'élève a été retiré du club
+
+        // Un Club ne voit que ses propres licenciés. Une Ligue/Fédération qui
+        // organise directement une compétition n'est pas limitée à un seul
+        // club : elle voit tous les athlètes des clubs de son ressort
+        // (hiérarchie club -> ligue -> fédération), pas seulement ceux d'un
+        // club en particulier.
+        if ($activeType === 'Club') {
+            $query->where('club_students.club_id', $activeId);
+        } elseif ($activeType === 'Ligue') {
+            $query->join('clubs', 'clubs.id', '=', 'club_students.club_id')
+                ->where('clubs.league_id', $activeId);
+        } elseif ($activeType === 'Federation') {
+            $liguesIds = League::where('federation_id', $activeId)->pluck('id');
+            $query->join('clubs', 'clubs.id', '=', 'club_students.club_id')
+                ->whereIn('clubs.league_id', $liguesIds);
+        } else {
+            return response()->json([
+                'success' => false,
+                'message' => 'Organisateur non reconnu.'
+            ], 403);
+        }
+
+        $students = $query
             ->whereNotIn('students.id', $dejaInscrits) // Déjà inscrit à cette épreuve
             ->when($category && $category->sexe !== 'Mixte', function ($q) use ($category) {
                 $q->where('students.sex', $category->sexe);
@@ -132,6 +168,7 @@ class InscriptionController extends Controller
                 $q->whereBetween('students.birthdate', [$dateNaissanceMin, $dateNaissanceMax]);
             })
             ->select('students.id', 'students.fullname', 'students.birthdate', 'students.sex')
+            ->distinct()
             ->orderBy('students.fullname')
             ->get();
 
