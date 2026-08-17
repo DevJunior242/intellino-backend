@@ -59,6 +59,7 @@ class CategoryController extends Controller
         }
 
         $categories = Category::where('saison_id', $saisonActive->id)
+            ->with('disciplines:id,nom')
             ->orderBy('age_min', 'asc')
             ->get();
 
@@ -94,6 +95,7 @@ class CategoryController extends Controller
                 'taux'            => $studentCount > 0
                     ? round(($licenciesCount / $studentCount) * 100)
                     : 0,
+                'disciplines'     => $cat->disciplines->pluck('nom'),
             ];
         });
 
