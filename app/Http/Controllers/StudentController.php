@@ -296,11 +296,15 @@ class StudentController extends Controller
 
                         $studentUserId = $studentUser->id;
 
-                        // Gestion du rôle dans le nouveau club (club_users)
-                        $role = cache()->rememberForever("role_karateka", fn() => Role::where('name', 'karateka')->first());
-                        if ($role) {
-                            // syncWithoutDetaching évite de recréer la ligne si elle existe déjà pour ce club
-                            $studentUser->clubs()->syncWithoutDetaching([$activeId => ['role_id' => $role->id]]);
+                        // Gestion du rôle dans le nouveau club (club_users) —
+                        // seulement s'il y a un vrai club (athlète indépendant
+                        // sinon, voir $clubIdPourLiaison plus haut).
+                        if ($clubIdPourLiaison) {
+                            $role = cache()->rememberForever("role_karateka", fn() => Role::where('name', 'karateka')->first());
+                            if ($role) {
+                                // syncWithoutDetaching évite de recréer la ligne si elle existe déjà pour ce club
+                                $studentUser->clubs()->syncWithoutDetaching([$clubIdPourLiaison => ['role_id' => $role->id]]);
+                            }
                         }
                     }
 
@@ -346,18 +350,9 @@ class StudentController extends Controller
                     }
 
                     // --- 4. LIAISON HISTORIQUE CLUB-ÉLÈVE AVEC LE SAISON_ID ---
-                    // Un Club s'auto-affecte toujours comme club de l'élève.
-                    // Une Ligue/Fédération qui inscrit un athlète manuellement
-                    // peut choisir un club réel de son ressort (club_id
-                    // fourni) ou laisser l'élève sans club (athlète
-                    // indépendant) — $clubIdPourLiaison reste alors null et
-                    // aucune ligne club_students n'est créée (utiliser
-                    // $activeId ici planterait : ce serait l'ID de la Ligue/
-                    // Fédération elle-même, pas un club réel).
-                    $clubIdPourLiaison = $activeType === 'Club'
-                        ? $activeId
-                        : ($validated['club_id'] ?? null);
-
+                    // $clubIdPourLiaison calculé une fois plus haut (avant la
+                    // boucle) : null = athlète indépendant, aucune ligne
+                    // club_students créée.
                     if ($clubIdPourLiaison) {
                         $student->clubs()->syncWithoutDetaching([
                             $clubIdPourLiaison => [
