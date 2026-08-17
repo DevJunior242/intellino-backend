@@ -28,22 +28,49 @@ class StudentController extends Controller
     use AuthorizesRequests;
     use ResolvesActiveSaison;
 
+    /**
+     * Élèves visibles par l'organisateur connecté : un Club ne voit que le
+     * sien, une Ligue/Fédération voit tous les clubs de son ressort
+     * (hiérarchie club -> ligue -> fédération). $clubId (optionnel) restreint
+     * encore à un club précis dans ce ressort, sans jamais l'élargir au-delà
+     * (ex: ClubExamModal choisissant un club précis parmi ceux d'une ligue).
+     */
+    private function studentsVisiblesPar(string $activeId, string $activeType, ?string $clubId = null)
+    {
+        $query = Student::query()
+            ->join('club_students', 'club_students.student_id', '=', 'students.id')
+            ->whereNull('club_students.deleted_at')
+            ->select('students.*');
+
+        if ($activeType === 'Club') {
+            $query->where('club_students.club_id', $activeId);
+        } elseif ($activeType === 'Ligue') {
+            $query->join('clubs', 'clubs.id', '=', 'club_students.club_id')
+                ->where('clubs.league_id', $activeId);
+        } elseif ($activeType === 'Federation') {
+            $liguesIds = League::where('federation_id', $activeId)->pluck('id');
+            $query->join('clubs', 'clubs.id', '=', 'club_students.club_id')
+                ->whereIn('clubs.league_id', $liguesIds);
+        }
+
+        if ($clubId && $activeType !== 'Club') {
+            $query->where('club_students.club_id', $clubId);
+        }
+
+        return $query->distinct();
+    }
+
     public function index(Request $request)
     {
-        $activeId = $request->attributes->get('organisateur_id');
-        $role = $request->attributes->get('role');
+        $activeId   = $request->attributes->get('organisateur_id');
+        $activeType = $request->attributes->get('organisateur_type');
+        $role       = $request->attributes->get('role');
         $isSuperAdmin = ($role === 'super_admin');
 
         if ($isSuperAdmin) {
             $students = Student::with('clubs:id,name')->get();
         } else {
-            // Exclut les élèves retirés du club (pivot club_students soft-supprimé)
-            $students = Student::query()
-                ->join('club_students', 'club_students.student_id', '=', 'students.id')
-                ->where('club_students.club_id', $activeId)
-                ->whereNull('club_students.deleted_at')
-                ->select('students.*')
-                ->get();
+            $students = $this->studentsVisiblesPar($activeId, $activeType, $request->input('club_id'))->get();
         }
 
         $formattedStudents = $students->map(function ($student) use ($isSuperAdmin) {
@@ -62,6 +89,36 @@ class StudentController extends Controller
             'success' => true,
             'message' => $isSuperAdmin ? 'Super Admin' : 'Students list',
             'students' => $formattedStudents,
+        ]);
+    }
+
+    /**
+     * Recherche paginée d'élèves par nom, pour les sélecteurs de type
+     * Autocomplete (ex: ajout d'un candidat à un examen) — évite de
+     * télécharger tout le roster d'un coup à chaque ouverture du sélecteur.
+     */
+    public function search(Request $request)
+    {
+        $activeId   = $request->attributes->get('organisateur_id');
+        $activeType = $request->attributes->get('organisateur_type');
+
+        if (!$activeId || !$activeType) {
+            return response()->json(['success' => false, 'message' => 'Organisateur non identifié.'], 403);
+        }
+
+        $perPage = min((int) $request->input('per_page', 15), 50);
+
+        $students = $this->studentsVisiblesPar($activeId, $activeType, $request->input('club_id'))
+            ->when($request->filled('q'), function ($q) use ($request) {
+                $q->where('students.fullname', 'LIKE', '%' . $request->input('q') . '%');
+            })
+            ->orderBy('students.fullname')
+            ->paginate($perPage);
+
+        return response()->json([
+            'success' => true,
+            'students' => $students->items(),
+            'has_more' => $students->hasMorePages(),
         ]);
     }
 

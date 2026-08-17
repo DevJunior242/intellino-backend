@@ -546,6 +546,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
         //student 
 
         Route::get('/students', [StudentController::class, 'index']);
+        Route::get('/students/search', [StudentController::class, 'search']);
         Route::get('/students/mon-club', [StudentController::class, 'monClub']);
         Route::get('/students/mes-parents', [StudentController::class, 'mesParents']);
         Route::get('/students/without-grade', [StudentController::class, 'studentsWithoutGrade']);
