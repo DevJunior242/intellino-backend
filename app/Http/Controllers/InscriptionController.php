@@ -131,23 +131,37 @@ class InscriptionController extends Controller
         $dejaInscrits = Inscription::where('competition_id', $competition->id)
             ->pluck('athlete_id');
 
-        $query = Student::query()
+        // Critères d'éligibilité (âge/sexe de la catégorie + pas déjà
+        // inscrit) partagés entre la recherche "via club" et la recherche
+        // "athlète indépendant" ci-dessous.
+        $appliquerFiltres = function ($q) use ($dejaInscrits, $category) {
+            $q->whereNotIn('students.id', $dejaInscrits)
+                ->when($category && $category->sexe !== 'Mixte', function ($q2) use ($category) {
+                    $q2->where('students.sex', $category->sexe);
+                })
+                ->when($category && !is_null($category->age_min) && !is_null($category->age_max), function ($q2) use ($category) {
+                    $aujourdhui = \Carbon\Carbon::now();
+                    $dateNaissanceMin = $aujourdhui->copy()->subYears($category->age_max)->format('Y-m-d');
+                    $dateNaissanceMax = $aujourdhui->copy()->subYears($category->age_min)->format('Y-m-d');
+                    $q2->whereBetween('students.birthdate', [$dateNaissanceMin, $dateNaissanceMax]);
+                });
+            return $q;
+        };
+
+        // 1) Athlètes rattachés à un club dans le ressort de l'organisateur
+        // (hiérarchie club -> ligue -> fédération).
+        $viaClub = Student::query()
             ->join('club_students', 'club_students.student_id', '=', 'students.id')
             ->whereNull('club_students.deleted_at'); // Exclure si l'élève a été retiré du club
 
-        // Un Club ne voit que ses propres licenciés. Une Ligue/Fédération qui
-        // organise directement une compétition n'est pas limitée à un seul
-        // club : elle voit tous les athlètes des clubs de son ressort
-        // (hiérarchie club -> ligue -> fédération), pas seulement ceux d'un
-        // club en particulier.
         if ($activeType === 'Club') {
-            $query->where('club_students.club_id', $activeId);
+            $viaClub->where('club_students.club_id', $activeId);
         } elseif ($activeType === 'Ligue') {
-            $query->join('clubs', 'clubs.id', '=', 'club_students.club_id')
+            $viaClub->join('clubs', 'clubs.id', '=', 'club_students.club_id')
                 ->where('clubs.league_id', $activeId);
         } elseif ($activeType === 'Federation') {
             $liguesIds = League::where('federation_id', $activeId)->pluck('id');
-            $query->join('clubs', 'clubs.id', '=', 'club_students.club_id')
+            $viaClub->join('clubs', 'clubs.id', '=', 'club_students.club_id')
                 ->whereIn('clubs.league_id', $liguesIds);
         } else {
             return response()->json([
@@ -156,21 +170,39 @@ class InscriptionController extends Controller
             ], 403);
         }
 
-        $students = $query
-            ->whereNotIn('students.id', $dejaInscrits) // Déjà inscrit à cette épreuve
-            ->when($category && $category->sexe !== 'Mixte', function ($q) use ($category) {
-                $q->where('students.sex', $category->sexe);
-            })
-            ->when($category && !is_null($category->age_min) && !is_null($category->age_max), function ($q) use ($category) {
-                $aujourdhui = \Carbon\Carbon::now();
-                $dateNaissanceMin = $aujourdhui->copy()->subYears($category->age_max)->format('Y-m-d');
-                $dateNaissanceMax = $aujourdhui->copy()->subYears($category->age_min)->format('Y-m-d');
-                $q->whereBetween('students.birthdate', [$dateNaissanceMin, $dateNaissanceMax]);
-            })
+        $students = $appliquerFiltres($viaClub)
             ->select('students.id', 'students.fullname', 'students.birthdate', 'students.sex')
             ->distinct()
-            ->orderBy('students.fullname')
             ->get();
+
+        // 2) Athlètes indépendants (sans club) inscrits directement par cet
+        // organisateur — ou par une de ses ligues, si on est la fédération.
+        // Un Club n'a pas d'athlètes indépendants à lui : tous ses
+        // licenciés passent par club_students.
+        if ($activeType !== 'Club') {
+            $organisateurs = [[$activeType, $activeId]];
+            if ($activeType === 'Federation') {
+                foreach (League::where('federation_id', $activeId)->pluck('id') as $ligueId) {
+                    $organisateurs[] = ['Ligue', $ligueId];
+                }
+            }
+
+            $independants = Student::query()->where(function ($q) use ($organisateurs) {
+                foreach ($organisateurs as [$type, $id]) {
+                    $q->orWhere(function ($q2) use ($type, $id) {
+                        $q2->where('organisateur_type', $type)->where('organisateur_id', $id);
+                    });
+                }
+            });
+
+            $independants = $appliquerFiltres($independants)
+                ->select('students.id', 'students.fullname', 'students.birthdate', 'students.sex')
+                ->get();
+
+            $students = $students->concat($independants);
+        }
+
+        $students = $students->unique('id')->sortBy('fullname')->values();
 
         return response()->json([
             'success'  => true,

@@ -337,6 +337,12 @@ class StudentController extends Controller
                             'user_id'   => $studentUserId,
                             'is_adult'  => Carbon::parse($studentData['birthdate'])->age >= 18,
                             'photo'     => $photoPath,
+                            // Athlète indépendant (pas de club) : on retient
+                            // qui l'a inscrit directement, sinon aucune
+                            // requête d'éligibilité aux épreuves ne pourrait
+                            // jamais le retrouver (voir studentsDisponibles()).
+                            'organisateur_id'   => $clubIdPourLiaison ? null : $activeId,
+                            'organisateur_type' => $clubIdPourLiaison ? null : $activeType,
                         ]);
                     } else {
                         // SCÉNARIO 2 : L'élève existe déjà ! (Réinscription ou Transfert)
