@@ -86,12 +86,18 @@ class KataNotationService
             ])
             ->get();
 
-        $dataNotes = $notes->map(fn($note) => [
-            'id'      => $note->id,
-            'valeur'  => (float) $note->valeur,
-            'poste'   => $note->rotationArbitre?->poste ?? "Inconnu",
-            'arbitre' => $note->rotationArbitre?->arbitreCompetition?->user?->fullname ?? "Inconnu",
-        ]);
+        // Triées par poste (position réelle du juge sur le tatami), pas par
+        // ordre d'arrivée des notes — sinon "Juge N" ne désigne pas le même
+        // juge selon qu'on regarde côté saisie (juges) ou côté public.
+        $dataNotes = $notes
+            ->sortBy(fn($note) => $note->rotationArbitre?->poste ?? PHP_INT_MAX)
+            ->values()
+            ->map(fn($note) => [
+                'id'      => $note->id,
+                'valeur'  => (float) $note->valeur,
+                'poste'   => $note->rotationArbitre?->poste ?? "Inconnu",
+                'arbitre' => $note->rotationArbitre?->arbitreCompetition?->user?->fullname ?? "Inconnu",
+            ]);
 
         $config = $ordrePassage->configNotation()->with('nbJugesOption')->first();
         $nbJugesAttendus = $config->nbJugesOption ? (int) $config->nbJugesOption->valeur : 5;
