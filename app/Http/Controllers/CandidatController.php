@@ -181,10 +181,19 @@ class CandidatController extends Controller
             // 2. Définition des accès
             $isOwner = ($examen->organisateur_id === $activeId);
 
-            // Un club peut inscrire si l'examen est organisé par une Ligue
-            $isClubAccessingLeague = ($activeType === 'Club' && $examen->organisateur_type === 'Ligue');
+            // Un club peut inscrire si l'examen est organisé par sa ligue,
+            // ou par la fédération de sa ligue (mêmes règles que storeBatch()).
+            $club = $activeType === 'Club' ? Club::with('league')->find($activeId) : null;
+            $isClubAccessingLeague = ($activeType === 'Club' && $examen->organisateur_type === 'Ligue' && $club && $examen->organisateur_id === $club->league_id);
+            $isClubAccessingFederation = (
+                $activeType === 'Club'
+                && $examen->organisateur_type === 'Federation'
+                && $club
+                && $club->league
+                && $examen->organisateur_id === $club->league->federation_id
+            );
 
-            if (!$isOwner && !$isClubAccessingLeague) {
+            if (!$isOwner && !$isClubAccessingLeague && !$isClubAccessingFederation) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Vous n\'avez pas la permission d\'inscrire des candidats à cet examen.'
