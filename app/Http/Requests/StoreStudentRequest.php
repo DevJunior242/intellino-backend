@@ -43,7 +43,9 @@ class StoreStudentRequest extends FormRequest
 
             // On valide chaque élément à l'intérieur du tableau students
             'students.*.fullname' => ['bail', 'required', 'regex:/^[\pL\s\d\-]+$/u', 'max:50'],
-            'students.*.birthdate' => ['required', 'date', 'before_or_equal:today'],
+            // 'after' rejette les dates absurdes (ex: année 0200 tapée par
+            // erreur au lieu de 2020) — personne n'a plus de 100 ans ici.
+            'students.*.birthdate' => ['required', 'date', 'before_or_equal:today', 'after:' . now()->subYears(100)->format('Y-m-d')],
             'students.*.sex' => ['required', 'string', 'max:255'],
 
             // Validation conditionnelle pour l'email et le téléphone
