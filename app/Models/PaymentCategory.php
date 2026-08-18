@@ -12,7 +12,18 @@ class PaymentCategory extends Model
         'name',
         'slug',
         'affects_validity',
+        'is_system',
+        'club_id',
+    ];
+    protected $casts = [
+        'affects_validity' => 'boolean',
+        'is_system' => 'boolean',
     ];
     public $incrementing = false;
     protected $keyType = 'string';
+
+    public function club()
+    {
+        return $this->belongsTo(Club::class);
+    }
 }

@@ -23,7 +23,6 @@ class StorePaymentCategoryRequest extends FormRequest
     {
         return [
             'name' => 'required|string|max:100',
-            'slug' => 'required|string|unique:payment_categories,slug',
             'affects_validity' => 'required|boolean'
         ];
     }
@@ -33,8 +32,6 @@ class StorePaymentCategoryRequest extends FormRequest
         return [
             'name.required' => 'Le nom est obligatoire',
             'name.max' => 'Le nom doit faire moins de 100 caractères',
-            'slug.required' => 'Le slug est obligatoire',
-            'slug.unique' => 'Le slug doit être unique',
             'affects_validity.required' => 'Le champ "Affecte la validité" est obligatoire',
         ];
     }

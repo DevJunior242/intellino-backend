@@ -193,10 +193,6 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::delete('/{id}', [ContactController::class, 'destroy']);
     });
 
-    //payment categories
-    Route::prefix('payment-categories')->group(function () {
-        Route::get('/', [PaymentCategoryController::class, 'index']);
-    });
 
 
 
@@ -634,6 +630,13 @@ Route::middleware(['auth:sanctum'])->group(function () {
             Route::get('/{examen}', [EvaluationController::class, 'index']);
             Route::post('/examen/{examen}/candidat/{candidat}', [EvaluationController::class, 'store']);
             Route::put('/examen/{examen}/candidat/{candidat}', [EvaluationController::class, 'update']);
+        });
+
+        //payment categories
+        Route::prefix('payment-categories')->group(function () {
+            Route::get('/', [PaymentCategoryController::class, 'index']);
+            Route::post('/', [PaymentCategoryController::class, 'store']);
+            Route::delete('/{id}', [PaymentCategoryController::class, 'destroy']);
         });
 
         //pricing plans
