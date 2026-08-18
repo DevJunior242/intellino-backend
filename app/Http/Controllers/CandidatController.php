@@ -222,13 +222,49 @@ class CandidatController extends Controller
             $examenId = $examen->id;
             $studentId = $student->id;
 
+            // Club responsable du paiement : le club connecté lui-même, ou —
+            // si c'est la ligue/fédération qui ajoute directement un candidat
+            // à son propre examen — le club auquel appartient déjà l'élève
+            // (le plus souvent le cas réel). Reste null pour un athlète
+            // vraiment indépendant : pas de transaction générée dans ce cas.
+            $payingClubId = $activeType === 'Club'
+                ? $activeId
+                : $student->clubs()->value('clubs.id');
 
+            $candidat = DB::transaction(function () use ($examenId, $studentId, $examen, $payingClubId) {
+                $created = ExamenCandidat::create([
+                    'student_id' => $studentId,
+                    'examen_id' => $examenId,
+                    'club_id' => $payingClubId,
+                    'status' => 'registered',
+                ]);
 
-            $candidat = ExamenCandidat::create([
-                'student_id' => $studentId,
-                'examen_id' => $examenId,
-                'status' => 'registered',
-            ]);
+                // Même suivi de paiement qu'un ajout en lot (storeBatch) —
+                // un examen payant génère une transaction même pour un ajout
+                // un par un, y compris quand le club s'inscrit lui-même à son
+                // propre examen (pour qu'il retrouve cette recette dans sa
+                // Comptabilité).
+                if ((float) $examen->price > 0 && $payingClubId) {
+                    $transaction = \App\Models\Transaction::create([
+                        'club_id'           => $payingClubId,
+                        'organisateur_id'   => $examen->organisateur_id,
+                        'organisateur_type' => $examen->organisateur_type,
+                        'saison_id'         => $examen->saison_id,
+                        'payable_type'      => \App\Models\Transaction::PAYABLE_EXAMEN,
+                        'payable_id'        => $examen->id,
+                        'amount'            => $examen->price,
+                        'status'            => 'pending',
+                    ]);
+
+                    \App\Models\TransactionItem::create([
+                        'transaction_id' => $transaction->id,
+                        'itemable_type'  => \App\Models\TransactionItem::ITEMABLE_EXAMEN_CANDIDAT,
+                        'itemable_id'    => $created->id,
+                    ]);
+                }
+
+                return $created;
+            });
 
             return response()->json([
                 'success' => true,

@@ -59,11 +59,12 @@ class ExamenController extends Controller
                 ->where('organisateur_type', 'Ligue')
                 ->paginate(8);
         }
-        // 4. Si Club : voit SES examens + les examens OUVERTS de la Ligue
+        // 4. Si Club : voit SES examens + les examens OUVERTS de sa Ligue et de sa Fédération
         else {
-            $currentClub = \App\Models\Club::select('id', 'league_id')->find($activeId);
+            $currentClub = \App\Models\Club::with('league:id,federation_id')->select('id', 'league_id')->find($activeId);
             $parentLeagueId = $currentClub?->league_id;
-            $examens = $query->where(function ($q) use ($activeId, $parentLeagueId) {
+            $parentFederationId = $currentClub?->league?->federation_id;
+            $examens = $query->where(function ($q) use ($activeId, $parentLeagueId, $parentFederationId) {
                 // Ses propres examens de club
                 $q->where(function ($sub) use ($activeId) {
                     $sub->where('organisateur_id', $activeId)
@@ -75,6 +76,15 @@ class ExamenController extends Controller
                     $q->orWhere(function ($sub) use ($parentLeagueId) {
                         $sub->where('organisateur_id', $parentLeagueId)
                             ->where('organisateur_type', 'Ligue')
+                            ->whereIn('status', [Examen::STATUS_SCHEDULED, Examen::STATUS_ONGOING]);
+                    });
+                }
+
+                // PLUS les examens de sa fédération (si elle existe)
+                if ($parentFederationId) {
+                    $q->orWhere(function ($sub) use ($parentFederationId) {
+                        $sub->where('organisateur_id', $parentFederationId)
+                            ->where('organisateur_type', 'Federation')
                             ->whereIn('status', [Examen::STATUS_SCHEDULED, Examen::STATUS_ONGOING]);
                     });
                 }
