@@ -15,6 +15,7 @@ return new class extends Migration
                 ->constrained('users')->cascadeOnDelete();
             $table->string('name');
             $table->foreignUuid('current_grade_id')->constrained('grades')->onDelete('cascade');
+            $table->foreignUuid('saison_id')->nullable()->constrained('saisons')->nullOnDelete();
             $table->timestamps();
         });
 
