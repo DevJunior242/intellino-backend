@@ -11,8 +11,9 @@ use App\Http\Requests\StoreAffiliationRequest;
 
 /**
  * Le tarif d'affiliation (cotisation) d'une saison est toujours défini par
- * la Fédération elle-même — voir AffiliationPaymentController pour le suivi,
- * club par club, du paiement de ce tarif.
+ * la Fédération elle-même — voir TransactionController
+ * (payable_type = 'affiliation') pour le suivi, club par club, du paiement
+ * de ce tarif.
  */
 class AffiliationController extends Controller
 {

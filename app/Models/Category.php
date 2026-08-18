@@ -28,7 +28,7 @@ class Category extends Model
 
         return Licence::where('federation_id', $federationId)
             ->where('saison_id', $saisonId)
-            ->where('status', Licence::STATUS_VALIDE)
+            ->where('status', Licence::STATUS_PAYE)
             ->when($leagueId, function ($query) use ($leagueId) {
                 $query->whereHas('club', fn($q) => $q->where('league_id', $leagueId));
             })

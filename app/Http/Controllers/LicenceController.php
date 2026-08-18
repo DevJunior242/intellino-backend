@@ -192,22 +192,25 @@ class LicenceController extends Controller
                 ]);
             }
 
-            // Créer un nouveau lot de paiement pour ces licences
+            // Créer une nouvelle transaction pour ces licences
             $montantLot = collect($created)->sum('montant_paye');
 
-            $lot = \App\Models\LicencePayment::create([
-                'saison_id'     => $saisonActive->id,
-                'federation_id' => $federationId,
-                'club_id'       => $club->id,
-                'amount'        => $montantLot,
-                'status'        => 'pending',
+            $lot = \App\Models\Transaction::create([
+                'club_id'           => $club->id,
+                'organisateur_id'   => $federationId,
+                'organisateur_type' => 'Federation',
+                'saison_id'         => $saisonActive->id,
+                'payable_type'      => \App\Models\Transaction::PAYABLE_LICENCE_LOT,
+                'amount'            => $montantLot,
+                'status'            => 'pending',
             ]);
 
-            // Lier chaque licence créée à ce lot
+            // Lier chaque licence créée à cette transaction
             foreach ($created as $licence) {
-                \App\Models\LicencePaymentItem::create([
-                    'licence_payment_id' => $lot->id,
-                    'licence_id'         => $licence->id,
+                \App\Models\TransactionItem::create([
+                    'transaction_id' => $lot->id,
+                    'itemable_type'  => \App\Models\TransactionItem::ITEMABLE_LICENCE,
+                    'itemable_id'    => $licence->id,
                 ]);
             }
 
@@ -339,10 +342,10 @@ class LicenceController extends Controller
             ], 403);
         }
 
-        if ((int) $licence->status === Licence::STATUS_VALIDE) {
+        if ((int) $licence->status === Licence::STATUS_PAYE) {
             return response()->json([
                 'success' => false,
-                'message' => 'Cette licence est déjà validée et ne peut plus être annulée.'
+                'message' => 'Cette licence est déjà payée et ne peut plus être annulée.'
             ], 422);
         }
 
@@ -350,23 +353,26 @@ class LicenceController extends Controller
         $federationId = $licence->federation_id;
         $clubId       = $licence->club_id;
 
-        // Retrouver le lot de paiement auquel appartient cette licence
-        $item = \App\Models\LicencePaymentItem::where('licence_id', $licence->id)->first();
+        // Retrouver la transaction à laquelle appartient cette licence
+        $item = \App\Models\TransactionItem::where('itemable_type', \App\Models\TransactionItem::ITEMABLE_LICENCE)
+            ->where('itemable_id', $licence->id)
+            ->first();
 
-        $licence->delete(); // softDelete — cascade supprime l'item automatiquement
+        $licence->delete(); // softDelete — l'item de transaction n'est pas supprimé automatiquement
 
-        // Si le lot existe et n'est pas encore payé, recalculer son montant
+        // Si la transaction existe et n'est pas encore payée, recalculer son montant
         if ($item) {
-            $lot = \App\Models\LicencePayment::find($item->licence_payment_id);
+            $lot = \App\Models\Transaction::find($item->transaction_id);
 
             if ($lot && $lot->status !== 'paid') {
-                $nouveauMontant = \App\Models\LicencePaymentItem::where('licence_payment_id', $lot->id)
-                    ->join('licences', 'licences.id', '=', 'licence_payment_items.licence_id')
+                $nouveauMontant = \App\Models\TransactionItem::where('transaction_id', $lot->id)
+                    ->where('itemable_type', \App\Models\TransactionItem::ITEMABLE_LICENCE)
+                    ->join('licences', 'licences.id', '=', 'transaction_items.itemable_id')
                     ->whereNull('licences.deleted_at') // respecte le softDelete
                     ->sum('licences.montant_paye');
 
                 if ($nouveauMontant <= 0) {
-                    // Plus aucune licence dans ce lot — on supprime le lot aussi
+                    // Plus aucune licence dans cette transaction — on la supprime aussi
                     $lot->delete();
                 } else {
                     $lot->update([

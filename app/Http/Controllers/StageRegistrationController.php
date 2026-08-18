@@ -109,21 +109,26 @@ class StageRegistrationController extends Controller
                 ]);
             }
 
-            // Créer un nouveau lot de paiement pour ces inscriptions
+            // Créer une nouvelle transaction pour ces inscriptions
             $montantLot = $stage->price * count($created);
 
-            $lot = \App\Models\StagePayment::create([
-                'stage_id' => $stage->id,
-                'club_id'  => $club->id,
-                'amount'   => $montantLot,
-                'status'   => 'pending',
+            $lot = \App\Models\Transaction::create([
+                'club_id'           => $club->id,
+                'organisateur_id'   => $stage->organisateur_id,
+                'organisateur_type' => $stage->organisateur_type,
+                'saison_id'         => $stage->saison_id,
+                'payable_type'      => \App\Models\Transaction::PAYABLE_STAGE,
+                'payable_id'        => $stage->id,
+                'amount'            => $montantLot,
+                'status'            => 'pending',
             ]);
 
-            // Lier chaque inscription à ce lot
+            // Lier chaque inscription à cette transaction
             foreach ($created as $registration) {
-                \App\Models\StagePaymentItem::create([
-                    'stage_payment_id'      => $lot->id,
-                    'stage_registration_id' => $registration->id,
+                \App\Models\TransactionItem::create([
+                    'transaction_id' => $lot->id,
+                    'itemable_type'  => \App\Models\TransactionItem::ITEMABLE_STAGE_REGISTRATION,
+                    'itemable_id'    => $registration->id,
                 ]);
             }
 
@@ -272,7 +277,7 @@ class StageRegistrationController extends Controller
             ], 403);
         }
 
-        // togglePaymentStatus supprimé — le paiement est géré via StagePayment/StagePaymentItem
+        // togglePaymentStatus supprimé — le paiement est géré via Transaction/TransactionItem
         return response()->json([
             'success' => false,
             'message' => 'Utilisez la route de paiement dédiée.'
@@ -310,18 +315,26 @@ class StageRegistrationController extends Controller
             ], 422);
         }
 
-        // Retrouver le lot de paiement lié via stage_payment_items
-        $item = \App\Models\StagePaymentItem::where('stage_registration_id', $registration->id)->first();
+        // Retrouver la transaction liée via transaction_items
+        $item = \App\Models\TransactionItem::where('itemable_type', \App\Models\TransactionItem::ITEMABLE_STAGE_REGISTRATION)
+            ->where('itemable_id', $registration->id)
+            ->first();
 
         $registration->delete();
 
-        // Recalculer le lot concerné si non encore payé
+        // itemable_id est polymorphique (pas de vraie contrainte FK possible),
+        // donc pas de cascade DB automatique comme avec l'ancien
+        // stage_registration_id : on supprime l'item explicitement.
+        $item?->delete();
+
+        // Recalculer la transaction concernée si non encore payée
         if ($item) {
-            $lot = \App\Models\StagePayment::find($item->stage_payment_id);
+            $lot = \App\Models\Transaction::find($item->transaction_id);
 
             if ($lot && $lot->status !== 'paid') {
-                $nouveauMontant = \App\Models\StagePaymentItem::where('stage_payment_id', $lot->id)
-                    ->join('stage_registrations', 'stage_registrations.id', '=', 'stage_payment_items.stage_registration_id')
+                $nouveauMontant = \App\Models\TransactionItem::where('transaction_id', $lot->id)
+                    ->where('itemable_type', \App\Models\TransactionItem::ITEMABLE_STAGE_REGISTRATION)
+                    ->join('stage_registrations', 'stage_registrations.id', '=', 'transaction_items.itemable_id')
                     ->count() * $stage->price;
 
                 if ($nouveauMontant <= 0) {

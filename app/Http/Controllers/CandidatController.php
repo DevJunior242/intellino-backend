@@ -6,9 +6,7 @@ use App\Models\Club;
 use App\Models\Examen;
 use App\Models\Student;
 use Illuminate\Http\Request;
-use App\Models\ExamenPayment;
 use App\Models\ExamenCandidat;
-use App\Models\ExamenPaymentItem;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Database\QueryException;
@@ -127,26 +125,27 @@ class CandidatController extends Controller
 
             $montantLot = $examen->price * count($created);
 
-            $lot = ExamenPayment::create([
-                'examen_id' => $examen->id,
-                'club_id'   => $club->id,
-                'amount'    => $montantLot,
-                'status'    => 'pending',
+            $lot = \App\Models\Transaction::create([
+                'club_id'           => $club->id,
+                'organisateur_id'   => $examen->organisateur_id,
+                'organisateur_type' => $examen->organisateur_type,
+                'saison_id'         => $examen->saison_id,
+                'payable_type'      => \App\Models\Transaction::PAYABLE_EXAMEN,
+                'payable_id'        => $examen->id,
+                'amount'            => $montantLot,
+                'status'            => 'pending',
             ]);
 
             foreach ($created as $candidat) {
-                ExamenPaymentItem::create([
-                    'examen_payment_id'  => $lot->id,
-                    'examen_candidat_id' => $candidat->id,
+                \App\Models\TransactionItem::create([
+                    'transaction_id' => $lot->id,
+                    'itemable_type'  => \App\Models\TransactionItem::ITEMABLE_EXAMEN_CANDIDAT,
+                    'itemable_id'    => $candidat->id,
                 ]);
             }
 
             return $created;
         });
-
-        if ($lot) {
-            $lot->setRelation('examen', $examen);
-        }
 
         return response()->json([
             'success' => true,
@@ -281,17 +280,26 @@ class CandidatController extends Controller
                 ], 400);
             }
 
-            // Retrouver le lot de paiement lié via examen_payment_items
-            $item = ExamenPaymentItem::where('examen_candidat_id', $examenCandidat->id)->first();
+            // Retrouver la transaction liée via transaction_items
+            $item = \App\Models\TransactionItem::where('itemable_type', \App\Models\TransactionItem::ITEMABLE_EXAMEN_CANDIDAT)
+                ->where('itemable_id', $examenCandidat->id)
+                ->first();
 
             $examenCandidat->delete();
 
-            // Recalculer le lot concerné si non encore payé
+            // itemable_id est polymorphique (pas de vraie contrainte FK
+            // possible), donc pas de cascade DB automatique comme avec
+            // l'ancien examen_candidat_id : on supprime l'item explicitement.
+            $item?->delete();
+
+            // Recalculer la transaction concernée si non encore payée
             if ($item) {
-                $lot = ExamenPayment::find($item->examen_payment_id);
+                $lot = \App\Models\Transaction::find($item->transaction_id);
 
                 if ($lot && $lot->status !== 'paid') {
-                    $nouveauMontant = ExamenPaymentItem::where('examen_payment_id', $lot->id)->count() * $examen->price;
+                    $nouveauMontant = \App\Models\TransactionItem::where('transaction_id', $lot->id)
+                        ->where('itemable_type', \App\Models\TransactionItem::ITEMABLE_EXAMEN_CANDIDAT)
+                        ->count() * $examen->price;
 
                     if ($nouveauMontant <= 0) {
                         $lot->delete();

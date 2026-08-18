@@ -6,7 +6,7 @@ use App\Models\Club;
 use App\Models\User;
 use App\Models\Grade;
 use App\Models\ExamenResult;
-use App\Models\ExamenPayment;
+use App\Models\Transaction;
 use App\Models\ExamenCandidat;
 use App\Models\ExamenEvaluation;
 use App\Models\GradeEnchainement;
@@ -75,7 +75,8 @@ class Examen extends Model
     }
     public function payments()
     {
-        return $this->hasMany(ExamenPayment::class);
+        return $this->hasMany(Transaction::class, 'payable_id')
+            ->where('payable_type', Transaction::PAYABLE_EXAMEN);
     }
     public function evaluations()
     {

@@ -33,7 +33,7 @@ use App\Http\Controllers\LicenceController;
 use App\Http\Controllers\SessionController;
 use App\Http\Controllers\StudentController;
 use App\Http\Controllers\CandidatController;
-use App\Http\Controllers\ExamenPaymentController;
+use App\Http\Controllers\TransactionController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\AdminClubController;
 use App\Http\Controllers\DashboardController;
@@ -58,7 +58,6 @@ use App\Http\Controllers\InscriptionController;
 use App\Http\Controllers\LicenceTypeController;
 use App\Http\Controllers\PricingPlanController;
 use App\Http\Controllers\ArbitreStatsController;
-use App\Http\Controllers\AffiliationPaymentController;
 use App\Http\Controllers\Auth\SettingController;
 use App\Http\Controllers\CombatActionController;
 use App\Http\Controllers\EnchainementController;
@@ -69,7 +68,6 @@ use App\Http\Controllers\LeagueMemberController;
 use App\Http\Controllers\FederationMemberController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\OrdrePassageController;
-use App\Http\Controllers\StagePaymentController;
 use App\Http\Controllers\StudentGradeController;
 use App\Http\Controllers\SubscriptionController;
 use App\Http\Controllers\ActivationKeyController;
@@ -81,7 +79,6 @@ use App\Http\Controllers\PaymentMethodController;
 use App\Http\Controllers\ResetPasswordController;
 use App\Http\Controllers\SubDisciplineController;
 use App\Http\Controllers\ConfigNotationController;
-use App\Http\Controllers\LicencePaymentController;
 use App\Http\Controllers\StudentPaymentController;
 use App\Http\Controllers\DashBoardLeagueController;
 use App\Http\Controllers\PaymentCategoryController;
@@ -275,16 +272,23 @@ Route::middleware(['auth:sanctum'])->group(function () {
         // Exemple d'appel : GET /api/payment-methods/Ligue/019ed526-af33-73ec-99c0-6791cb0ccee4
         Route::get('/payment-methods/{type}/{id}', [PaymentMethodController::class, 'pourOrganisateur']);
 
-        // --- Paiements de licences : côté Club ---
-        Route::get('/licence-payments/mes-lots', [LicencePaymentController::class, 'mesLots']);
-        Route::post('/licence-payments/{payment}/declarer', [LicencePaymentController::class, 'declarer'])
-            ->middleware(['throttle:15,1', 'verified']);
-
-        // --- Paiements de licences : côté Fédération (index/statistiques/toggle consolidés plus bas) ---
-        Route::patch('/licence-payments/{payment}/confirmer', [LicencePaymentController::class, 'confirmer'])
-            ->middleware(['throttle:15,1', 'verified']);
-        Route::patch('/licence-payments/{payment}/rejeter', [LicencePaymentController::class, 'rejeter'])
-            ->middleware(['throttle:15,1', 'verified']);
+        // --- Transactions : unifie licences/affiliations/stages/examens ---
+        // (anciennement LicencePaymentController/AffiliationPaymentController/
+        // StagePaymentController/ExamenPaymentController, 4 systèmes séparés
+        // fusionnés en un seul pour avoir une vraie vue "Comptabilité").
+        Route::prefix('transactions')->group(function () {
+            Route::get('/mes-lots', [TransactionController::class, 'mesLots']);
+            Route::get('/mon-statut-affiliation', [TransactionController::class, 'monStatutAffiliation']);
+            Route::get('/a-verifier', [TransactionController::class, 'paiementsAVerifier']);
+            Route::get('/statistiques', [TransactionController::class, 'statistiques']);
+            Route::get('/statistiques-mensuelles', [TransactionController::class, 'statistiquesMensuelles']);
+            Route::get('/', [TransactionController::class, 'index']);
+            Route::middleware(['throttle:15,1', 'verified'])->group(function () {
+                Route::post('/{transaction}/declarer', [TransactionController::class, 'declarer']);
+                Route::patch('/{transaction}/confirmer', [TransactionController::class, 'confirmer']);
+                Route::patch('/{transaction}/rejeter', [TransactionController::class, 'rejeter']);
+            });
+        });
         //LicenceleagueController
         Route::get('/licences', [LicenceleagueController::class, 'index']);
 
@@ -365,20 +369,11 @@ Route::middleware(['auth:sanctum'])->group(function () {
 
         Route::apiResource('/saisons', SaisonController::class);
 
-        // Côté Club
-        Route::get('/stage-payments/mes-lots', [StagePaymentController::class, 'mesLotsClub']); // à créer
-        Route::post('/stage-payments/{payment}/declarer', [StagePaymentController::class, 'declarer'])
-            ->middleware(['throttle:15,1', 'verified']);
-
-        // Côté organisateur (Ligue, Fédération, Club organisateur)
-        Route::get('/stage-payments/a-verifier', [StagePaymentController::class, 'paiementsAVerifier']);
-        Route::get('/stages/{stage}/paiements', [StagePaymentController::class, 'parStage']);
-        Route::patch('/stage-payments/{payment}/confirmer', [StagePaymentController::class, 'confirmer'])
-            ->middleware(['throttle:15,1', 'verified']);
-        Route::patch('/stage-payments/{payment}/rejeter', [StagePaymentController::class, 'rejeter'])
-            ->middleware(['throttle:15,1', 'verified']);
-        Route::get('/stage-payments/statistiques', [StagePaymentController::class, 'statistiques']);
-        //stages 
+        // Paiements des stages : voir le groupe transactions?payable_type=stage
+        // plus haut (mes-lots / a-verifier / declarer / confirmer / rejeter /
+        // statistiques). GET /stages/{stage}/paiements équivaut désormais à
+        // GET /transactions?payable_type=stage&payable_id={stage}.
+        //stages
         Route::get('/stages/ma-ligue', [StageController::class, 'stagesDeMaLigue']);
         // routes/api.php
         Route::get('/stages/{stage}/mes-inscrits', [StageRegistrationController::class, 'mesInscriptionsDetail']);
@@ -429,16 +424,9 @@ Route::middleware(['auth:sanctum'])->group(function () {
             Route::apiResource('/affiliations', AffiliationController::class);
         });
 
-        //affiliation-payments : suivi, club par club, du paiement de ce tarif
-        Route::prefix('affiliation-payments')->group(function () {
-            Route::get('mon-statut', [AffiliationPaymentController::class, 'monStatut']);
-            Route::get('/', [AffiliationPaymentController::class, 'index']);
-            Route::middleware(['throttle:15,1', 'verified'])->group(function () {
-                Route::post('{payment}/declarer', [AffiliationPaymentController::class, 'declarer']);
-                Route::post('{payment}/confirmer', [AffiliationPaymentController::class, 'confirmer']);
-                Route::post('{payment}/rejeter', [AffiliationPaymentController::class, 'rejeter']);
-            });
-        });
+        // Suivi, club par club, du paiement de la cotisation d'affiliation :
+        // voir le groupe transactions?payable_type=affiliation plus haut
+        // (mon-statut-affiliation / index / declarer / confirmer / rejeter).
 
         //inscription 
 
@@ -520,7 +508,6 @@ Route::middleware(['auth:sanctum'])->group(function () {
         //dashboard league
         Route::get('/dashboard/league/stats', [DashBoardLeagueController::class, 'stats']);
         Route::get('/dashboard/league/alert', [DashBoardLeagueController::class, 'Alert']);
-        Route::get('/stage-payments/statistiques-mensuelles', [StagePaymentController::class, 'statistiquesMensuelles']);
 
         // --- Côté Fédération : gestion des types de licence ---
         Route::get('/licence-types', [LicenceTypeController::class, 'index']);
@@ -536,13 +523,6 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::get('/licences/mes-etudiants', [LicenceController::class, 'mesEtudiants']);
         Route::get('/licences/mes-licences-etudiant', [LicenceController::class, 'mesLicencesEtudiant']);
         Route::delete('/licences/{licence}', [LicenceController::class, 'destroy']);
-
-        // --- Paiements de licences (Fédération) ---
-        Route::get('/licence-payments', [LicencePaymentController::class, 'index']);
-        Route::patch('/licence-payments/{payment}/toggle', [LicencePaymentController::class, 'togglePayment']);
-        Route::get('/licence-payments/statistiques', [LicencePaymentController::class, 'statistiques']);
-        Route::get('/licence-payments/statistiques-mensuelles', [LicencePaymentController::class, 'statistiquesMensuelles']);
-
 
         Route::post('/grade/store', [GradeController::class, 'store']);
 
@@ -649,18 +629,6 @@ Route::middleware(['auth:sanctum'])->group(function () {
             Route::delete('/remove/{examen}/{examenCandidat}', [CandidatController::class, 'destroy']);
         });
 
-        //examen-payments : inscription payante aux examens (club/ligue/fédération)
-        Route::get('/examen-payments/mes-lots', [ExamenPaymentController::class, 'mesLotsClub']);
-        Route::post('/examen-payments/{payment}/declarer', [ExamenPaymentController::class, 'declarer'])
-            ->middleware(['throttle:15,1', 'verified']);
-        Route::get('/examen-payments/a-verifier', [ExamenPaymentController::class, 'paiementsAVerifier']);
-        Route::get('/examens/{examen}/paiements', [ExamenPaymentController::class, 'parExamen']);
-        Route::patch('/examen-payments/{payment}/confirmer', [ExamenPaymentController::class, 'confirmer'])
-            ->middleware(['throttle:15,1', 'verified']);
-        Route::patch('/examen-payments/{payment}/rejeter', [ExamenPaymentController::class, 'rejeter'])
-            ->middleware(['throttle:15,1', 'verified']);
-        Route::get('/examen-payments/statistiques', [ExamenPaymentController::class, 'statistiques']);
-        Route::get('/examen-payments/statistiques-mensuelles', [ExamenPaymentController::class, 'statistiquesMensuelles']);
         Route::prefix('evaluation')->group(function () {
             Route::get('/{examen}', [EvaluationController::class, 'index']);
             Route::post('/examen/{examen}/candidat/{candidat}', [EvaluationController::class, 'store']);

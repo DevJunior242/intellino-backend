@@ -4,14 +4,15 @@ namespace App\Models;
 
 use App\Models\Saison;
 use App\Models\Federation;
-use App\Models\AffiliationPayment;
+use App\Models\Transaction;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 
 /**
  * Le tarif d'affiliation fixé par une Fédération pour une saison donnée.
- * Une seule ligne par (federation_id, saison_id) : voir AffiliationPayment
- * pour le suivi, club par club, du paiement de ce tarif.
+ * Une seule ligne par (federation_id, saison_id) : voir Transaction
+ * (payable_type = 'affiliation') pour le suivi, club par club, du paiement
+ * de ce tarif.
  */
 class Affiliation extends Model
 {
@@ -37,6 +38,7 @@ class Affiliation extends Model
 
     public function payments()
     {
-        return $this->hasMany(AffiliationPayment::class);
+        return $this->hasMany(Transaction::class, 'payable_id')
+            ->where('payable_type', Transaction::PAYABLE_AFFILIATION);
     }
 }

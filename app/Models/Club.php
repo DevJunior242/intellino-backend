@@ -13,7 +13,7 @@ use App\Models\Student;
 use App\Models\ClubUser;
 use App\Models\Discipline;
 use App\Models\Subscription;
-use App\Models\AffiliationPayment;
+use App\Models\Transaction;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 
@@ -98,7 +98,7 @@ class Club extends Model
 
     public function affiliationPayments()
     {
-        return $this->hasMany(AffiliationPayment::class);
+        return $this->hasMany(Transaction::class)->where('payable_type', Transaction::PAYABLE_AFFILIATION);
     }
 
     public function licences()

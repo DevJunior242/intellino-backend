@@ -10,7 +10,7 @@ use App\Models\Federation;
 use App\Models\Affiliation;
 use Illuminate\Http\Request;
 use App\Models\ActivationKey;
-use App\Models\AffiliationPayment;
+use App\Models\Transaction;
 use Illuminate\Support\Facades\DB;
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Storage;
@@ -49,7 +49,9 @@ class FederationController extends Controller
             : null;
 
         $statusByClub = $affiliation
-            ? AffiliationPayment::where('affiliation_id', $affiliation->id)->pluck('status', 'club_id')
+            ? Transaction::where('payable_type', Transaction::PAYABLE_AFFILIATION)
+                ->where('payable_id', $affiliation->id)
+                ->pluck('status', 'club_id')
             : collect();
 
         $leagues->each(function ($league) use ($statusByClub) {

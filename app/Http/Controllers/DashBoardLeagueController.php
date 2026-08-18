@@ -8,8 +8,8 @@ use App\Models\Licence;
 use App\Models\Evenement;
 use App\Models\Affiliation;
 use App\Models\Competition;
+use App\Models\Transaction;
 use Illuminate\Http\Request;
-use App\Models\AffiliationPayment;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Concerns\ResolvesActiveSaison;
 
@@ -59,7 +59,8 @@ class DashBoardLeagueController extends Controller
             ->first();
 
         $afiliation = $affiliation
-            ? AffiliationPayment::where('affiliation_id', $affiliation->id)
+            ? Transaction::where('payable_type', Transaction::PAYABLE_AFFILIATION)
+            ->where('payable_id', $affiliation->id)
             ->where('status', 'paid')
             ->whereIn('club_id', $clubIds)
             ->count()
@@ -110,7 +111,8 @@ class DashBoardLeagueController extends Controller
                 ->first();
 
             $unpaidCount = $affiliation
-                ? $clubIds->count() - AffiliationPayment::where('affiliation_id', $affiliation->id)
+                ? $clubIds->count() - Transaction::where('payable_type', Transaction::PAYABLE_AFFILIATION)
+                ->where('payable_id', $affiliation->id)
                 ->where('status', 'paid')
                 ->whereIn('club_id', $clubIds)
                 ->count()

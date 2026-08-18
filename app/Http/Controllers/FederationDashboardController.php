@@ -6,6 +6,7 @@ use App\Models\Club;
 use App\Models\League;
 use App\Models\Saison;
 use App\Models\Licence;
+use App\Models\Transaction;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -44,10 +45,21 @@ class FederationDashboardController extends Controller
             $licencesStats = Licence::where('saison_id', $saison->id)
                 ->select(
                     DB::raw('COUNT(id) as total_licences'),
-                    DB::raw('SUM(CASE WHEN status = 2 THEN montant_paye ELSE 0 END) as total_recettes'),
                     DB::raw('COUNT(CASE WHEN status = 0 THEN 1 END) as licences_en_attente')
                 )
                 ->first();
+
+            // Recettes globales = tous les types de transactions confirmées
+            // (licences, affiliations, stages, examens) pour cette fédération
+            // et cette saison — pas seulement les licences, vu que le total
+            // est explicitement "Global". Auparavant calculé à partir de
+            // licences.status = 2 (Validé), une valeur que rien ne mettait
+            // jamais à jour : ce total affichait toujours zéro.
+            $totalRecettes = Transaction::where('organisateur_id', $activeId)
+                ->where('organisateur_type', 'Federation')
+                ->where('saison_id', $saison->id)
+                ->where('status', 'paid')
+                ->sum('amount');
 
             // 5. Répartition des athlètes par Sexe pour la saison active
             $sexeRepartition = Licence::join('students', 'students.id', '=', 'licences.student_id')

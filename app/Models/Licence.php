@@ -15,10 +15,11 @@ class Licence extends Model
 {
     use HasUuids, SoftDeletes;
 
-    // Statuts (cohérents avec la colonne tinyInteger 'status')
+    // Statuts (cohérents avec la colonne tinyInteger 'status') — purement
+    // une donnée d'appartenance, l'argent lui-même vit dans `transactions`
+    // (voir TransactionController::confirmer, qui met ce statut à jour).
     public const STATUS_EN_ATTENTE = 0;
     public const STATUS_PAYE = 1;
-    public const STATUS_VALIDE = 2;
 
     protected $fillable = [
         'saison_id',
@@ -66,7 +67,6 @@ class Licence extends Model
     {
         return match ((int) $this->status) {
             self::STATUS_PAYE => 'Payé',
-            self::STATUS_VALIDE => 'Validé',
             default => 'En attente',
         };
     }

@@ -101,7 +101,7 @@ class CategoryController extends Controller
 
         $totalLicencies = Licence::where('federation_id', $federationId)
             ->where('saison_id', $saisonActive->id)
-            ->where('status', Licence::STATUS_VALIDE)
+            ->where('status', Licence::STATUS_PAYE)
             ->when($leagueId, function ($query) use ($leagueId) {
                 $query->whereHas('club', fn($q) => $q->where('league_id', $leagueId));
             })
