@@ -9,6 +9,7 @@ use Database\Seeders\KataSeeder;
 use Database\Seeders\DisciplineSeeder;
 use Database\Seeders\JugeOptionSeeder;
 use Database\Seeders\ModeSaisieSeeder;
+use Database\Seeders\KumiteFormatSeeder;
 use Database\Seeders\RolesTableSeeder;
 use Database\Seeders\PaymentCategorySeeder;
 use Database\Seeders\NiveauCompetitionSeeder;
@@ -35,6 +36,7 @@ class DatabaseSeeder extends Seeder
             PaymentCategorySeeder::class,
             JugeOptionSeeder::class,
             ModeSaisieSeeder::class,
+            KumiteFormatSeeder::class,
             DisciplineSeeder::class,
             NiveauCompetitionSeeder::class,
             GradeSeeder::class,
