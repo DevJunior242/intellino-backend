@@ -18,6 +18,11 @@ class PricingPlan extends Model
         'price',
         'duration_value',
         'payment_category_id',
+        'is_active',
+    ];
+
+    protected $casts = [
+        'is_active' => 'boolean',
     ];
 
 

@@ -624,6 +624,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
             Route::post('/add/{examen}/{student}', [CandidatController::class, 'addCandidate']);
             Route::post('/batch/{examen}', [CandidatController::class, 'storeBatch'])
                 ->middleware(['throttle:20,1', 'verified']);
+            Route::get('/eligibles/{examen}', [CandidatController::class, 'candidatsEligibles']);
             Route::get('/{id}', [CandidatController::class, 'show']);
             Route::put('/{id}', [CandidatController::class, 'update']);
             Route::delete('/remove/{examen}/{examenCandidat}', [CandidatController::class, 'destroy']);
@@ -639,6 +640,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::prefix('pricing-plans')->group(function () {
             Route::get('/', [PricingPlanController::class, 'index']);
             Route::post('/', [PricingPlanController::class, 'store']);
+            Route::patch('/{id}/toggle', [PricingPlanController::class, 'toggle']);
             Route::delete('/{id}', [PricingPlanController::class, 'destroy']);
         });
         //paiments

@@ -12,48 +12,105 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Database\QueryException;
 use App\Http\Requests\StoreCandidatRequest;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use App\Http\Controllers\Concerns\ResolvesVisibleStudents;
 
 class CandidatController extends Controller
 {
     use AuthorizesRequests;
+    use ResolvesVisibleStudents;
 
     /**
-     * Inscrit plusieurs candidats (élèves du club connecté) à un examen,
-     * en lot, avec un seul lot de paiement pour tout le groupe.
-     *
-     * Le club peut inscrire :
-     * - à son propre examen (organisé par le club lui-même)
-     * - à un examen organisé par sa ligue
-     * - à un examen organisé par sa fédération (via sa ligue)
+     * Est-ce que l'organisateur connecté peut inscrire des candidats à cet
+     * examen ? Soit c'est lui l'organisateur (Club/Ligue/Fédération sur son
+     * propre examen), soit c'est un club inscrivant ses élèves à l'examen de
+     * sa ligue ou de la fédération de sa ligue.
+     */
+    private function peutInscrireA(Examen $examen, ?string $activeId, ?string $activeType): bool
+    {
+        if (!$activeId || !$activeType) {
+            return false;
+        }
+
+        if ($examen->organisateur_id === $activeId && $examen->organisateur_type === $activeType) {
+            return true;
+        }
+
+        if ($activeType !== 'Club') {
+            return false;
+        }
+
+        $club = Club::with('league')->find($activeId);
+
+        if (!$club) {
+            return false;
+        }
+
+        if ($examen->organisateur_type === 'Ligue' && $examen->organisateur_id === $club->league_id) {
+            return true;
+        }
+
+        return $examen->organisateur_type === 'Federation'
+            && $club->league
+            && $examen->organisateur_id === $club->league->federation_id;
+    }
+
+    /**
+     * Élèves éligibles à un examen pour l'organisateur connecté : visibles
+     * selon la hiérarchie club/ligue/fédération, ayant exactement le grade
+     * requis, et pas déjà inscrits — pour cocher directement les bons
+     * candidats sans risquer un rejet après coup.
+     */
+    public function candidatsEligibles(Examen $examen, Request $request)
+    {
+        $activeId   = $request->attributes->get('organisateur_id');
+        $activeType = $request->attributes->get('organisateur_type');
+
+        if (!$this->peutInscrireA($examen, $activeId, $activeType)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Vous n\'avez pas la permission de consulter les candidats de cet examen.'
+            ], 403);
+        }
+
+        $alreadyRegisteredIds = ExamenCandidat::where('examen_id', $examen->id)->pluck('student_id');
+
+        $visibleIds = $this->studentsVisiblesPar($activeId, $activeType)
+            ->pluck('id')
+            ->diff($alreadyRegisteredIds);
+
+        $students = Student::with('currentGrade')
+            ->whereIn('id', $visibleIds)
+            ->get()
+            ->filter(fn ($student) => $student->currentGrade?->current_grade_id === $examen->current_grade_id)
+            ->sortBy('fullname')
+            ->values()
+            ->map(fn ($s) => [
+                'id'        => $s->id,
+                'fullname'  => $s->fullname,
+                'birthdate' => $s->birthdate,
+            ]);
+
+        return response()->json([
+            'success' => true,
+            'data'    => $students,
+        ]);
+    }
+
+    /**
+     * Inscrit plusieurs candidats à un examen en lot, avec une seule
+     * transaction de paiement pour tout le groupe. Voir peutInscrireA()
+     * pour les règles d'accès (Club/Ligue/Fédération sur leur propre
+     * examen, ou Club inscrivant ses élèves à l'examen de sa ligue/fédé).
      */
     public function storeBatch(Request $request, Examen $examen)
     {
         $activeId   = $request->attributes->get('organisateur_id');
         $activeType = $request->attributes->get('organisateur_type');
 
-        if (!$activeId || $activeType !== 'Club') {
+        if (!$this->peutInscrireA($examen, $activeId, $activeType)) {
             return response()->json([
                 'success' => false,
-                'message' => 'Seul un club peut inscrire des candidats en lot.'
-            ], 403);
-        }
-
-        $club = Club::with('league')->find($activeId);
-
-        if (!$club) {
-            return response()->json(['message' => 'Club introuvable.'], 404);
-        }
-
-        $isOwner = $examen->organisateur_type === 'Club' && $examen->organisateur_id === $club->id;
-        $isLeagueExam = $examen->organisateur_type === 'Ligue' && $examen->organisateur_id === $club->league_id;
-        $isFederationExam = $examen->organisateur_type === 'Federation'
-            && $club->league
-            && $examen->organisateur_id === $club->league->federation_id;
-
-        if (!$isOwner && !$isLeagueExam && !$isFederationExam) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Cet examen n\'est pas organisé par votre club, votre ligue ou votre fédération.'
+                'message' => 'Vous n\'avez pas la permission d\'inscrire des candidats à cet examen.'
             ], 403);
         }
 
@@ -62,17 +119,14 @@ class CandidatController extends Controller
             'student_ids.*' => 'required|uuid|exists:students,id',
         ]);
 
-        // Vérifie que chaque élève appartient bien au club connecté
-        $validStudentIds = Student::whereHas('clubs', function ($q) use ($club) {
-            $q->where('club_id', $club->id);
-        })->whereIn('id', $validated['student_ids'])
-            ->pluck('id')
-            ->toArray();
+        // Vérifie que chaque élève est bien visible par l'organisateur connecté
+        $visibleIds = $this->studentsVisiblesPar($activeId, $activeType)->pluck('id');
+        $validStudentIds = $visibleIds->intersect($validated['student_ids'])->values()->toArray();
 
         if (count($validStudentIds) !== count($validated['student_ids'])) {
             return response()->json([
                 'success' => false,
-                'message' => 'Un ou plusieurs élèves sélectionnés n\'appartiennent pas à votre club.'
+                'message' => 'Un ou plusieurs élèves sélectionnés ne vous sont pas accessibles.'
             ], 403);
         }
 
@@ -104,47 +158,67 @@ class CandidatController extends Controller
             ], 422);
         }
 
+        // Club responsable du paiement : le club connecté lui-même, ou — si
+        // c'est la ligue/fédération qui inscrit directement des candidats à
+        // son propre examen — le club de chaque élève (le plus souvent le
+        // cas réel), sinon pas de transaction (athlète vraiment indépendant).
+        $payingClubId = $activeType === 'Club' ? $activeId : null;
+
         $lot = null;
 
-        $candidats = DB::transaction(function () use ($examen, $club, $validStudentIds, &$lot) {
+        $candidats = DB::transaction(function () use ($examen, $validStudentIds, $payingClubId, &$lot) {
             $created = [];
 
             foreach ($validStudentIds as $studentId) {
-                $created[] = ExamenCandidat::create([
-                    'examen_id' => $examen->id,
-                    'student_id' => $studentId,
-                    'club_id'   => $club->id,
-                    'status'    => ExamenCandidat::STATUS_REGISTERED,
-                ]);
+                $clubId = $payingClubId ?? Student::find($studentId)?->clubs()->value('clubs.id');
+
+                $created[] = [
+                    'candidat' => ExamenCandidat::create([
+                        'examen_id' => $examen->id,
+                        'student_id' => $studentId,
+                        'club_id'   => $clubId,
+                        'status'    => ExamenCandidat::STATUS_REGISTERED,
+                    ]),
+                    'club_id' => $clubId,
+                ];
             }
 
             // Un examen gratuit (price = 0) n'a pas besoin de lot de paiement
             if ((float) $examen->price <= 0) {
-                return $created;
+                return array_column($created, 'candidat');
             }
 
-            $montantLot = $examen->price * count($created);
+            // Regroupe par club payeur : un club inscrivant en lot n'a qu'une
+            // seule transaction, mais une ligue/fédération inscrivant des
+            // élèves de plusieurs clubs différents a une transaction par club.
+            $parClub = collect($created)->groupBy('club_id');
 
-            $lot = \App\Models\Transaction::create([
-                'club_id'           => $club->id,
-                'organisateur_id'   => $examen->organisateur_id,
-                'organisateur_type' => $examen->organisateur_type,
-                'saison_id'         => $examen->saison_id,
-                'payable_type'      => \App\Models\Transaction::PAYABLE_EXAMEN,
-                'payable_id'        => $examen->id,
-                'amount'            => $montantLot,
-                'status'            => 'pending',
-            ]);
+            foreach ($parClub as $clubId => $groupe) {
+                if (!$clubId) {
+                    continue; // athlète(s) sans club : pas de transaction
+                }
 
-            foreach ($created as $candidat) {
-                \App\Models\TransactionItem::create([
-                    'transaction_id' => $lot->id,
-                    'itemable_type'  => \App\Models\TransactionItem::ITEMABLE_EXAMEN_CANDIDAT,
-                    'itemable_id'    => $candidat->id,
+                $lot = \App\Models\Transaction::create([
+                    'club_id'           => $clubId,
+                    'organisateur_id'   => $examen->organisateur_id,
+                    'organisateur_type' => $examen->organisateur_type,
+                    'saison_id'         => $examen->saison_id,
+                    'payable_type'      => \App\Models\Transaction::PAYABLE_EXAMEN,
+                    'payable_id'        => $examen->id,
+                    'amount'            => $examen->price * $groupe->count(),
+                    'status'            => 'pending',
                 ]);
+
+                foreach ($groupe as $item) {
+                    \App\Models\TransactionItem::create([
+                        'transaction_id' => $lot->id,
+                        'itemable_type'  => \App\Models\TransactionItem::ITEMABLE_EXAMEN_CANDIDAT,
+                        'itemable_id'    => $item['candidat']->id,
+                    ]);
+                }
             }
 
-            return $created;
+            return array_column($created, 'candidat');
         });
 
         return response()->json([
@@ -177,22 +251,7 @@ class CandidatController extends Controller
 
         try {
 
-            // 2. Définition des accès
-            $isOwner = ($examen->organisateur_id === $activeId);
-
-            // Un club peut inscrire si l'examen est organisé par sa ligue,
-            // ou par la fédération de sa ligue (mêmes règles que storeBatch()).
-            $club = $activeType === 'Club' ? Club::with('league')->find($activeId) : null;
-            $isClubAccessingLeague = ($activeType === 'Club' && $examen->organisateur_type === 'Ligue' && $club && $examen->organisateur_id === $club->league_id);
-            $isClubAccessingFederation = (
-                $activeType === 'Club'
-                && $examen->organisateur_type === 'Federation'
-                && $club
-                && $club->league
-                && $examen->organisateur_id === $club->league->federation_id
-            );
-
-            if (!$isOwner && !$isClubAccessingLeague && !$isClubAccessingFederation) {
+            if (!$this->peutInscrireA($examen, $activeId, $activeType)) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Vous n\'avez pas la permission d\'inscrire des candidats à cet examen.'

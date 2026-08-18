@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-use App\Models\Club;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 
@@ -16,8 +15,4 @@ class PaymentCategory extends Model
     ];
     public $incrementing = false;
     protected $keyType = 'string';
-    public function club()
-    {
-        return $this->belongsTo(Club::class);
-    }
 }

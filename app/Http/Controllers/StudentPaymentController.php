@@ -83,11 +83,6 @@ class StudentPaymentController extends Controller
                 'success' => true,
                 'paiements' => $Payments,
             ]);
-
-            return response()->json([
-                'success' => true,
-                'paiements' => $Payments,
-            ]);
         }
     }
     public function store(StorePaymentRequest $request)
