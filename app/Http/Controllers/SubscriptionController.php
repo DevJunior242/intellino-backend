@@ -3,118 +3,249 @@
 namespace App\Http\Controllers;
 
 use Carbon\Carbon;
+use App\Models\Plan;
 use App\Models\Subscription;
+use App\Models\SubscriptionPayment;
+use App\Http\Controllers\Concerns\ResolvesEffectifOrganisation;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
-use App\Http\Requests\SubscribedRequest;
+use Illuminate\Support\Facades\DB;
 
+/**
+ * Abonnements Intellino (Club/Ligue/Fédération payant leur propre usage de
+ * la plateforme) — flux déclarer/confirmer, même logique que
+ * TransactionController pour les licences/stages/examens, plutôt que la
+ * redirection Stripe jamais configurée qui existait avant.
+ */
 class SubscriptionController extends Controller
 {
+    use ResolvesEffectifOrganisation;
+
+    private function estSuperAdmin(Request $request): bool
+    {
+        return (bool) $request->user()?->isSuperAdmin();
+    }
 
     public function index(Request $request)
     {
-        $user = auth()->user();
-        $clubId = $request->attributes->get('club_id');
-
-
-        $role = $request->attributes->get('role');
-
-
-        if ($role === 'super_admin') {
-
-            $subscriptions = \App\Models\Subscription::with(['club', 'plan'])
+        if ($this->estSuperAdmin($request)) {
+            $subscriptions = Subscription::with(['organisateur', 'plan'])
                 ->latest()
                 ->paginate(10);
 
-            return response()->json([
-                'success' => true,
-                'subscriptions' => $subscriptions
-            ]);
+            return response()->json(['success' => true, 'subscriptions' => $subscriptions]);
         }
 
+        $activeId = $request->attributes->get('organisateur_id');
+        $activeType = $request->attributes->get('organisateur_type');
 
-
-
-        $subscriptions = \App\Models\Subscription::with(['club', 'plan'])
-            ->where('club_id', $clubId)
+        $subscriptions = Subscription::with('plan')
+            ->where('organisateur_id', $activeId)
+            ->where('organisateur_type', $activeType)
             ->latest()
             ->paginate(8);
 
-        return response()->json([
-            'success' => true,
-            'subscriptions' => $subscriptions
-        ]);
+        return response()->json(['success' => true, 'subscriptions' => $subscriptions]);
     }
 
-    public function store(SubscribedRequest $request)
+    /**
+     * Crée un abonnement pour l'organisation connectée, sur le palier
+     * qu'elle a choisi — pas nécessairement celui déduit de son effectif
+     * actuel (une petite structure peut vouloir prendre de l'avance).
+     */
+    public function store(Request $request)
     {
-        $clubId = $request->validated()['club_id'] ?? null;
-        if (!$clubId) {
-            return response()->json(['message' => 'Club ID manquant dans la requête'], 422);
-        }
-        $subscription = Subscription::where('club_id', $clubId)
-            ->where('plan_id', $request->plan_id)
-            ->whereIn('status', ['pending_payment', 'paid'])
-            ->first();
+        $activeId = $request->attributes->get('organisateur_id');
+        $activeType = $request->attributes->get('organisateur_type');
 
-        if ($subscription) {
+        if (!$activeId || !in_array($activeType, ['Club', 'Ligue', 'Federation'], true)) {
             return response()->json([
                 'success' => false,
-                'message' => 'Vous avez déjà un abonnement pour ce type de plan',
-            ], 400);
+                'message' => "Impossible d'identifier l'organisation connectée.",
+            ], 403);
         }
-        $validated = $request->validated();
-        $start = isset($validated['start_date'])
-            ? Carbon::parse($validated['start_date'])
-            : now();
 
-        $end = isset($validated['end_date'])
-            ? Carbon::parse($validated['end_date'])
-            : $start->copy()->addMonth();
-
-        $subscription = Subscription::create([
-            'plan_id' => $validated['plan_id'],
-            'club_id' => $clubId,
-            'start_date' => $start,
-            'end_date' => $end,
+        $validated = $request->validate([
+            'plan_id' => ['required', 'exists:plans,id'],
         ]);
-        $paymentUrl = config('services.stripe.payment_url') . $subscription->id;
+
+        $plan = Plan::findOrFail($validated['plan_id']);
+
+        if ($plan->organisateur_type !== $activeType) {
+            return response()->json([
+                'success' => false,
+                'message' => "Ce palier ne correspond pas au type de votre organisation.",
+            ], 422);
+        }
+
+        $existant = Subscription::where('organisateur_id', $activeId)
+            ->where('organisateur_type', $activeType)
+            ->whereIn('status', [Subscription::STATUS_PENDING, Subscription::STATUS_PAID])
+            ->first();
+
+        if ($existant) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Vous avez déjà un abonnement en cours ou en attente de paiement.',
+            ], 422);
+        }
+
+        $start = now();
+        $subscription = Subscription::create([
+            'organisateur_id' => $activeId,
+            'organisateur_type' => $activeType,
+            'plan_id' => $plan->id,
+            'amount' => $plan->amount,
+            'start_date' => $start,
+            'end_date' => $start->copy()->addMonth(),
+        ]);
+
         return response()->json([
             'success' => true,
-            'message' => 'votre abonnement a été créé avec succès.vous serez redirigé vers la page de paiement',
-            'subscription' => $subscription,
-            'payment_url' => $paymentUrl,
+            'message' => 'Abonnement créé. Déclarez votre paiement pour le faire vérifier.',
+            'subscription' => $subscription->load('plan'),
         ], 201);
     }
 
-
-    public function show(Request $request)
+    /**
+     * L'organisation déclare avoir envoyé le paiement de son abonnement.
+     */
+    public function declarer(Request $request, Subscription $subscription)
     {
-        $user = auth()->user();
-        $clubId = $request->attributes->get('club_id');
-        Log::info('club_id', ['clubId' => $clubId]);
-        $role = $request->attributes->get('role');
-        //afficher les abonnements actif pour le club
-        if ($role === 'super_admin') {
-            $subscriptions = Subscription::with(['club', 'plan'])
-                ->where('status', 'paid')
-                ->latest()
-                ->paginate(2);
-            return response()->json([
-                'success' => true,
-                'active_subscriptions' => $subscriptions
-            ]);
+        $activeId = $request->attributes->get('organisateur_id');
+        $activeType = $request->attributes->get('organisateur_type');
+
+        if ($subscription->organisateur_id !== $activeId || $subscription->organisateur_type !== $activeType) {
+            return response()->json(['success' => false, 'message' => 'Action non autorisée.'], 403);
         }
-        //afficher les abonnements actif pour le club
-        
-        $subscriptions = Subscription::with(['club', 'plan'])
-            ->where('club_id', $clubId)
-            ->where('status', 'paid')
-            ->latest()
-            ->paginate(10);
+
+        if ($subscription->status === Subscription::STATUS_PAID) {
+            return response()->json(['success' => false, 'message' => 'Cet abonnement est déjà payé.'], 422);
+        }
+
+        if ($subscription->payments()->where('status', SubscriptionPayment::STATUS_DECLARED)->exists()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Une déclaration est déjà en attente de vérification pour cet abonnement.',
+            ], 422);
+        }
+
+        $validated = $request->validate([
+            'platform_payment_method_id' => ['required', 'exists:platform_payment_methods,id'],
+            'sender_number' => ['nullable', 'string', 'max:50'],
+            'transaction_id' => ['required', 'string', 'max:100'],
+        ]);
+
+        $payment = SubscriptionPayment::create([
+            'subscription_id' => $subscription->id,
+            'platform_payment_method_id' => $validated['platform_payment_method_id'],
+            'sender_number' => $validated['sender_number'] ?? null,
+            'transaction_id' => $validated['transaction_id'],
+            'amount' => $subscription->amount,
+            'status' => SubscriptionPayment::STATUS_DECLARED,
+            'declared_at' => now(),
+        ]);
+
         return response()->json([
             'success' => true,
-            'active_subscriptions' => $subscriptions
+            'message' => 'Paiement déclaré. Il sera vérifié sous peu.',
+            'data' => $payment,
+        ], 201);
+    }
+
+    public function paiementsAVerifier(Request $request)
+    {
+        if (!$this->estSuperAdmin($request)) {
+            return response()->json(['success' => false, 'message' => 'Action non autorisée.'], 403);
+        }
+
+        $paiements = SubscriptionPayment::with(['subscription.organisateur', 'subscription.plan', 'platformPaymentMethod'])
+            ->where('status', SubscriptionPayment::STATUS_DECLARED)
+            ->latest('declared_at')
+            ->get();
+
+        return response()->json(['success' => true, 'data' => $paiements]);
+    }
+
+    public function confirmer(Request $request, SubscriptionPayment $subscriptionPayment)
+    {
+        if (!$this->estSuperAdmin($request)) {
+            return response()->json(['success' => false, 'message' => 'Action non autorisée.'], 403);
+        }
+
+        if ($subscriptionPayment->status !== SubscriptionPayment::STATUS_DECLARED) {
+            return response()->json(['success' => false, 'message' => 'Ce paiement a déjà été traité.'], 422);
+        }
+
+        DB::transaction(function () use ($subscriptionPayment, $request) {
+            $subscriptionPayment->update([
+                'status' => SubscriptionPayment::STATUS_CONFIRMED,
+                'confirmed_at' => now(),
+                'confirmed_by_user_id' => $request->user()->id,
+            ]);
+
+            $subscription = $subscriptionPayment->subscription;
+            $start = now();
+            $subscription->update([
+                'status' => Subscription::STATUS_PAID,
+                'start_date' => $subscription->start_date ?? $start,
+                'end_date' => $start->copy()->addMonth(),
+            ]);
+        });
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Paiement confirmé, abonnement activé.',
+            'data' => $subscriptionPayment->fresh(),
+        ]);
+    }
+
+    public function rejeter(Request $request, SubscriptionPayment $subscriptionPayment)
+    {
+        if (!$this->estSuperAdmin($request)) {
+            return response()->json(['success' => false, 'message' => 'Action non autorisée.'], 403);
+        }
+
+        if ($subscriptionPayment->status !== SubscriptionPayment::STATUS_DECLARED) {
+            return response()->json(['success' => false, 'message' => 'Ce paiement a déjà été traité.'], 422);
+        }
+
+        $subscriptionPayment->update([
+            'status' => SubscriptionPayment::STATUS_REJECTED,
+            'confirmed_by_user_id' => $request->user()->id,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Déclaration rejetée.',
+            'data' => $subscriptionPayment->fresh(),
+        ]);
+    }
+
+    public function statistiques(Request $request)
+    {
+        if (!$this->estSuperAdmin($request)) {
+            return response()->json(['success' => false, 'message' => 'Action non autorisée.'], 403);
+        }
+
+        $totalEncaisse = SubscriptionPayment::where('status', SubscriptionPayment::STATUS_CONFIRMED)->sum('amount');
+        $totalEnAttente = SubscriptionPayment::where('status', SubscriptionPayment::STATUS_DECLARED)->sum('amount');
+        $abonnesActifs = Subscription::where('status', Subscription::STATUS_PAID)->count();
+
+        $parMois = SubscriptionPayment::where('status', SubscriptionPayment::STATUS_CONFIRMED)
+            ->selectRaw("DATE_FORMAT(confirmed_at, '%b') as month, SUM(amount) as total")
+            ->where('confirmed_at', '>=', now()->subMonths(6))
+            ->groupBy('month')
+            ->orderBy('confirmed_at')
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'total_encaisse' => $totalEncaisse,
+                'total_en_attente' => $totalEnAttente,
+                'abonnes_actifs' => $abonnesActifs,
+                'par_mois' => $parMois,
+            ],
         ]);
     }
 }

@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-use App\Models\Club;
 use App\Models\Plan;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -11,9 +10,13 @@ class Subscription extends Model
 {
     use HasUuids;
 
+    const STATUS_PENDING = 'pending_payment';
+    const STATUS_PAID = 'paid';
+    const STATUS_EXPIRED = 'expired';
 
     protected $fillable = [
-        'club_id',
+        'organisateur_id',
+        'organisateur_type',
         'plan_id',
         'amount',
         'start_date',
@@ -21,16 +24,23 @@ class Subscription extends Model
         'status',
     ];
     protected $attributes = [
-        'status' => 'pending_payment',
+        'status' => self::STATUS_PENDING,
     ];
     public $incrementing = false;
     protected $keyType = 'string';
-    public function club()
+
+    public function organisateur()
     {
-        return $this->belongsTo(Club::class);
+        return $this->morphTo();
     }
+
     public function plan()
     {
         return $this->belongsTo(Plan::class);
+    }
+
+    public function payments()
+    {
+        return $this->hasMany(SubscriptionPayment::class);
     }
 }

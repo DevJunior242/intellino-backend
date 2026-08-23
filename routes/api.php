@@ -77,6 +77,7 @@ use App\Http\Controllers\Auth\RegisterController;
 use App\Http\Controllers\Auth\EmailVerificationController;
 use App\Http\Controllers\LicenceleagueController;
 use App\Http\Controllers\PaymentMethodController;
+use App\Http\Controllers\PlatformPaymentMethodController;
 use App\Http\Controllers\ResetPasswordController;
 use App\Http\Controllers\SubDisciplineController;
 use App\Http\Controllers\ConfigNotationController;
@@ -490,14 +491,26 @@ Route::middleware(['auth:sanctum'])->group(function () {
 
         Route::get('/club-exams', [ExamenLeagueController::class, 'getClubExams']);
 
-        //subscriptions 
+        //subscriptions (abonnements Intellino : Club/Ligue/Fédération)
         Route::prefix('subscriptions')->group(function () {
             Route::get('/', [SubscriptionController::class, 'index']);
             Route::post('/', [SubscriptionController::class, 'store'])
                 ->middleware(['throttle:15,1', 'verified']);
-            Route::get('/show', [SubscriptionController::class, 'show']);
-            Route::put('/{id}', [SubscriptionController::class, 'update']);
-            Route::delete('/{id}', [SubscriptionController::class, 'destroy']);
+            Route::post('/{subscription}/declarer', [SubscriptionController::class, 'declarer'])
+                ->middleware(['throttle:15,1', 'verified']);
+            Route::get('/paiements-a-verifier', [SubscriptionController::class, 'paiementsAVerifier']);
+            Route::patch('/paiements/{subscriptionPayment}/confirmer', [SubscriptionController::class, 'confirmer']);
+            Route::patch('/paiements/{subscriptionPayment}/rejeter', [SubscriptionController::class, 'rejeter']);
+            Route::get('/statistiques', [SubscriptionController::class, 'statistiques']);
+        });
+
+        //moyens de paiement d'Intellino (pour recevoir les abonnements)
+        Route::prefix('platform-payment-methods')->group(function () {
+            Route::get('/', [PlatformPaymentMethodController::class, 'index']);
+            Route::post('/', [PlatformPaymentMethodController::class, 'store']);
+            Route::patch('/{platformPaymentMethod}', [PlatformPaymentMethodController::class, 'update']);
+            Route::patch('/{platformPaymentMethod}/toggle', [PlatformPaymentMethodController::class, 'toggleActive']);
+            Route::delete('/{platformPaymentMethod}', [PlatformPaymentMethodController::class, 'destroy']);
         });
         //course
         Route::post('/course/full-store', [CourseController::class, 'storeFullCourse']);
