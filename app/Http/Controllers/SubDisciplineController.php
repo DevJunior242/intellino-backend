@@ -2,40 +2,50 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Saison;
 use App\Models\Category;
 use Illuminate\Http\Request;
 use App\Models\SubDiscipline;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
+use App\Http\Controllers\Concerns\ResolvesActiveSaison;
 
 class SubDisciplineController extends Controller
 {
+    use ResolvesActiveSaison;
 
+    /**
+     * Seul le gestionnaire EFFECTIF de la saison peut définir la charte
+     * disciplines/catégories : la Fédération, ou une Ligue indépendante (pas
+     * de federation_id) — même logique que la saison elle-même, voir
+     * ResolvesActiveSaison. Une Ligue affiliée reste en lecture seule : elle
+     * hérite de la charte de sa Fédération.
+     */
     public function store(Request $request)
     {
         $activeId   = $request->attributes->get('organisateur_id');
         $activeType = $request->attributes->get('organisateur_type');
 
-        // ──  SÉCURITÉ RADICALE : Seule la Fédération passe ──────────────────
-        if ($activeType !== 'Federation' || !$activeId) {
+        $organisateur = $this->organisateurEffectifSaison($activeId, $activeType);
+
+        if (!$organisateur || $organisateur['type'] !== $activeType) {
             return response()->json([
                 'success' => false,
-                'message' => 'Action interdite. Seule l\'administration de la Fédération peut définir la charte des disciplines et catégories.'
+                'message' => $organisateur
+                    ? "Action interdite. C'est à l'administration de votre "
+                        . ($organisateur['type'] === 'Federation' ? 'fédération' : 'ligue')
+                        . ($organisateur['nom'] ? " ({$organisateur['nom']})" : '')
+                        . " de définir la charte des disciplines et catégories."
+                    : 'Seules une ligue ou une fédération peuvent définir une charte de disciplines et catégories.',
             ], 403);
         }
 
-        // Récupération de la saison active de la Fédération
-        $saison = Saison::where('active', true)
-            ->where('organisateur_id', $activeId)
-            ->where('organisateur_type', 'Federation')
-            ->first();
+        $saison = $this->saisonActivePour($activeId, $activeType);
 
         if (!$saison) {
             return response()->json([
                 'success' => false,
-                'message' => 'Vous devez avoir une saison fédérale active pour enregistrer cette configuration.',
+                'message' => $this->messageAucuneSaisonActivePour($activeId, $activeType),
             ], 422);
         }
 
@@ -116,20 +126,20 @@ class SubDisciplineController extends Controller
         }
 
         try {
-            $result = DB::transaction(function () use ($validated, $saison, $activeId) {
+            $result = DB::transaction(function () use ($validated, $saison, $organisateur) {
 
-                // ── ÉTAPE 1 : Créer / Récupérer les Disciplines de la Fédé ─────
+                // ── ÉTAPE 1 : Créer / Récupérer les Disciplines de l'organisateur ──
                 $disciplinesCreees = [];
 
                 foreach ($validated['disciplines'] as $disc) {
                     $discipline = SubDiscipline::firstOrCreate(
                         [
                             'nom'             => $disc['nom'],
-                            'organisateur_id' => $activeId, // ID de la Fédé connectée
+                            'organisateur_id' => $organisateur['id'],
+                            'organisateur_type' => $organisateur['type'],
                         ],
                         [
                             'description'       => $disc['description'] ?? null,
-                            'organisateur_type' => 'Federation',
                         ]
                     );
                     $disciplinesCreees[strtolower($disc['nom'])] = $discipline->id;
@@ -143,7 +153,7 @@ class SubDisciplineController extends Controller
                         [
                             'nom'       => $catData['nom'],
                             'sexe'      => $catData['sexe'],
-                            'saison_id' => $saison->id, // Lié à la saison Fédérale
+                            'saison_id' => $saison->id,
                         ],
                         [
                             'age_min'   => $catData['age_min'],
@@ -175,11 +185,11 @@ class SubDisciplineController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Charte nationale enregistrée avec succès par la Fédération.',
+                'message' => 'Charte des disciplines et catégories enregistrée avec succès.',
                 'data'    => $result,
             ], 201);
         } catch (\Exception $e) {
-            Log::error('Erreur configuration exclusive Fédération: ' . $e->getMessage(), [
+            Log::error('Erreur configuration disciplines/catégories: ' . $e->getMessage(), [
                 'trace' => $e->getTraceAsString()
             ]);
 

@@ -2,61 +2,53 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Saison;
-use App\Models\League;
 use App\Models\Licence;
 use App\Models\Student;
 use App\Models\Category;
 use Illuminate\Http\Request;
+use App\Http\Controllers\Concerns\ResolvesActiveSaison;
 
 
 class CategoryController extends Controller
 {
+    use ResolvesActiveSaison;
 
     /**
-     * Les catégories et la saison appartiennent toujours à la Fédération
-     * (voir SaisonController::store). Une Ligue consulte celles de sa
-     * fédération de rattachement, en lecture seule ; seule la Fédération
-     * peut en créer/modifier — voir le bouton "Nouvelle catégorie" côté front.
+     * Les catégories appartiennent toujours à la saison active de leur
+     * gestionnaire effectif : la Fédération, ou une Ligue indépendante (pas
+     * de federation_id) qui gère sa propre charte — voir
+     * SubDisciplineController::store() et ResolvesActiveSaison. Une Ligue
+     * affiliée consulte celles de sa Fédération, en lecture seule.
      */
     public function index(Request $request)
     {
         $activeId = $request->attributes->get('organisateur_id');
         $activeType = $request->attributes->get('organisateur_type');
 
-        $federationId = $activeId;
-        $leagueId = null;
-
-        if ($activeType === 'Ligue') {
-            $league = League::find($activeId);
-
-            if (!$league || !$league->federation_id) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Votre ligue doit être affiliée à une fédération pour charger les catégories.',
-                ], 422);
-            }
-
-            $federationId = $league->federation_id;
-            $leagueId = $activeId;
-        } elseif ($activeType !== 'Federation') {
+        if (!in_array($activeType, ['Ligue', 'Federation'], true)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Seules une ligue ou une fédération peuvent consulter les catégories.',
             ], 403);
         }
 
-        $saisonActive = Saison::where('active', true)
-            ->where('organisateur_id', $federationId)
-            ->where('organisateur_type', 'Federation')
-            ->first();
+        $organisateur = $this->organisateurEffectifSaison($activeId, $activeType);
+        $saisonActive = $organisateur ? $this->saisonActivePour($activeId, $activeType) : null;
 
         if (!$saisonActive) {
             return response()->json([
                 'categories'      => [],
                 'total_licencies' => 0,
+                'message'         => $this->messageAucuneSaisonActivePour($activeId, $activeType),
             ]);
         }
+
+        // Le comptage de licenciés (via la Fédération) ne s'applique qu'aux
+        // catégories rattachées à une saison fédérale ; une Ligue
+        // indépendante gérant sa propre charte n'a pas de licences fédérales
+        // à décompter dans ce contexte.
+        $federationId = $organisateur['type'] === 'Federation' ? $organisateur['id'] : null;
+        $leagueId = $activeType === 'Ligue' ? $activeId : null;
 
         $categories = Category::where('saison_id', $saisonActive->id)
             ->with('disciplines:id,nom')
@@ -80,7 +72,9 @@ class CategoryController extends Controller
             }
 
             $studentCount = $studentQuery->count();
-            $licenciesCount = $cat->getLicenciesCount($federationId, $saisonActive->id, $leagueId);
+            $licenciesCount = $federationId
+                ? $cat->getLicenciesCount($federationId, $saisonActive->id, $leagueId)
+                : 0;
 
             return [
                 'id'              => $cat->id,
@@ -99,14 +93,16 @@ class CategoryController extends Controller
             ];
         });
 
-        $totalLicencies = Licence::where('federation_id', $federationId)
-            ->where('saison_id', $saisonActive->id)
-            ->where('status', Licence::STATUS_PAYE)
-            ->when($leagueId, function ($query) use ($leagueId) {
-                $query->whereHas('club', fn($q) => $q->where('league_id', $leagueId));
-            })
-            ->distinct('student_id')
-            ->count('student_id');
+        $totalLicencies = $federationId
+            ? Licence::where('federation_id', $federationId)
+                ->where('saison_id', $saisonActive->id)
+                ->where('status', Licence::STATUS_PAYE)
+                ->when($leagueId, function ($query) use ($leagueId) {
+                    $query->whereHas('club', fn($q) => $q->where('league_id', $leagueId));
+                })
+                ->distinct('student_id')
+                ->count('student_id')
+            : 0;
 
         return response()->json([
             'categories'      => $result,
@@ -119,79 +115,17 @@ class CategoryController extends Controller
         $activeId   = $request->attributes->get('organisateur_id');
         $activeType = $request->attributes->get('organisateur_type');
 
-        // 1. Déterminer l'ID de la Fédération cible
-        $targetFederationId = $activeId;
+        $saisonActive = $this->saisonActivePour($activeId, $activeType);
 
-        if ($activeType === 'Ligue') {
-            $league = \App\Models\League::find($activeId);
-
-            if (!$league || !$league->federation_id) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Votre ligue doit être affiliée à une fédération pour charger les catégories.'
-                ], 422);
-            }
-
-            $targetFederationId = $league->federation_id;
+        if (!$saisonActive) {
+            return response()->json([], 200);
         }
 
-        // 2. Trouver la saison active de cette Fédération
-        $saisonFederation = \App\Models\Saison::where('active', true)
-            ->where('organisateur_id', $targetFederationId)
-            ->where('organisateur_type', 'Federation')
-            ->first();
-
-        if (!$saisonFederation) {
-            return response()->json([], 200); // On renvoie un tableau vide propre si la Fédé n'a pas encore créé de saison
-        }
-
-        // 3. Récupérer les catégories de la saison fédérale avec leurs sous-disciplines pour le front
-        $categories = Category::where('saison_id', $saisonFederation->id)
+        $categories = Category::where('saison_id', $saisonActive->id)
             ->with('disciplines:id,nom')
             ->orderBy('age_min', 'asc')
             ->get();
 
         return response()->json($categories);
-    }
-
-
-    // public function store(Request $request)
-    // {
-    //     $validated = $request->validate([
-    //         'nom'           => 'required|string|max:100',
-    //         'sexe'          => 'required|in:M,F,Mixte',
-    //         'age_min'       => 'nullable|integer|min:0',
-    //         'age_max'       => 'nullable|integer|gt:age_min',
-    //         'saison_id'     => 'required|exists:saisons,id',
-    //         'disciplines'   => 'required|array',
-    //         'disciplines.*' => 'exists:disciplines,id',
-    //     ]);
-
-    //     $category = Category::create($validated);
-
-    //     // Attacher les disciplines (table pivot)
-    //     $category->disciplines()->sync($request->disciplines);
-
-    //     return response()->json([
-    //         'success' => true,
-    //         'message' => 'Catégorie créée avec succès',
-    //         'data' => $category
-    //     ], 201);
-    // }
-
-    public function update(Request $request, Category $category)
-    {
-        $category->update($request->validated());
-        $category->disciplines()->sync($request->disciplines);
-
-        return back()->with('success', 'Catégorie mise à jour.');
-    }
-
-    public function destroy(Category $category)
-    {
-        $category->disciplines()->detach(); // nettoie le pivot
-        $category->delete();
-
-        return back()->with('success', 'Catégorie supprimée.');
     }
 }

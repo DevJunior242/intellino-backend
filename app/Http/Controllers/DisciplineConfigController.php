@@ -2,34 +2,32 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\SubDiscipline;
 use Illuminate\Http\Request;
-
-use App\Http\Controllers\Controller;
+use App\Http\Controllers\Concerns\ResolvesActiveSaison;
 
 class DisciplineConfigController extends Controller
 {
+    use ResolvesActiveSaison;
 
+    /**
+     * Une Ligue affiliée à une Fédération hérite des disciplines de sa
+     * Fédération. Une Ligue indépendante (pas de federation_id) gère les
+     * siennes — même logique que la saison, voir ResolvesActiveSaison.
+     */
     public function index(Request $request)
     {
         $activeId = $request->attributes->get('organisateur_id');
         $activeType = $request->attributes->get('organisateur_type');
 
-        // 1. Initialisation des identifiants cibles avec les valeurs actuelles
-        $targetFederationId = $activeId;
+        $organisateur = $this->organisateurEffectifSaison($activeId, $activeType);
 
-        // 2. Si c'est une Ligue qui interroge l'API, on remonte à sa Fédération parente
-        if ($activeType === 'Ligue') {
-            // On va chercher la ligue actuelle pour connaître sa federation_id
-            $league = \App\Models\League::find($activeId);
-
-            if ($league) {
-                $targetFederationId = $league->federation_id;
-            }
+        if (!$organisateur) {
+            return response()->json([]);
         }
 
-        // 3. On filtre toujours sur le type 'Federation' car c'est elle qui gère la charte nationale
-        $disciplines = \App\Models\SubDiscipline::where('organisateur_id', $targetFederationId)
-            ->where('organisateur_type', 'Federation')
+        $disciplines = SubDiscipline::where('organisateur_id', $organisateur['id'])
+            ->where('organisateur_type', $organisateur['type'])
             ->select('id', 'nom')
             ->get();
 

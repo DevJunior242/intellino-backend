@@ -411,7 +411,6 @@ Route::middleware(['auth:sanctum'])->group(function () {
         //categories
         Route::get('/categories', [CategoryController::class, 'index']);
         Route::get('/getCategories', [CategoryController::class, 'getCategories']);
-        Route::post('/categories', [CategoryController::class, 'store']);
 
         Route::apiResource('/disciplineLeague', DisciplineConfigController::class);
 
