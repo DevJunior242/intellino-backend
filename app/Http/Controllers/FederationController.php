@@ -92,24 +92,27 @@ class FederationController extends Controller
             'website'        => 'nullable|url',
             'logo'           => 'nullable|image|mimes:jpg,jpeg,png,webp,svg|max:2048', // 2 Mo max
 
-            // Étape 2 : Sécurité / Clé d'activation
-            'activation_key' => 'required|string',
+            // Étape 2 : Sécurité / Clé d'activation — optionnelle : sans
+            // clé, la fédération démarre en essai (voir ResolvesTrialStatus).
+            'activation_key' => 'nullable|string',
             'mandate_end_at' => 'nullable|date|after:now',
         ], $messages);
 
         // =========================================================================
-        // VERIFICATION DE LA CLÉ D'ACTIVATION
+        // VERIFICATION DE LA CLÉ D'ACTIVATION (si fournie)
         // =========================================================================
-        // On cherche une clé valide, non utilisée, et destinée à une Fédération
-        $key = ActivationKey::where('key_code', $validated['activation_key'])
-            ->where('is_used', false)
-            ->where('type', 'federation') // Pour éviter qu'on utilise une clé de Club ici
-            ->first();
+        $key = null;
+        if (!empty($validated['activation_key'])) {
+            $key = ActivationKey::where('key_code', $validated['activation_key'])
+                ->where('is_used', false)
+                ->where('type', 'federation') // Pour éviter qu'on utilise une clé de Club ici
+                ->first();
 
-        if (!$key) {
-            return response()->json([
-                'errors' => ['activation_key' => ["La clé d'activation est invalide ou déjà utilisée."]]
-            ], 422);
+            if (!$key) {
+                return response()->json([
+                    'errors' => ['activation_key' => ["La clé d'activation est invalide ou déjà utilisée."]]
+                ], 422);
+            }
         }
 
         $user = $request->user();
@@ -133,8 +136,8 @@ class FederationController extends Controller
                 'name'       => $validated['name'],
                 'code'       => strtoupper($validated['code']),
                 'country_id' => $validated['country_id'],
-                'address'    => $validated['address'],
-                'website'    => $validated['website'],
+                'address'    => $validated['address'] ?? null,
+                'website'    => $validated['website'] ?? null,
                 'logo'       => $logoPath,
             ]);
 
@@ -149,13 +152,15 @@ class FederationController extends Controller
                 'mandate_end_at'   => $validated['mandate_end_at'] ?? null,
                 'mandate_status'   => 1,
             ]);
-            // On marque la clé comme utilisée par cette fédération
-            $key->update([
-                'is_used' => true,
-                'used_by_user_id' => $user->id,
-                'used_by_organisation_id' => $federation->id,
-                'used_at' => now(),
-            ]);
+            // On marque la clé comme utilisée par cette fédération (si fournie)
+            if ($key) {
+                $key->update([
+                    'is_used' => true,
+                    'used_by_user_id' => $user->id,
+                    'used_by_organisation_id' => $federation->id,
+                    'used_at' => now(),
+                ]);
+            }
             $user->updateQuietly([
                 'current_federation_id' => $federation->id,
             ]);

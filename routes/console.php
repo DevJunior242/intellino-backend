@@ -10,3 +10,6 @@ Artisan::command('inspire', function () {
 
 Schedule::command('app:expire-licences')
     ->daily();
+
+Schedule::command('app:deactivate-expired-trials')
+    ->daily();

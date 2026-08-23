@@ -7,6 +7,7 @@ use App\Models\League;
 use App\Models\Federation;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use App\Http\Controllers\Concerns\ResolvesTrialStatus;
 
 /**
  * Auto-édition d'une organisation (Club, Ligue ou Fédération) par son propre
@@ -17,6 +18,8 @@ use Illuminate\Support\Facades\Storage;
  */
 class OrganisationController extends Controller
 {
+    use ResolvesTrialStatus;
+
     private function resolve(?string $activeId, ?string $activeType)
     {
         if (!$activeId) {
@@ -69,7 +72,11 @@ class OrganisationController extends Controller
             return response()->json(['message' => 'Organisation introuvable.'], 404);
         }
 
-        return response()->json(['data' => $org, 'type' => $activeType]);
+        return response()->json([
+            'data' => $org,
+            'type' => $activeType,
+            'trial' => $this->statutEssaiPour($org),
+        ]);
     }
 
     public function update(Request $request)

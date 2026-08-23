@@ -71,17 +71,24 @@ class ClubController extends Controller
          return DB::transaction(function () use ($request, $user) {
 
             // 1. VERIFICATION ET VERROUILLAGE DE LA CLÉ D'ACTIVATION
-            $key = ActivationKey::where('key_code', $request->activation_key)
-               ->where('is_used', false)
-               ->where('type', 'club')
-               ->lockForUpdate()
-               ->first();
+            // Optionnelle : sans clé, le club est créé quand même et démarre
+            // en essai (voir ResolvesTrialStatus) — il sera désactivé
+            // automatiquement si aucune clé n'est jamais consommée avant la
+            // fin du délai configuré (app.trial_activation_days).
+            $key = null;
+            if ($request->filled('activation_key')) {
+               $key = ActivationKey::where('key_code', $request->activation_key)
+                  ->where('is_used', false)
+                  ->where('type', 'club')
+                  ->lockForUpdate()
+                  ->first();
 
-            if (!$key) {
-               return response()->json([
-                  'success' => false,
-                  'message' => 'La clé d\'activation est invalide ou a déjà été utilisée.',
-               ], 422);
+               if (!$key) {
+                  return response()->json([
+                     'success' => false,
+                     'message' => 'La clé d\'activation est invalide ou a déjà été utilisée.',
+                  ], 422);
+               }
             }
 
             // 2. VERIFICATION DU ROLE
@@ -118,13 +125,15 @@ class ClubController extends Controller
                'logo' => isset($path) ? $path : null,
             ]);
 
-            // 5. MARQUER LA CLÉ COMME CONSOMMÉE
-            $key->update([
-               'is_used' => true,
-               'used_at' => now(),
-               'used_by_user_id' => $user->id,
-               'used_by_organisation_id' => $club->id,
-            ]);
+            // 5. MARQUER LA CLÉ COMME CONSOMMÉE (si une clé a été fournie)
+            if ($key) {
+               $key->update([
+                  'is_used' => true,
+                  'used_at' => now(),
+                  'used_by_user_id' => $user->id,
+                  'used_by_organisation_id' => $club->id,
+               ]);
+            }
 
             // 6. LOGIQUE UTILISATEUR & ROLES (Ton code d'origine)
             $user->updateQuietly([

@@ -27,7 +27,9 @@ class ClubStoreRequest extends FormRequest
             'name' => ['bail', 'required', 'regex:/^[\pL\s\d\-]+$/u', 'max:50'],
             'logo' => ['bail', 'nullable', 'image', 'mimes:jpeg,png,jpg,gif,svg', 'max:2048'],
             'address' => ['bail', 'nullable', 'regex:/^[\pL\s\d\-\.,\#\/\(\)\']+$/u', 'max:50'],
-            'activation_key' => 'required|string',
+            // Optionnelle : sans clé, le club démarre en essai (voir
+            // ResolvesTrialStatus / ClubController::store).
+            'activation_key' => 'nullable|string',
         ];
     }
 
@@ -44,7 +46,6 @@ class ClubStoreRequest extends FormRequest
             'logo.max' => 'Le logo est trop grand',
 
             'address.max' => 'L\'adresse est trop longue',
-            'activation_key.required' => 'La clé d\'activation est requise',
         ];
     }
 }

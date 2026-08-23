@@ -55,17 +55,23 @@ class LeagueController extends Controller
             return DB::transaction(function () use ($request, $user) {
 
                 // 1. VÉRIFICATION ET VERROUILLAGE DE LA CLÉ LIGUE
-                $key = ActivationKey::where('key_code', $request->activation_key)
-                    ->where('is_used', false)
-                    ->where('type', 'league')
-                    ->lockForUpdate()
-                    ->first();
+                // Optionnelle : sans clé, la ligue démarre en essai (voir
+                // ResolvesTrialStatus) — désactivée automatiquement si aucune
+                // clé n'est jamais consommée avant la fin du délai configuré.
+                $key = null;
+                if ($request->filled('activation_key')) {
+                    $key = ActivationKey::where('key_code', $request->activation_key)
+                        ->where('is_used', false)
+                        ->where('type', 'league')
+                        ->lockForUpdate()
+                        ->first();
 
-                if (!$key) {
-                    return response()->json([
-                        'success' => false,
-                        'message' => 'La clé d\'activation est invalide ou a déjà été utilisée.',
-                    ], 422);
+                    if (!$key) {
+                        return response()->json([
+                            'success' => false,
+                            'message' => 'La clé d\'activation est invalide ou a déjà été utilisée.',
+                        ], 422);
+                    }
                 }
 
                 $adminRoleName = Role::where('name', 'admin')->first();
@@ -93,13 +99,15 @@ class LeagueController extends Controller
                     'logo' => isset($path) ? $path : null,
                 ]);
 
-                // 3. CONSOMMATION DE LA CLÉ
-                $key->update([
-                    'is_used' => true,
-                    'used_at' => now(),
-                    'used_by_user_id' => $user->id,
-                    'used_by_organisation_id' => $league->id,
-                ]);
+                // 3. CONSOMMATION DE LA CLÉ (si une clé a été fournie)
+                if ($key) {
+                    $key->update([
+                        'is_used' => true,
+                        'used_at' => now(),
+                        'used_by_user_id' => $user->id,
+                        'used_by_organisation_id' => $league->id,
+                    ]);
+                }
 
                 $user->current_league_id = $league->id;
                 $user->save();
@@ -145,6 +153,7 @@ class LeagueController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Une erreur est survenue lors de la création du league',
+                'error'   => $th->getMessage(),
             ], 422);
         }
     }

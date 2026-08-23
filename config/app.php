@@ -124,4 +124,18 @@ return [
         'store' => env('APP_MAINTENANCE_STORE', 'database'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Délai d'essai avant activation
+    |--------------------------------------------------------------------------
+    |
+    | Nombre de jours pendant lesquels un club/une ligue/une fédération créé(e)
+    | sans clé d'activation reste utilisable normalement. Passé ce délai, s'il
+    | n'a toujours consommé aucune clé, l'organisation est automatiquement
+    | désactivée (voir App\Console\Commands\DeactivateExpiredTrials).
+    |
+    */
+
+    'trial_activation_days' => (int) env('TRIAL_ACTIVATION_DAYS', 14),
+
 ];
