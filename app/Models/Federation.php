@@ -27,10 +27,18 @@ class Federation extends Model
         'country_id',
         'invitation_code',
         'status',
+        'langue',
+        'devise',
     ];
 
     public $incrementing = false;
     protected $keyType = 'string';
+    protected $appends = ['logo_url'];
+
+    public function getLogoUrlAttribute()
+    {
+        return $this->logo ? url('storage/' . $this->logo) : null;
+    }
 
     const STATUS_ACTIVE = 1;
     const STATUS_INACTIVE = 0;

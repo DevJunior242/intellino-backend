@@ -31,15 +31,23 @@ class Club extends Model
         'region',
         'address',
         'status',
+        'langue',
+        'devise',
 
     ];
 
     protected $keyType = 'string';
+    protected $appends = ['logo_url'];
 
     public $incrementing = false;
 
     const STATUS_ACTIVE = 1;
     const STATUS_INACTIVE = 0;
+
+    public function getLogoUrlAttribute()
+    {
+        return $this->logo ? url('storage/' . $this->logo) : null;
+    }
 
     public function subscriptions()
     {

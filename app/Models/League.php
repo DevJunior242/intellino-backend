@@ -25,10 +25,18 @@ class League extends Model
         'invitation_code',
         'federation_id',
         'status',
+        'langue',
+        'devise',
     ];
 
     protected $keyType = 'string';
+    protected $appends = ['logo_url'];
     public $incrementing = false;
+
+    public function getLogoUrlAttribute()
+    {
+        return $this->logo ? url('storage/' . $this->logo) : null;
+    }
 
     const STATUS_ACTIVE = 1;
     const STATUS_INACTIVE = 0;

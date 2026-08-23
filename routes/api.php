@@ -5,6 +5,7 @@ use App\Models\KataController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\PdfController;
 use App\Http\Controllers\ClubController;
+use App\Http\Controllers\OrganisationController;
 use App\Http\Controllers\JuryController;
 use App\Http\Controllers\LikeController;
 use App\Http\Controllers\KataNotationController;
@@ -256,6 +257,12 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::post('/leagues/takeover', [MandatController::class, 'takeoverLeague']);
 
     Route::middleware('permission:instructeur,secretaire,admin,parent,karateka,super_admin,arbitre')->group(function () {
+
+        //organisation active (club/ligue/fédération) : auto-édition par son admin
+        Route::prefix('organisation')->group(function () {
+            Route::get('/', [OrganisationController::class, 'show']);
+            Route::post('/', [OrganisationController::class, 'update']);
+        });
 
         Route::get('/federation/dashboard-stats', [FederationDashboardController::class, 'getStats']);
         Route::get('/federation/clubs-par-ligue', [FederationDashboardController::class, 'clubsParLigue']);
