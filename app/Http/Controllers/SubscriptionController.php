@@ -28,9 +28,12 @@ class SubscriptionController extends Controller
     public function index(Request $request)
     {
         if ($this->estSuperAdmin($request)) {
+            // Vue complète pour le super admin (page "Abonnements" de la
+            // Comptabilité) : pagination côté client dans le DataGrid plutôt
+            // que côté serveur, le volume reste faible pour un outil interne.
             $subscriptions = Subscription::with(['organisateur', 'plan'])
                 ->latest()
-                ->paginate(10);
+                ->paginate(100);
 
             return response()->json(['success' => true, 'subscriptions' => $subscriptions]);
         }
