@@ -82,13 +82,29 @@ class SubscriptionController extends Controller
         $existant = Subscription::where('organisateur_id', $activeId)
             ->where('organisateur_type', $activeType)
             ->whereIn('status', [Subscription::STATUS_PENDING, Subscription::STATUS_PAID])
+            ->latest()
             ->first();
 
         if ($existant) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Vous avez déjà un abonnement en cours ou en attente de paiement.',
-            ], 422);
+            if ($existant->plan_id === $plan->id) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Vous avez déjà un abonnement en cours pour ce palier.',
+                ], 422);
+            }
+
+            if ($existant->status === Subscription::STATUS_PENDING
+                && $existant->payments()->where('status', SubscriptionPayment::STATUS_DECLARED)->exists()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "Un paiement pour votre abonnement actuel (\"{$existant->plan?->name}\") est en cours de vérification. Attendez sa confirmation ou son rejet avant de changer de palier.",
+                ], 422);
+            }
+
+            // On change de palier : l'ancien abonnement (encore impayé, ou
+            // payé mais qu'on remplace) est marqué "cancelled" plutôt que
+            // supprimé, pour garder l'historique visible dans "Mon abonnement".
+            $existant->update(['status' => Subscription::STATUS_CANCELLED]);
         }
 
         $start = now();
@@ -122,6 +138,13 @@ class SubscriptionController extends Controller
 
         if ($subscription->status === Subscription::STATUS_PAID) {
             return response()->json(['success' => false, 'message' => 'Cet abonnement est déjà payé.'], 422);
+        }
+
+        if ($subscription->status === Subscription::STATUS_CANCELLED) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Cet abonnement a été remplacé par un changement de palier. Rechargez la page.',
+            ], 422);
         }
 
         if ($subscription->payments()->where('status', SubscriptionPayment::STATUS_DECLARED)->exists()) {

@@ -13,6 +13,7 @@ class Subscription extends Model
     const STATUS_PENDING = 'pending_payment';
     const STATUS_PAID = 'paid';
     const STATUS_EXPIRED = 'expired';
+    const STATUS_CANCELLED = 'cancelled';
 
     protected $fillable = [
         'organisateur_id',
