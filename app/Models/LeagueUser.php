@@ -5,12 +5,14 @@ namespace App\Models;
 use App\Models\Role;
 use App\Models\User;
 use App\Models\League;
-use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\Pivot;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 
-class LeagueUser extends Model
+class LeagueUser extends Pivot
 {
     use HasUuids;
+
+    protected $table = 'league_users';
 
     protected $fillable = [
         'league_id',

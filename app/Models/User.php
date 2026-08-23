@@ -98,6 +98,7 @@ class User extends Authenticatable implements MustVerifyEmail
     public function leagues()
     {
         return $this->belongsToMany(League::class, 'league_users')
+            ->using(LeagueUser::class)
             ->withPivot('role_id')
             ->withTimestamps();
     }
@@ -105,6 +106,7 @@ class User extends Authenticatable implements MustVerifyEmail
     public function federations(): BelongsToMany
     {
         return $this->belongsToMany(Federation::class, 'federation_users')
+            ->using(FederationUser::class)
             ->withPivot('role_id', 'mandate_start_at', 'mandate_end_at', 'mandate_status')
             ->withTimestamps();
     }

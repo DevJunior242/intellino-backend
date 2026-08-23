@@ -5,12 +5,13 @@ namespace App\Models;
 use App\Models\Role;
 use App\Models\User;
 use App\Models\Federation;
-use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\Pivot;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 
-class FederationUser extends Model
+class FederationUser extends Pivot
 {
     use HasUuids;
+    protected $table = 'federation_users';
     protected $fillable = ['federation_id', 'user_id', 'role_id', 'mandate_start_at', 'mandate_end_at', 'mandate_status'];
     protected $keyType = 'string';
     public $incrementing = false;
