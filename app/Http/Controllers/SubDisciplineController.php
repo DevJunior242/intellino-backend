@@ -15,28 +15,22 @@ class SubDisciplineController extends Controller
     use ResolvesActiveSaison;
 
     /**
-     * Seul le gestionnaire EFFECTIF de la saison peut définir la charte
-     * disciplines/catégories : la Fédération, ou une Ligue indépendante (pas
-     * de federation_id) — même logique que la saison elle-même, voir
-     * ResolvesActiveSaison. Une Ligue affiliée reste en lecture seule : elle
-     * hérite de la charte de sa Fédération.
+     * Chaque Ligue (affiliée ou non) et chaque Fédération gère sa propre
+     * charte disciplines/catégories, de façon totalement indépendante — pas
+     * d'héritage ni de blocage entre une ligue et sa fédération (à la
+     * différence de la saison, qui elle reste hiérarchique). Une ligue ne
+     * doit jamais être bloquée dans la création de ses compétitions en
+     * attendant que sa fédération publie les siennes.
      */
     public function store(Request $request)
     {
         $activeId   = $request->attributes->get('organisateur_id');
         $activeType = $request->attributes->get('organisateur_type');
 
-        $organisateur = $this->organisateurEffectifSaison($activeId, $activeType);
-
-        if (!$organisateur || $organisateur['type'] !== $activeType) {
+        if (!in_array($activeType, ['Ligue', 'Federation'], true) || !$activeId) {
             return response()->json([
                 'success' => false,
-                'message' => $organisateur
-                    ? "Action interdite. C'est à l'administration de votre "
-                        . ($organisateur['type'] === 'Federation' ? 'fédération' : 'ligue')
-                        . ($organisateur['nom'] ? " ({$organisateur['nom']})" : '')
-                        . " de définir la charte des disciplines et catégories."
-                    : 'Seules une ligue ou une fédération peuvent définir une charte de disciplines et catégories.',
+                'message' => 'Seules une ligue ou une fédération peuvent définir une charte de disciplines et catégories.',
             ], 403);
         }
 
@@ -126,7 +120,7 @@ class SubDisciplineController extends Controller
         }
 
         try {
-            $result = DB::transaction(function () use ($validated, $saison, $organisateur) {
+            $result = DB::transaction(function () use ($validated, $saison, $activeId, $activeType) {
 
                 // ── ÉTAPE 1 : Créer / Récupérer les Disciplines de l'organisateur ──
                 $disciplinesCreees = [];
@@ -135,8 +129,8 @@ class SubDisciplineController extends Controller
                     $discipline = SubDiscipline::firstOrCreate(
                         [
                             'nom'             => $disc['nom'],
-                            'organisateur_id' => $organisateur['id'],
-                            'organisateur_type' => $organisateur['type'],
+                            'organisateur_id' => $activeId,
+                            'organisateur_type' => $activeType,
                         ],
                         [
                             'description'       => $disc['description'] ?? null,
@@ -154,6 +148,8 @@ class SubDisciplineController extends Controller
                             'nom'       => $catData['nom'],
                             'sexe'      => $catData['sexe'],
                             'saison_id' => $saison->id,
+                            'organisateur_id' => $activeId,
+                            'organisateur_type' => $activeType,
                         ],
                         [
                             'age_min'   => $catData['age_min'],

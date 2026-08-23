@@ -14,11 +14,10 @@ class CategoryController extends Controller
     use ResolvesActiveSaison;
 
     /**
-     * Les catégories appartiennent toujours à la saison active de leur
-     * gestionnaire effectif : la Fédération, ou une Ligue indépendante (pas
-     * de federation_id) qui gère sa propre charte — voir
-     * SubDisciplineController::store() et ResolvesActiveSaison. Une Ligue
-     * affiliée consulte celles de sa Fédération, en lecture seule.
+     * Chaque Ligue (affiliée ou non) et chaque Fédération gère et consulte
+     * ses propres catégories, de façon indépendante — voir
+     * SubDisciplineController::store(). Pas d'héritage entre une ligue et sa
+     * fédération : chacune ne voit que ce qu'elle a défini elle-même.
      */
     public function index(Request $request)
     {
@@ -32,8 +31,7 @@ class CategoryController extends Controller
             ], 403);
         }
 
-        $organisateur = $this->organisateurEffectifSaison($activeId, $activeType);
-        $saisonActive = $organisateur ? $this->saisonActivePour($activeId, $activeType) : null;
+        $saisonActive = $this->saisonActivePour($activeId, $activeType);
 
         if (!$saisonActive) {
             return response()->json([
@@ -43,14 +41,14 @@ class CategoryController extends Controller
             ]);
         }
 
-        // Le comptage de licenciés (via la Fédération) ne s'applique qu'aux
-        // catégories rattachées à une saison fédérale ; une Ligue
-        // indépendante gérant sa propre charte n'a pas de licences fédérales
-        // à décompter dans ce contexte.
-        $federationId = $organisateur['type'] === 'Federation' ? $organisateur['id'] : null;
+        // Le comptage de licenciés n'a de sens que pour les catégories
+        // définies par une Fédération (les licences sont toujours fédérales).
+        $federationId = $activeType === 'Federation' ? $activeId : null;
         $leagueId = $activeType === 'Ligue' ? $activeId : null;
 
         $categories = Category::where('saison_id', $saisonActive->id)
+            ->where('organisateur_id', $activeId)
+            ->where('organisateur_type', $activeType)
             ->with('disciplines:id,nom')
             ->orderBy('age_min', 'asc')
             ->get();
@@ -122,6 +120,8 @@ class CategoryController extends Controller
         }
 
         $categories = Category::where('saison_id', $saisonActive->id)
+            ->where('organisateur_id', $activeId)
+            ->where('organisateur_type', $activeType)
             ->with('disciplines:id,nom')
             ->orderBy('age_min', 'asc')
             ->get();

@@ -12,7 +12,7 @@ class Category extends Model
 {
     use HasUuids;
 
-    protected $fillable = ['nom', 'sexe', 'age_min', 'age_max', 'poids_min', 'poids_max', 'saison_id'];
+    protected $fillable = ['nom', 'sexe', 'age_min', 'age_max', 'poids_min', 'poids_max', 'saison_id', 'organisateur_id', 'organisateur_type'];
     protected $keyType = 'string';
     public $incrementing = false;
     /**
@@ -88,6 +88,11 @@ class Category extends Model
     public function saison()
     {
         return $this->belongsTo(Saison::class);
+    }
+
+    public function organisateur()
+    {
+        return $this->morphTo();
     }
 
     public function licencies()
