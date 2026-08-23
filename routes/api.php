@@ -262,6 +262,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::prefix('organisation')->group(function () {
             Route::get('/', [OrganisationController::class, 'show']);
             Route::post('/', [OrganisationController::class, 'update']);
+            Route::post('/activate', [OrganisationController::class, 'activate']);
         });
 
         Route::get('/federation/dashboard-stats', [FederationDashboardController::class, 'getStats']);

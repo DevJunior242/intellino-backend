@@ -5,7 +5,9 @@ namespace App\Http\Controllers;
 use App\Models\Club;
 use App\Models\League;
 use App\Models\Federation;
+use App\Models\ActivationKey;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use App\Http\Controllers\Concerns\ResolvesTrialStatus;
 
@@ -117,5 +119,81 @@ class OrganisationController extends Controller
             'message' => 'Informations mises à jour avec succès.',
             'data'    => $org->fresh(),
         ]);
+    }
+
+    private const TYPE_CLE = [
+        'Club' => 'club',
+        'Ligue' => 'league',
+        'Federation' => 'federation',
+    ];
+
+    /**
+     * Permet à l'admin d'une organisation créée sans clé (en essai, voir
+     * ResolvesTrialStatus) de saisir sa clé une fois reçue — le seul moment
+     * où une clé était consommée jusqu'ici était la création elle-même
+     * (ClubController/LeagueController/FederationController::store()),
+     * sans possibilité de le faire après coup.
+     */
+    public function activate(Request $request)
+    {
+        $activeId = $request->attributes->get('organisateur_id');
+        $activeType = $request->attributes->get('organisateur_type');
+        $role = $request->attributes->get('role');
+
+        $org = $this->resolve($activeId, $activeType);
+
+        if (!$org) {
+            return response()->json(['message' => 'Organisation introuvable.'], 404);
+        }
+
+        if ($role !== 'admin') {
+            return response()->json([
+                'message' => "Seul l'administrateur de l'organisation peut l'activer.",
+            ], 403);
+        }
+
+        if ($this->estActivee($org)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Cette organisation a déjà consommé une clé d\'activation.',
+            ], 422);
+        }
+
+        $validated = $request->validate(['activation_key' => 'required|string']);
+        $typeCle = self::TYPE_CLE[$activeType] ?? null;
+
+        return DB::transaction(function () use ($validated, $typeCle, $activeId, $activeType, $org, $request) {
+            $key = ActivationKey::where('key_code', $validated['activation_key'])
+                ->where('is_used', false)
+                ->where('type', $typeCle)
+                ->lockForUpdate()
+                ->first();
+
+            if (!$key) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "La clé d'activation est invalide ou a déjà été utilisée.",
+                ], 422);
+            }
+
+            $key->update([
+                'is_used' => true,
+                'used_at' => now(),
+                'used_by_user_id' => $request->user()->id,
+                'used_by_organisation_id' => $org->id,
+            ]);
+
+            // Réactive immédiatement si l'essai avait déjà expiré (pas besoin
+            // d'attendre le prochain passage de app:deactivate-expired-trials).
+            if ((int) $org->status !== 1) {
+                $org->update(['status' => 1]);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Organisation activée avec succès.',
+                'data'    => $org->fresh(),
+            ]);
+        });
     }
 }
