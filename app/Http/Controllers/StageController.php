@@ -253,16 +253,31 @@ class StageController extends Controller
             ], 404);
         }
 
-        // Filtres optionnels, réutilisables  
+        // Filtres optionnels, réutilisables
         $filters = $request->validate([
             'type'   => 'nullable|string',
             'search' => 'nullable|string|max:255',
         ]);
 
+        // Un club voit les stages de SA ligue + ceux de SA fédération (si la
+        // ligue y est affiliée) — même logique que ExamenController::index().
+        $federationId = $league->federation_id;
+
         $query = Stage::query()
-            ->where('organisateur_type', 'Ligue')
-            ->where('organisateur_id', $league->id)
-            ->where('saison_id', $saisonActive->id);
+            ->where('saison_id', $saisonActive->id)
+            ->where(function ($q) use ($league, $federationId) {
+                $q->where(function ($sub) use ($league) {
+                    $sub->where('organisateur_type', 'Ligue')
+                        ->where('organisateur_id', $league->id);
+                });
+
+                if ($federationId) {
+                    $q->orWhere(function ($sub) use ($federationId) {
+                        $sub->where('organisateur_type', 'Federation')
+                            ->where('organisateur_id', $federationId);
+                    });
+                }
+            });
 
         if (!empty($filters['type'])) {
             $query->where('type', $filters['type']);
@@ -278,8 +293,9 @@ class StageController extends Controller
             'success' => true,
             'data'    => $stages,
             'meta'    => [
-                'league_id'   => $league->id,
-                'league_name' => $league->name ?? null,
+                'league_id'      => $league->id,
+                'league_name'    => $league->name ?? null,
+                'federation_id'  => $federationId,
             ],
         ]);
     }
