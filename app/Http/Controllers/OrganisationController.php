@@ -81,7 +81,7 @@ class OrganisationController extends Controller
         return response()->json([
             'data' => $org,
             'type' => $activeType,
-            'trial' => $this->statutEssaiPour($org),
+            'trial' => $this->statutEssaiPour($org, $activeType),
             'palier' => $this->statutPalierPour($activeType, $nbUsers),
         ]);
     }
@@ -157,7 +157,7 @@ class OrganisationController extends Controller
             ], 403);
         }
 
-        if ($this->estActivee($org)) {
+        if ($this->aUneCleActivee($org)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Cette organisation a déjà consommé une clé d\'activation.',

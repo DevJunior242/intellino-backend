@@ -13,3 +13,6 @@ Schedule::command('app:expire-licences')
 
 Schedule::command('app:deactivate-expired-trials')
     ->daily();
+
+Schedule::command('app:expire-subscriptions')
+    ->daily();
