@@ -42,6 +42,7 @@ class DatabaseSeeder extends Seeder
             GradeSeeder::class,
             CountrySeeder::class,
             KataSeeder::class,
+            PlanSeeder::class,
 
         ]);
     }

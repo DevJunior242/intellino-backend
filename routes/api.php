@@ -125,6 +125,12 @@ Route::middleware('throttle:60,1')->group(function () {
     Route::get('/configs/{config}/bracket', [CombatController::class, 'bracket']);
 });
 
+// Page publique "Tarifs" : consultable sans être connecté.
+Route::middleware('throttle:60,1')->group(function () {
+    Route::get('/public/plans', [PlanController::class, 'getPlans']);
+    Route::get('/public/annual-discount', [PlanController::class, 'getAnnualDiscount']);
+});
+
 Route::middleware(['auth:sanctum'])->group(function () {
     Route::get('/user', [LoginController::class, 'me']);
 
@@ -480,6 +486,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
 
         //plan controller
         Route::post('/plan/store', [PlanController::class, 'storePlan']);
+        Route::patch('/plan/annual-discount', [PlanController::class, 'updateAnnualDiscount']);
 
         Route::get('/club-exams', [ExamenLeagueController::class, 'getClubExams']);
 

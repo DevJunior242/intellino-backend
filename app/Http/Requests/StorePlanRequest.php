@@ -24,7 +24,10 @@ class StorePlanRequest extends FormRequest
         return [
             'name' => ['bail', 'required','unique:plans,name', 'max:255'],
             'description' => ['bail', 'nullable', 'string', 'max:255'],
-            'amount' => ['bail', 'required', 'numeric', 'min:1000', 'max:99999999.99'],
+            'amount' => ['bail', 'required', 'numeric', 'min:0', 'max:99999999.99'],
+            'organisateur_type' => ['bail', 'required', 'in:Club,Ligue,Federation'],
+            'min_users' => ['bail', 'required', 'integer', 'min:0'],
+            'max_users' => ['bail', 'nullable', 'integer', 'gt:min_users'],
         ];
     }
 
@@ -36,9 +39,13 @@ class StorePlanRequest extends FormRequest
             'name.unique' => 'Le nom existe déjà',
             'description.max' => 'La description est trop longue',
             'amount.required' => 'Le montant est requis',
-            'amount.min' => 'Le montant doit être supérieur à 1000',
+            'amount.min' => 'Le montant ne peut pas être négatif',
             'amount.max' => 'Le montant est trop grand',
             'amount.numeric' => 'Le montant doit être un nombre',
+            'organisateur_type.required' => 'Le type d\'organisation est requis',
+            'organisateur_type.in' => 'Le type d\'organisation doit être Club, Ligue ou Federation',
+            'min_users.required' => 'Le seuil minimum d\'utilisateurs est requis',
+            'max_users.gt' => 'Le seuil maximum doit être supérieur au minimum',
         ];
     }
 }
