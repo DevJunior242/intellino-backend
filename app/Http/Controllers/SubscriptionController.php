@@ -38,7 +38,9 @@ class SubscriptionController extends Controller
         $activeId = $request->attributes->get('organisateur_id');
         $activeType = $request->attributes->get('organisateur_type');
 
-        $subscriptions = Subscription::with('plan')
+        $subscriptions = Subscription::with(['plan', 'payments' => function ($q) {
+                $q->latest();
+            }])
             ->where('organisateur_id', $activeId)
             ->where('organisateur_type', $activeType)
             ->latest()
@@ -130,9 +132,9 @@ class SubscriptionController extends Controller
         }
 
         $validated = $request->validate([
-            'platform_payment_method_id' => ['required', 'exists:platform_payment_methods,id'],
-            'sender_number' => ['nullable', 'string', 'max:50'],
-            'transaction_id' => ['required', 'string', 'max:100'],
+            'platform_payment_method_id' => ['required', 'uuid', 'exists:platform_payment_methods,id'],
+            'sender_number' => ['required', 'string', 'max:50'],
+            'transaction_id' => ['nullable', 'string', 'max:255'],
         ]);
 
         $payment = SubscriptionPayment::create([
