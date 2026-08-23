@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use App\Http\Controllers\Concerns\ResolvesTrialStatus;
+use App\Http\Controllers\Concerns\ResolvesEffectifOrganisation;
 
 /**
  * Auto-édition d'une organisation (Club, Ligue ou Fédération) par son propre
@@ -21,6 +22,7 @@ use App\Http\Controllers\Concerns\ResolvesTrialStatus;
 class OrganisationController extends Controller
 {
     use ResolvesTrialStatus;
+    use ResolvesEffectifOrganisation;
 
     private function resolve(?string $activeId, ?string $activeType)
     {
@@ -74,10 +76,13 @@ class OrganisationController extends Controller
             return response()->json(['message' => 'Organisation introuvable.'], 404);
         }
 
+        $nbUsers = $this->nombreUtilisateursActifs($activeId, $activeType);
+
         return response()->json([
             'data' => $org,
             'type' => $activeType,
             'trial' => $this->statutEssaiPour($org),
+            'palier' => $this->statutPalierPour($activeType, $nbUsers),
         ]);
     }
 
