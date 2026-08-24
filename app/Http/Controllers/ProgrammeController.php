@@ -30,7 +30,8 @@ class ProgrammeController extends Controller
         if (!$saison) {
             return response()->json([
                 'success' => false,
-                'message' => 'Aucune saison active trouvée.',
+                'message' => $this->messageAucuneSaisonActivePour($activeId, $activeType),
+                'code' => 'aucune_saison_active',
             ], 422);
         }
 

@@ -90,7 +90,11 @@ trait ResolvesActiveSaison
      */
     private function messageAucuneSaisonActivePour(?string $activeId, ?string $activeType): string
     {
-        $générique = "Aucune saison sportive active n'a été configurée.";
+        // Cas le plus fréquent : une organisation (Club/Ligue/Fédération
+        // indépendant·e) tout juste créée n'a jamais eu l'occasion de
+        // définir sa première saison — le message doit dire quoi faire,
+        // pas juste constater l'absence.
+        $générique = "Aucune saison sportive active n'a été configurée. Rendez-vous dans Paramétrage général pour créer et activer une saison avant de continuer.";
 
         $organisateur = $this->organisateurEffectifSaison($activeId, $activeType);
 
