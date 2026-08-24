@@ -86,21 +86,38 @@ class KataNotationService
             ])
             ->get();
 
-        // Triées par poste (position réelle du juge sur le tatami), pas par
-        // ordre d'arrivée des notes — sinon "Juge N" ne désigne pas le même
-        // juge selon qu'on regarde côté saisie (juges) ou côté public.
+        $config = $ordrePassage->configNotation()->with('nbJugesOption')->first();
+        $nbJugesAttendus = $config->nbJugesOption ? (int) $config->nbJugesOption->valeur : 5;
+
+        // Le superviseur du tatami occupe lui aussi un poste dans la rotation
+        // mais ne note pas (Art. 10 — il tranche seulement les égalités) : le
+        // poste brut ne peut donc pas servir de numéro d'affichage "Juge N",
+        // sinon il vole un slot 1..nbJugesAttendus et le dernier vrai juge
+        // (poste le plus élevé) sort de cette plage. On renumérote les juges
+        // (hors superviseur) séquentiellement par poste croissant.
+        $displayPosteParRotationId = RotationArbitre::where('config_notation_id', $ordrePassage->config_notation_id)
+            ->where('actif', true)
+            ->where('est_superviseur', false)
+            ->orderBy('poste')
+            ->pluck('id')
+            ->values()
+            ->flip()
+            ->map(fn($i) => $i + 1);
+
+        // Triées par poste d'affichage (position réelle du juge sur le
+        // tatami), pas par ordre d'arrivée des notes — sinon "Juge N" ne
+        // désigne pas le même juge selon qu'on regarde côté saisie (juges) ou
+        // côté public.
         $dataNotes = $notes
-            ->sortBy(fn($note) => $note->rotationArbitre?->poste ?? PHP_INT_MAX)
+            ->filter(fn($note) => $note->rotationArbitre && !$note->rotationArbitre->est_superviseur)
+            ->sortBy(fn($note) => $displayPosteParRotationId->get($note->rotation_arbitre_id, PHP_INT_MAX))
             ->values()
             ->map(fn($note) => [
                 'id'      => $note->id,
                 'valeur'  => (float) $note->valeur,
-                'poste'   => $note->rotationArbitre?->poste ?? "Inconnu",
+                'poste'   => $displayPosteParRotationId->get($note->rotation_arbitre_id, "Inconnu"),
                 'arbitre' => $note->rotationArbitre?->arbitreCompetition?->user?->fullname ?? "Inconnu",
             ]);
-
-        $config = $ordrePassage->configNotation()->with('nbJugesOption')->first();
-        $nbJugesAttendus = $config->nbJugesOption ? (int) $config->nbJugesOption->valeur : 5;
 
         $termine = $dataNotes->count() >= $nbJugesAttendus;
 
