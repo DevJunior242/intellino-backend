@@ -229,4 +229,26 @@ class LeagueMemberController extends Controller
             'members'           => $members
         ]);
     }
+
+    public function destroyArbitre(Request $request, string $userId)
+    {
+        if ($request->attributes->get('role') !== 'admin') {
+            return response()->json(['success' => false, 'message' => "Action non autorisée."], 403);
+        }
+
+        $activeId = $request->attributes->get('organisateur_id');
+        $arbitreRoleId = Role::where('name', 'arbitre')->value('id');
+
+        $deleted = DB::table('league_users')
+            ->where('league_id', $activeId)
+            ->where('user_id', $userId)
+            ->where('role_id', $arbitreRoleId)
+            ->delete();
+
+        if (!$deleted) {
+            return response()->json(['success' => false, 'message' => "Arbitre introuvable pour cette ligue."], 404);
+        }
+
+        return response()->json(['success' => true, 'message' => 'Arbitre retiré avec succès.']);
+    }
 }

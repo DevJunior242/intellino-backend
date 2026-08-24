@@ -34,6 +34,7 @@ use App\Http\Controllers\LicenceController;
 use App\Http\Controllers\SessionController;
 use App\Http\Controllers\StudentController;
 use App\Http\Controllers\StudentHealthProfileController;
+use App\Http\Controllers\AiAssistantController;
 use App\Http\Controllers\CandidatController;
 use App\Http\Controllers\TransactionController;
 use App\Http\Controllers\CategoryController;
@@ -410,10 +411,12 @@ Route::middleware(['auth:sanctum'])->group(function () {
             Route::apiResource('league', LeagueMemberController::class);
             //arbitres
             Route::get('arbitres', [LeagueMemberController::class, 'arbitres']);
+            Route::delete('arbitres/{userId}', [LeagueMemberController::class, 'destroyArbitre']);
 
             //ajout membre federation
             Route::apiResource('federation', FederationMemberController::class);
             Route::get('federation-arbitres', [FederationMemberController::class, 'arbitres']);
+            Route::delete('federation-arbitres/{userId}', [FederationMemberController::class, 'destroyArbitre']);
         });
         //AddManuelClubController
         Route::post('leagues/addClubManuel', [AddManuelClubController::class, 'store']);
@@ -574,6 +577,13 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::post('/student/{student}', [StudentController::class, 'updateStudent']);
         Route::get('/student/{student}/health', [StudentHealthProfileController::class, 'show']);
         Route::patch('/student/{student}/health', [StudentHealthProfileController::class, 'update']);
+
+        //assistant IA (club + parent)
+        Route::prefix('ai')->middleware('throttle:15,1')->group(function () {
+            Route::post('/ask', [AiAssistantController::class, 'ask']);
+            Route::post('/ask-parent', [AiAssistantController::class, 'askAsParent']);
+            Route::get('/risque', [AiAssistantController::class, 'riskReport']);
+        });
         Route::delete('/student/{student}', [StudentController::class, 'destroy']);
         //stats
         Route::get('/student-stats', [StudentController::class, 'StudentStatsDashboard']);
