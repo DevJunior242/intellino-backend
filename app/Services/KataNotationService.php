@@ -282,7 +282,19 @@ class KataNotationService
             ->get()
             ->keyBy('id');
 
-        $lignes = array_map(function ($jugeId) use ($notesAka, $notesAo, $rotations) {
+        // Même renumérotation que resultatPassage() : le superviseur occupe
+        // un poste dans la rotation sans être un juge notant, donc le poste
+        // brut ne peut pas servir de numéro d'affichage "Juge N".
+        $displayPosteParRotationId = RotationArbitre::where('config_notation_id', $combat->config_notation_id)
+            ->where('actif', true)
+            ->where('est_superviseur', false)
+            ->orderBy('poste')
+            ->pluck('id')
+            ->values()
+            ->flip()
+            ->map(fn($i) => $i + 1);
+
+        $lignes = array_map(function ($jugeId) use ($notesAka, $notesAo, $rotations, $displayPosteParRotationId) {
             $rotation = $rotations->get($jugeId);
             $noteAka  = $notesAka[$jugeId] ?? null;
             $noteAo   = $notesAo[$jugeId] ?? null;
@@ -295,17 +307,17 @@ class KataNotationService
             }
 
             return [
-                'poste'    => $rotation?->poste,
+                'poste'    => $displayPosteParRotationId->get($jugeId),
                 'juge'     => $rotation?->arbitreCompetition?->user?->fullname ?? "Inconnu",
                 'note_aka' => $noteAka,
                 'note_ao'  => $noteAo,
                 'vote'     => $vote,
             ];
-        }, $jugeIds);
+        }, array_filter($jugeIds, fn($jugeId) => !$rotations->get($jugeId)?->est_superviseur));
 
         usort($lignes, fn($a, $b) => ($a['poste'] ?? 999) <=> ($b['poste'] ?? 999));
 
-        return $lignes;
+        return array_values($lignes);
     }
 
     /**
