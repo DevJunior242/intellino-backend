@@ -24,7 +24,7 @@ class LoginRequest extends FormRequest
         return [
             'email' => ['required', 'string', 'email', 'max:255'],
             'password' => ['required', 'string'],
-            // 'captcha_token' => ['required', new \App\Rules\Turnstile],
+            'captcha_token' => ['required', new \App\Rules\Turnstile],
         ];
     }
 
@@ -35,6 +35,7 @@ class LoginRequest extends FormRequest
             'email.email' => 'L\'email est invalide',
             'email.max' => 'L\'email est trop long',
             'password.required' => 'Le mot de passe est requis',
+            'captcha_token.required' => 'La vérification de sécurité est requise',
         ];
     }
 }
