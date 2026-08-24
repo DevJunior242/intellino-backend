@@ -238,6 +238,34 @@ class InscriptionController extends Controller
             ], 422);
         }
 
+        // Détection de quasi-doublon : deux fiches élève distinctes pour la
+        // même personne (même date de naissance, nom mal orthographié la
+        // deuxième fois — ex: "Christèle" / "Christelle") peuvent toutes les
+        // deux passer la vérification d'ID ci-dessus puisqu'elles ont des
+        // athlete_id différents. Bloque plutôt qu'un avertissement
+        // contournable : mieux vaut vérifier à deux avant d'inscrire deux
+        // fois la même personne à la même compétition.
+        $inscritsExistants = Student::whereIn(
+            'id',
+            Inscription::where('competition_id', $competitionId)->pluck('athlete_id')
+        )->get(['id', 'fullname', 'birthdate', 'sex']);
+
+        foreach (Student::whereIn('id', $aInscrire->pluck('athlete_id'))->get(['id', 'fullname', 'birthdate', 'sex']) as $athlete) {
+            foreach ($inscritsExistants as $existant) {
+                if ($existant->id === $athlete->id) continue;
+                if ((string) $existant->birthdate !== (string) $athlete->birthdate) continue;
+                if ($existant->sex !== $athlete->sex) continue;
+
+                $distance = levenshtein(mb_strtolower($athlete->fullname), mb_strtolower($existant->fullname));
+                if ($distance > 0 && $distance <= 3) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => "« {$athlete->fullname} » ressemble beaucoup à « {$existant->fullname} », déjà inscrit(e) à cette compétition (même date de naissance). Vérifiez qu'il ne s'agit pas de la même personne avant de continuer.",
+                    ], 422);
+                }
+            }
+        }
+
         $inscriptions = DB::transaction(function () use ($competitionId, $activeId, $activeType, $aInscrire) {
             $ordre = Inscription::where('competition_id', $competitionId)
                 ->lockForUpdate()
