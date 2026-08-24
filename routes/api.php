@@ -488,6 +488,8 @@ Route::middleware(['auth:sanctum'])->group(function () {
         //plan controller
         Route::post('/plan/store', [PlanController::class, 'storePlan']);
         Route::patch('/plan/annual-discount', [PlanController::class, 'updateAnnualDiscount']);
+        Route::patch('/plan/{plan}', [PlanController::class, 'updatePlan']);
+        Route::delete('/plan/{plan}', [PlanController::class, 'destroyPlan']);
 
         Route::get('/club-exams', [ExamenLeagueController::class, 'getClubExams']);
 

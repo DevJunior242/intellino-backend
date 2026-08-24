@@ -37,7 +37,9 @@ class Subscription extends Model
 
     public function plan()
     {
-        return $this->belongsTo(Plan::class);
+        // withTrashed() : un palier supprimé (soft delete) doit rester
+        // affichable dans l'historique des abonnements qui l'utilisaient.
+        return $this->belongsTo(Plan::class)->withTrashed();
     }
 
     public function payments()
