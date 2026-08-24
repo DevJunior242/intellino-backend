@@ -273,6 +273,35 @@ class StudentController extends Controller
                     ? $activeId
                     : ($validated['club_id'] ?? null);
 
+                // --- PRÉ-VÉRIFICATION DES TÉLÉPHONES (avant toute création) ---
+                // users.phone a une contrainte UNIQUE en base, mais rien ici
+                // ne le vérifiait avant l'insertion (seul l'email l'était,
+                // via User::updateOrCreate/where('email', ...)) — un
+                // numéro déjà utilisé par un AUTRE compte faisait planter
+                // toute la transaction en erreur 500 brute au lieu d'un
+                // message clair. Vérifié ici, avant toute création, pour ne
+                // rien avoir à annuler en cas de conflit.
+                $phonesAVerifier = [];
+                if (!$validated['is_own_responsible'] && !empty($validated['parent_phone'])) {
+                    $phonesAVerifier[$validated['parent_phone']] = $validated['parent_email'];
+                }
+                foreach ($validated['students'] as $studentData) {
+                    $creeraUnCompte = $validated['is_own_responsible'] || ($studentData['create_account'] ?? false);
+                    if ($creeraUnCompte && !empty($studentData['phone'])) {
+                        $phonesAVerifier[$studentData['phone']] = $studentData['email'];
+                    }
+                }
+
+                foreach ($phonesAVerifier as $phone => $email) {
+                    $conflit = User::where('phone', $phone)->where('email', '!=', $email)->first();
+                    if ($conflit) {
+                        return response()->json([
+                            'success' => false,
+                            'message' => "Le numéro {$phone} est déjà utilisé par un autre compte. Vérifiez le numéro, ou contactez l'administrateur si ce compte existe déjà.",
+                        ], 422);
+                    }
+                }
+
                 // --- GESTION DU PARENT ---
                 if (!$validated['is_own_responsible']) {
                     $parentUser = User::updateOrCreate(
