@@ -39,9 +39,10 @@ class StudentController extends Controller
         $isSuperAdmin = ($role === 'super_admin');
 
         if ($isSuperAdmin) {
-            $students = Student::with('clubs:id,name')->get();
+            $students = Student::with(['clubs:id,name', 'currentGrade'])->get();
         } else {
-            $students = $this->studentsVisiblesPar($activeId, $activeType, $request->input('club_id'));
+            $students = $this->studentsVisiblesPar($activeId, $activeType, $request->input('club_id'))
+                ->load('currentGrade');
         }
 
         $formattedStudents = $students->map(function ($student) use ($isSuperAdmin) {
@@ -53,6 +54,11 @@ class StudentController extends Controller
                 'status' => $student->status,
                 'club' => $isSuperAdmin ? $student->clubs->first() : null,
                 'photo' => $student->photo ? url('storage/' . $student->photo) : null,
+                // Le premier grade se donne à la main (menu "Attribuer un
+                // grade"), les suivants passent par les examens — une fois
+                // qu'un élève a un grade, ce menu ne doit plus lui être
+                // proposé (voir StudentList.jsx).
+                'has_grade' => $student->currentGrade !== null,
             ];
         });
 

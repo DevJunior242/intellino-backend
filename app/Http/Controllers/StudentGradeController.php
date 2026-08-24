@@ -88,22 +88,22 @@ class StudentGradeController extends Controller
 
             $hasGrades = StudentGrade::where('student_id', $request->student_id)->exists();
 
-            if (!$hasGrades) {
-                // C'est son PREMIER grade
-                $studentGrade = StudentGrade::create([
-                    ...$validated,
-                    'instructor_id' => $user->id,
-                    'club_id' => $activeId,
-                    'is_current' => true,
-
-
-                ]);
-            } else {
-                $studentGrade = $this->promoteStudent(
-                    $request->student_id,
-                    $request->current_grade_id
-                );
+            if ($hasGrades) {
+                // Le premier grade se donne à la main, les suivants
+                // s'obtiennent via les examens — pas de ré-attribution
+                // manuelle une fois qu'un élève a déjà un grade.
+                return response()->json([
+                    'success' => false,
+                    'message' => "Cet élève a déjà un grade. Les grades suivants s'obtiennent via les examens, pas par attribution manuelle.",
+                ], 422);
             }
+
+            $studentGrade = StudentGrade::create([
+                ...$validated,
+                'instructor_id' => $user->id,
+                'club_id' => $activeId,
+                'is_current' => true,
+            ]);
 
 
             return response()->json([
