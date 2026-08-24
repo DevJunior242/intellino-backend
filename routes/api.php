@@ -33,6 +33,7 @@ use App\Http\Controllers\CountryController;
 use App\Http\Controllers\LicenceController;
 use App\Http\Controllers\SessionController;
 use App\Http\Controllers\StudentController;
+use App\Http\Controllers\StudentHealthProfileController;
 use App\Http\Controllers\CandidatController;
 use App\Http\Controllers\TransactionController;
 use App\Http\Controllers\CategoryController;
@@ -571,6 +572,8 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::post('/parent-eleven/store-multiple', [StudentController::class, 'store']);
         Route::post('/student/parent', [StudentController::class, 'studentParent']);
         Route::post('/student/{student}', [StudentController::class, 'updateStudent']);
+        Route::get('/student/{student}/health', [StudentHealthProfileController::class, 'show']);
+        Route::patch('/student/{student}/health', [StudentHealthProfileController::class, 'update']);
         Route::delete('/student/{student}', [StudentController::class, 'destroy']);
         //stats
         Route::get('/student-stats', [StudentController::class, 'StudentStatsDashboard']);

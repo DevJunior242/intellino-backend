@@ -123,6 +123,11 @@ class Student extends Model
         return $this->hasMany(Licence::class);
     }
 
+    public function healthProfile()
+    {
+        return $this->hasOne(StudentHealthProfile::class);
+    }
+
     public function isSubscriptionActive(): bool
     {
         if (!$this->subscription_expires_at) {

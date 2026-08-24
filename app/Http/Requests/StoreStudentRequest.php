@@ -66,6 +66,21 @@ class StoreStudentRequest extends FormRequest
                 'string',
                 'regex:/^(\+226|00226)?[0567]\d{7}$/',
             ],
+
+            // Fiche santé (optionnelle, voir StudentHealthProfile) — remplie
+            // dès l'inscription si le club le souhaite, jamais bloquante.
+            'students.*.health' => ['sometimes', 'array'],
+            'students.*.health.groupe_sanguin' => ['nullable', 'string', 'max:10'],
+            'students.*.health.allergies' => ['nullable', 'string', 'max:1000'],
+            'students.*.health.conditions_medicales' => ['nullable', 'string', 'max:1000'],
+            'students.*.health.medecin_nom' => ['nullable', 'string', 'max:255'],
+            'students.*.health.medecin_telephone' => ['nullable', 'string', 'max:50'],
+            'students.*.health.contact_urgence_nom' => ['nullable', 'string', 'max:255'],
+            'students.*.health.contact_urgence_telephone' => ['nullable', 'string', 'max:50'],
+            'students.*.health.contact_urgence_relation' => ['nullable', 'string', 'max:100'],
+            'students.*.health.certificat_medical_fourni' => ['nullable', 'boolean'],
+            'students.*.health.certificat_medical_expire_le' => ['nullable', 'date'],
+            'students.*.health.notes' => ['nullable', 'string', 'max:1000'],
         ];
     }
 

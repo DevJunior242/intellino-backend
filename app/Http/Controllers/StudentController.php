@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Models\Licence;
 use App\Models\Student;
 use App\Models\ParentModel;
+use App\Models\StudentHealthProfile;
 use Illuminate\Support\Str;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -432,8 +433,34 @@ class StudentController extends Controller
                         $student->parents()->syncWithoutDetaching([$currentStudentParentId]);
                     }
 
+                    // --- 6. FICHE SANTÉ (optionnelle, remplie dès l'inscription) ---
+                    // Purement informative : rien n'est bloqué si absente ou
+                    // incomplète. On ne crée la ligne que si au moins un
+                    // champ a été renseigné, pour ne pas polluer la table
+                    // avec des fiches entièrement vides.
+                    $healthData = $studentData['health'] ?? null;
+                    if ($healthData && array_filter($healthData, fn ($v) => $v !== null && $v !== '')) {
+                        StudentHealthProfile::updateOrCreate(
+                            ['student_id' => $student->id],
+                            [
+                                'groupe_sanguin' => $healthData['groupe_sanguin'] ?? null,
+                                'allergies' => $healthData['allergies'] ?? null,
+                                'conditions_medicales' => $healthData['conditions_medicales'] ?? null,
+                                'medecin_nom' => $healthData['medecin_nom'] ?? null,
+                                'medecin_telephone' => $healthData['medecin_telephone'] ?? null,
+                                'contact_urgence_nom' => $healthData['contact_urgence_nom'] ?? null,
+                                'contact_urgence_telephone' => $healthData['contact_urgence_telephone'] ?? null,
+                                'contact_urgence_relation' => $healthData['contact_urgence_relation'] ?? null,
+                                'certificat_medical_fourni' => (bool) ($healthData['certificat_medical_fourni'] ?? false),
+                                'certificat_medical_expire_le' => $healthData['certificat_medical_expire_le'] ?? null,
+                                'notes' => $healthData['notes'] ?? null,
+                                'updated_by' => $request->user()->id,
+                            ]
+                        );
+                    }
+
                     // On charge la relation pour la réponse JSON
-                    $createdStudents[] = $student->load('user');
+                    $createdStudents[] = $student->load(['user', 'healthProfile']);
                 }
                 return response()->json([
                     'success' => true,
