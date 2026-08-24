@@ -14,11 +14,11 @@ class ArbitreVerificationService
             'fk'    => 'league_id',
             'role'  => 'arbitre',
         ],
-        // 'Federation' => [
-        //     'table' => 'federation_users',
-        //     'fk'    => 'federation_id',
-        //     'role'  => 'arbitre',
-        // ],
+        'Federation' => [
+            'table' => 'federation_users',
+            'fk'    => 'federation_id',
+            'role'  => 'arbitre',
+        ],
     ];
     public function estArbitre(Evenement $evenement, int|string $userId): bool
     {
