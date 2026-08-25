@@ -27,11 +27,22 @@ class StoreInscriptionReq extends FormRequest
             'inscriptions'                  => 'required|array|min:1',
             'inscriptions.*.athlete_id'      => 'required|distinct|exists:students,id',
             'inscriptions.*.poids_declare'   => 'nullable|numeric|min:0',
+            // Kata WKF Art. 5.1 : un athlète doit présenter un kata précis du
+            // catalogue officiel — laisser ce champ vide produit un passage
+            // sans nom de kata affiché aux juges/écran public. Nullable pour
+            // le Kumite uniquement (aucun kata n'y a de sens).
             'inscriptions.*.kata_id'         => [
-                'nullable',
+                $this->competitionEstKata() ? 'required' : 'nullable',
                 Rule::exists('katas', 'id')->where('actif', true),
             ],
         ];
+    }
+
+    private function competitionEstKata(): bool
+    {
+        $competition = \App\Models\Competition::with('subDiscipline')->find($this->input('competition_id'));
+
+        return strtolower($competition?->subDiscipline?->nom ?? '') === 'kata';
     }
 
     public function messages(): array
@@ -47,6 +58,7 @@ class StoreInscriptionReq extends FormRequest
             'inscriptions.*.poids_declare.numeric' => 'Le champ poids_declare doit être un nombre.',
             'inscriptions.*.poids_declare.min' => 'Le champ poids_declare doit être supérieur à 0.',
             'inscriptions.*.kata_id.exists' => 'Le kata sélectionné est invalide.',
+            'inscriptions.*.kata_id.required' => 'Veuillez saisir votre kata.',
         ];
     }
 

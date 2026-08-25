@@ -89,6 +89,7 @@ class StoreStudentRequest extends FormRequest
         return [
             'students.*.fullname.required' => 'Le nom complet de l\'élève est requis',
             'students.*.email.required_if' => 'L\'email est obligatoire pour créer le compte du responsable',
+            'students.*.email.email' => 'L\'email saisi n\'est pas valide (ex : nom@exemple.com)',
             'students.*.phone.regex' => 'Le numéro de téléphone est invalide',
             'students.*.is_own_responsible.boolean' => 'Le champ est_own_responsible doit être un booléen',
             'students.*.create_account.boolean' => 'Le champ create_account doit être un booléen',
