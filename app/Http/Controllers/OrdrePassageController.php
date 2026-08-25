@@ -129,6 +129,21 @@ class OrdrePassageController extends Controller
         $configId = $request->config_notation_id;
         $inscriptionId = $request->inscription_id;
 
+        $config = ConfigNotation::findOrFail($configId);
+
+        // Le tableau (Combat/OrdrePassage) est déjà construit à partir de la
+        // file d'assignation au moment de la validation (SeanceController::
+        // valider() -> BracketService::generer()) — un athlète assigné après
+        // coup ne rejoint jamais ce tableau : sa ligne reste orpheline
+        // (combat_id null) mais peut quand même être piochée par
+        // lancerSeance()/athleteSuivant() (aucun filtre sur combat_id), ce
+        // qui produit un athlète noté hors de tout combat.
+        if ($config->configuration_validee) {
+            return response()->json([
+                'message' => 'Le tableau a déjà été généré pour ce tatami — impossible d\'y assigner un nouvel athlète.',
+            ], 422);
+        }
+
         // Le kata choisi à l'inscription (Inscription::kata_id) sert de
         // valeur par défaut ici — l'admin peut la remplacer explicitement
         // au moment d'assigner le tatami.
@@ -136,12 +151,8 @@ class OrdrePassageController extends Controller
             ?: Inscription::find($inscriptionId)?->kata_id;
 
         // Kata WKF Art. 5.1 : seul un kata du catalogue officiel actif peut être choisi.
-        if ($kataId) {
-            $config = ConfigNotation::findOrFail($configId);
-
-            if ($config->estKata() && !Kata::where('id', $kataId)->where('actif', true)->exists()) {
-                return response()->json(['message' => 'Kata invalide ou inactif.'], 422);
-            }
+        if ($kataId && $config->estKata() && !Kata::where('id', $kataId)->where('actif', true)->exists()) {
+            return response()->json(['message' => 'Kata invalide ou inactif.'], 422);
         }
 
         // On calcule le prochain numéro d'ordre pour ce tatami
