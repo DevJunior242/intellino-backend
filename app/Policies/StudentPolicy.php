@@ -78,11 +78,20 @@ class StudentPolicy
             return true;
         }
 
-        // Student n'a pas de colonne club_id (relation many-to-many via club_students).
         $clubIds = $student->clubs()->wherePivot('is_active', true)->pluck('clubs.id');
 
         if ($clubIds->isEmpty()) {
-            return false;
+            // Pas de club actif : soit un athlète indépendant, géré par la
+            // Ligue/Fédération qui l'a inscrit directement (organisateur_id
+            // pointe vers elle) — CheckClubRole a déjà vérifié le rôle admin
+            // pour l'organisation active avant que la requête n'arrive ici —
+            // soit un élève sans lien actif du tout, refusé par défaut.
+            $activeId   = request()->attributes->get('organisateur_id');
+            $activeType = request()->attributes->get('organisateur_type');
+
+            return !is_null($student->organisateur_id)
+                && $student->organisateur_type === $activeType
+                && (string) $student->organisateur_id === (string) $activeId;
         }
 
         return $user->clubs()
@@ -103,7 +112,13 @@ class StudentPolicy
         $clubIds = $student->clubs()->wherePivot('is_active', true)->pluck('clubs.id');
 
         if ($clubIds->isEmpty()) {
-            return false;
+            // Athlète indépendant : même règle que update() ci-dessus.
+            $activeId   = request()->attributes->get('organisateur_id');
+            $activeType = request()->attributes->get('organisateur_type');
+
+            return !is_null($student->organisateur_id)
+                && $student->organisateur_type === $activeType
+                && (string) $student->organisateur_id === (string) $activeId;
         }
 
         return $user->clubs()

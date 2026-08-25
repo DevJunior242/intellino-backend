@@ -49,25 +49,43 @@ trait ResolvesVisibleStudents
         $students = $appliquerRecherche($viaClub)->distinct()->get();
 
         if ($activeType !== 'Club' && !$clubId) {
-            $organisateurs = [[$activeType, $activeId]];
-            if ($activeType === 'Federation') {
-                foreach (League::where('federation_id', $activeId)->pluck('id') as $ligueId) {
-                    $organisateurs[] = ['Ligue', $ligueId];
-                }
-            }
-
-            $independants = Student::query()->where(function ($query) use ($organisateurs) {
-                foreach ($organisateurs as [$type, $id]) {
-                    $query->orWhere(function ($q2) use ($type, $id) {
-                        $q2->where('organisateur_type', $type)->where('organisateur_id', $id);
-                    });
-                }
-            });
-
-            $independants = $appliquerRecherche($independants)->get();
+            $independants = $this->independantsVisiblesPar($activeId, $activeType, $q);
             $students = $students->concat($independants);
         }
 
         return $students->unique('id')->sortBy('fullname')->values();
+    }
+
+    /**
+     * Athlètes indépendants (sans club) inscrits directement par cette
+     * Ligue/Fédération (ou l'une des ligues de son ressort pour une
+     * Fédération) — sans les élèves affiliés à un club, contrairement à
+     * studentsVisiblesPar(). Utilisé pour l'écran de gestion dédié à ces
+     * athlètes (saisie manuelle à Ligue/Fédération, donc plus sujette à
+     * erreur qu'une inscription club classique — d'où le besoin d'édition/
+     * suppression à ce niveau).
+     */
+    private function independantsVisiblesPar(string $activeId, string $activeType, ?string $q = null)
+    {
+        $organisateurs = [[$activeType, $activeId]];
+        if ($activeType === 'Federation') {
+            foreach (League::where('federation_id', $activeId)->pluck('id') as $ligueId) {
+                $organisateurs[] = ['Ligue', $ligueId];
+            }
+        }
+
+        $independants = Student::query()->where(function ($query) use ($organisateurs) {
+            foreach ($organisateurs as [$type, $id]) {
+                $query->orWhere(function ($q2) use ($type, $id) {
+                    $q2->where('organisateur_type', $type)->where('organisateur_id', $id);
+                });
+            }
+        });
+
+        if ($q) {
+            $independants->where('students.fullname', 'LIKE', '%' . $q . '%');
+        }
+
+        return $independants->get();
     }
 }

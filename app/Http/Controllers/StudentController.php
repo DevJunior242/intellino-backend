@@ -40,6 +40,11 @@ class StudentController extends Controller
 
         if ($isSuperAdmin) {
             $students = Student::with(['clubs:id,name', 'currentGrade'])->get();
+        } elseif ($request->boolean('independants') && in_array($activeType, ['Ligue', 'Federation'], true)) {
+            // Athlètes sans club uniquement (écran dédié Ligue/Fédération) —
+            // pas les élèves affiliés à un club, qui se gèrent au niveau du club.
+            $students = $this->independantsVisiblesPar($activeId, $activeType)
+                ->load('currentGrade');
         } else {
             $students = $this->studentsVisiblesPar($activeId, $activeType, $request->input('club_id'))
                 ->load('currentGrade');
@@ -514,11 +519,7 @@ class StudentController extends Controller
         $this->authorize('update', $student);
 
         $validated = $request->validated();
-        $activeId = $request->attributes->get('organisateur_id');
-        $studentData = [
-            ...$validated,
-            'club_id' => $activeId,
-        ];
+        $studentData = $validated;
         $file = $request->file('photo');
         if ($file) {
             $ext = $file->getClientOriginalExtension();

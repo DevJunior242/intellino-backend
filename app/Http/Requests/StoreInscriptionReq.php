@@ -56,8 +56,23 @@ class StoreInscriptionReq extends FormRequest
     public function withValidator($validator): void
     {
         $validator->after(function ($validator) {
-            $competition = \App\Models\Competition::with('category')->find($this->input('competition_id'));
+            $competition = \App\Models\Competition::with(['category', 'subDiscipline'])->find($this->input('competition_id'));
             $category = $competition?->category;
+
+            // Kata WKF Art. 5.1 : un athlète doit présenter un kata précis du
+            // catalogue officiel — laisser kata_id vide produit un passage
+            // sans nom de kata affiché aux juges/écran public.
+            $estKata = strtolower($competition?->subDiscipline?->nom ?? '') === 'kata';
+            if ($estKata) {
+                foreach ($this->input('inscriptions', []) as $index => $inscription) {
+                    if (empty($inscription['kata_id'] ?? null)) {
+                        $validator->errors()->add(
+                            "inscriptions.{$index}.kata_id",
+                            "Le kata est obligatoire pour une épreuve Kata."
+                        );
+                    }
+                }
+            }
 
             if (!$category || (is_null($category->poids_min) && is_null($category->poids_max))) {
                 return;
